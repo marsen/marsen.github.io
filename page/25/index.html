@@ -103,6 +103,168 @@ j=d.createElement(s),dl=l!='dataLayer'?'&l='+l:'';j.async=true;j.src=
       <div class="outer">
         <section id="main">
   
+    <article id="post-2016/aspdotnet_threadpool_and_redis" class="article article-type-post" itemscope itemprop="blogPost">
+  <div class="article-meta">
+    <a href="/2016/11/21/2016/aspdotnet_threadpool_and_redis/" class="article-date">
+  <time datetime="2016-11-21T08:49:17.000Z" itemprop="datePublished">2016-11-21</time>
+</a>
+    
+  </div>
+  <div class="article-inner">
+    
+    
+      <header class="article-header">
+        
+  
+    <h1 itemprop="name">
+      <a class="article-title" href="/2016/11/21/2016/aspdotnet_threadpool_and_redis/">ASP.NET Thread Pool 與 Redis Timeout Exception</a>
+    </h1>
+  
+
+      </header>
+    
+    <div class="article-entry" itemprop="articleBody">
+      
+        <h2 id="概述"><a href="#概述" class="headerlink" title="概述"></a>概述</h2><p>ASP.NET Thread Pool 的機制如何影響 Redis</p>
+<h2 id="案例"><a href="#案例" class="headerlink" title="案例"></a>案例</h2><p>線上維護的系統偶爾會發生 Redis Timeout Exception ,<br>並在 elmah 發現以下的錯誤記錄</p>
+<figure class="highlight csharp"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br></pre></td><td class="code"><pre><span class="line">Timeout performing SETEX Cache:Prod:WebAPI:Key:<span class="number">20161121152607</span>, inst: <span class="number">18</span>, mgr: ExecuteSelect, err: never,</span><br><span class="line">queue: <span class="number">0</span>, qu: <span class="number">0</span>, qs: <span class="number">0</span>, qc: <span class="number">0</span>, wr: <span class="number">0</span>, wq: <span class="number">0</span>, <span class="keyword">in</span>: <span class="number">0</span>, ar: <span class="number">1</span>,</span><br><span class="line">IOCP: (Busy=<span class="number">0</span>,Free=<span class="number">1000</span>,Min=<span class="number">8</span>,Max=<span class="number">1000</span>), WORKER: (Busy=<span class="number">13</span>,Free=<span class="number">32754</span>,Min=<span class="number">8</span>,Max=<span class="number">32767</span>), clientName: TYO-MWEB</span><br></pre></td></tr></table></figure>
+
+<h2 id="解析"><a href="#解析" class="headerlink" title="解析"></a>解析</h2><p>這時當 StackExchange.Redis 在進行同步作業的時候,<br>如果超過 <code>syncTimeout</code> 的設定值(預設是 1000ms),<br>Redis 會佔用.NET 的 worker Thread<br>而在 .NET 底層隱含著一個機制,<br>會導致錯誤。</p>
+<h3 id="Thread-Pool-500ms-的機制"><a href="#Thread-Pool-500ms-的機制" class="headerlink" title="Thread Pool 500ms 的機制"></a>Thread Pool 500ms 的機制</h3><h4 id="一種簡化的說法「-ASP-NET-Thread-Pool-一秒能建立-2-個-Thread。」"><a href="#一種簡化的說法「-ASP-NET-Thread-Pool-一秒能建立-2-個-Thread。」" class="headerlink" title="一種簡化的說法「 ASP.NET Thread Pool 一秒能建立 2 個 Thread。」"></a>一種簡化的說法「 ASP.NET Thread Pool 一秒能建立 2 個 Thread。」</h4><p>設定值 <code>minworkerthread</code> 就像是遊樂場<em>已經開啟</em>的閘門,<br>每當有一個遊客(Task)進來時,立即提供給它使用。<br>但是當遊客(Task)變多的時候,就會開始排隊(Queue),<br>ASP.NET Thread Pool 隱含著一個機制,<br>當它的隊伍(Queue)長達 500 豪秒沒有移動的話,<br>就會開啟新的閘門(建立新的 Thread)。<br>而我的情境屬於<a href="#burst_of_traffic">Burst of traffic</a>,<br>突然大量 Task 湧入 Queue ,<br>ThreadPool 需要大量的 Thread<br>每個新的 Thread 都需要 500ms 的反應時間 ,<br>而累積的時間超過 Task 的 Timeout 設定值時 ,<br>就會拋出 Exception.</p>
+<p><img src="/images/workerthread_and_iothread/110416_103521_AM.jpg" alt="ASP.NET Thread Pool"></p>
+<p>ASP.NET Thread Pool 的排隊機制與<code>minworkerthread</code> 設定值相關。<br>可以透過調整 <code>machine.config</code> 來修正。<br>參考(<a target="_blank" rel="noopener" href="https://support.microsoft.com/zh-tw/kb/821268">爭用、 效能不佳、 和死結 （deadlock） 當您從 ASP.NET 應用程式呼叫 Web 服務</a>)。</p>
+<p><code>minworkerthread</code> 的預設值是 1 。<br>但是會與執行環境的 CPU 個數有關,<br>假設你是四核的主機,那就要乘上 4。</p>
+<figure class="highlight xml"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br></pre></td><td class="code"><pre><span class="line"><span class="tag">&lt;<span class="name">system.web</span>&gt;</span></span><br><span class="line">    <span class="tag">&lt;<span class="name">processModel</span> <span class="attr">autoConfig</span>=<span class="string">&quot;false&quot;</span> <span class="attr">minWorkerThreads</span>=<span class="string">&quot;1&quot;</span> /&gt;</span></span><br><span class="line"><span class="tag">&lt;/<span class="name">system.web</span>&gt;</span></span><br></pre></td></tr></table></figure>
+
+<h3 id="範例"><a href="#範例" class="headerlink" title="範例"></a>範例</h3><p>當 Redis 發生 Timeout 時,<br>可以透過錯誤訊息判斷其背後的原因是否與 workerthread 有關。<br>在以下的例子可以看到 IOCP 與 WORKER 兩個值。<br>這兩值表示 .Net ThreadPool 內的兩種執行緒,<br>如果 Busy 值很高, 就有可能是 ThreadPool 來不及建立造成的錯誤。</p>
+<figure class="highlight csharp"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br></pre></td><td class="code"><pre><span class="line">System.TimeoutException: Timeout performing MGET <span class="number">2728</span>cc84<span class="number">-58</span>ae<span class="number">-406b</span><span class="number">-8</span>ec8<span class="number">-3f</span>962419f641,</span><br><span class="line">inst: <span class="number">1</span>,mgr: Inactive, queue: <span class="number">73</span>, qu=<span class="number">6</span>, qs=<span class="number">67</span>, qc=<span class="number">0</span>, wr=<span class="number">1</span>/<span class="number">1</span>, <span class="keyword">in</span>=<span class="number">0</span>/<span class="number">0</span></span><br><span class="line">IOCP: (Busy=<span class="number">0</span>, Free=<span class="number">999</span>, Min=<span class="number">2</span>,Max=<span class="number">1000</span>), WORKER (Busy=<span class="number">7</span>,Free=<span class="number">8184</span>,Min=<span class="number">2</span>,Max=<span class="number">8191</span>)</span><br></pre></td></tr></table></figure>
+
+<h3 id="Error-Code-說明"><a href="#Error-Code-說明" class="headerlink" title="Error Code 說明"></a>Error Code 說明</h3><table>
+<thead>
+<tr>
+<th>Error code</th>
+<th>Details</th>
+<th>範例</th>
+<th>說明</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>inst</td>
+<td>in the last time slice: 0 commands have been issued</td>
+<td>在最後時脈：已發出 0 個命令</td>
+<td>最後的時脈發出的命令個數</td>
+</tr>
+<tr>
+<td>mgr</td>
+<td>the socket manager is performing “socket.select”, <br /> which means it is asking the OS to indicate a socket <br /> that has something to do; <br /> basically: the reader is not actively reading from <br /> the network because it doesn’t think there <br /> is anything to do</td>
+<td></td>
+<td>最後的操作命令</td>
+</tr>
+<tr>
+<td>queue</td>
+<td>there are 73 total in-progress operations</td>
+<td>73 個正在排隊中的操作</td>
+<td>正在排隊中的操作</td>
+</tr>
+<tr>
+<td>qu</td>
+<td>6 of those are in unsent queue: they have not yet been written to the outbound network</td>
+<td>6 個未發送的 queue</td>
+<td>未發送的 queue</td>
+</tr>
+<tr>
+<td>qs</td>
+<td>67 of those have been sent to the server but a response is not yet available. The response could be: Not yet sent by the server sent by the server but not yet processed by the client.</td>
+<td>67 個已發送的 queue</td>
+<td>已發送的 queue</td>
+</tr>
+<tr>
+<td>qc</td>
+<td>0 of those have seen replies but have not yet been marked as complete due to waiting on the completion loop</td>
+<td>0 個已發送未標記完成的 queue</td>
+<td>已發送未標記完成的 queue</td>
+</tr>
+<tr>
+<td>wr</td>
+<td>there is an active writer (meaning - those 6 unsent are not being ignored) bytes&#x2F;activewriters</td>
+<td>有 1 個啟用的 writer,(意味著 qu 的工作並沒有被忽略) bytes&#x2F;activewriters</td>
+<td>bytes&#x2F;activewriters</td>
+</tr>
+<tr>
+<td>in</td>
+<td>there are no active readers and zero bytes are available to be read on the NIC bytes&#x2F;activereaders</td>
+<td>0 個 reader</td>
+<td>bytes&#x2F;activereaders</td>
+</tr>
+</tbody></table>
+<h2 id="參考"><a href="#參考" class="headerlink" title="參考"></a>參考</h2><ul>
+<li><a target="_blank" rel="noopener" href="https://msdn.microsoft.com/en-us/library/orm-9780596527570-03-19.aspx">Threading</a></li>
+<li><a target="_blank" rel="noopener" href="https://msdn.microsoft.com/en-us/library/ms998549.aspx">Improving ASP.NET Performance</a></li>
+<li><a target="_blank" rel="noopener" href="https://msdn.microsoft.com/en-us/library/ms973903.aspx">Programming the Thread Pool in the .NET Framework</a></li>
+<li><a target="_blank" rel="noopener" href="https://gist.github.com/JonCole/db0e90bedeb3fc4823c2">DiagnoseRedisErrors-ClientSide</a></li>
+<li><a target="_blank" rel="noopener" href="https://gist.github.com/JonCole/e65411214030f0d823cb">ThreadPool</a></li>
+</ul>
+<hr>
+<h2 id="其它的-Redis-Error-情境"><a href="#其它的-Redis-Error-情境" class="headerlink" title="其它的 Redis Error 情境"></a>其它的 Redis Error 情境</h2><p>只作摘要式的翻譯。</p>
+<h3 id="Memory-pressure-記憶體壓力"><a href="#Memory-pressure-記憶體壓力" class="headerlink" title="Memory pressure (記憶體壓力)"></a>Memory pressure (記憶體壓力)</h3><p><code>Problem:</code><br>記憶體不足而開始讀取虛擬記憶體(磁碟)而導致特能低落。<br>Memory pressure on the client machine leads to all kinds of performance problems that can<br>delay processing of data that was sent by the Redis instance without any delay.<br>When memory pressure hits, the system typically has to page data from physical memory to<br>virtual memory which is on disk. This page faulting causes the system to slow down significantly.</p>
+<p><code>Measurement:</code><br>Monitory memory usage on machine to make sure that it does not exceed available memory.<br>Monitor the Page Faults&#x2F;Sec perf counter. Most systems will have some page faults even during<br>normal operation, so watch for spikes in this page faults perf counter which correspond with timeouts.</p>
+<p><code>Resolution:</code></p>
+<p>增加記憶體或是減少記憶體使用量<br>Upgrade to a larger client VM size with more memory or dig into your memory usage patterns<br>to reduce memory consuption.</p>
+<h3 id="Burst-of-traffic"><a href="#Burst-of-traffic" class="headerlink" title="Burst of traffic"></a>Burst of traffic</h3><p><code>Problem:</code></p>
+<p>ThreadPool 突然大量的工作湧入 queue 導致執行緒來不及建立。<br>Bursts of traffic combined with poor ThreadPool settings can result in delays in processing<br> data already sent by the Redis Server but not yet consumed on the client side.</p>
+<p><code>測量:</code></p>
+<p>可以用<a target="_blank" rel="noopener" href="https://github.com/JonCole/SampleCode/blob/master/ThreadPoolMonitor/ThreadPoolLogger.cs">程式</a>監控 ThreadPool .<br>或是單純透過 TimeoutException 的訊息,觀察 IOCP 與 WORKER 的 Busy 值來判斷.</p>
+<p><code>Measurement:</code></p>
+<p>Monitor how your ThreadPool statistics change over time using code like <a target="_blank" rel="noopener" href="https://github.com/JonCole/SampleCode/blob/master/ThreadPoolMonitor/ThreadPoolLogger.cs">this</a>.<br>You can also look at the TimeoutException message from StackExchange.Redis.<br>Here is an example :</p>
+<figure class="highlight csharp"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br></pre></td><td class="code"><pre><span class="line">System.TimeoutException: Timeout performing EVAL, inst: <span class="number">8</span>, mgr: Inactive, queue: <span class="number">0</span>, qu: <span class="number">0</span>, qs: <span class="number">0</span>, qc: <span class="number">0</span>, wr: <span class="number">0</span>, wq: <span class="number">0</span>, <span class="keyword">in</span>: <span class="number">64221</span>, ar: <span class="number">0</span>,</span><br><span class="line">IOCP: (Busy=<span class="number">6</span>,Free=<span class="number">999</span>,Min=<span class="number">2</span>,Max=<span class="number">1000</span>), WORKER: (Busy=<span class="number">7</span>,Free=<span class="number">8184</span>,Min=<span class="number">2</span>,Max=<span class="number">8191</span>)</span><br></pre></td></tr></table></figure>
+
+<p>In the above message, there are several issues that are interesting:<br>Notice that in the “IOCP” section and the “WORKER” section you have a “Busy” value that is<br>greater than the “Min” value. This means that your threadpool settings need adjusting.<br>You can also see “in: 64221”. This indicates that 64211 bytes have been received at the kernel<br>socket layer but haven’t yet been read by the application (e.g. StackExchange.Redis).<br>This typically means that your application isn’t reading data from the network as quickly as<br>the server is sending it to you.</p>
+<p><code>Resolution:</code></p>
+<p>調整 ThreadPool 設定<br>Configure your ThreadPool Settings to make sure that your threadpool will scale up quickly under burst scenarios.</p>
+<hr>
+<h3 id="High-CPU-usage-CPU-過載"><a href="#High-CPU-usage-CPU-過載" class="headerlink" title="High CPU usage (CPU 過載)"></a>High CPU usage (CPU 過載)</h3><p><code>Problem:</code></p>
+<p>High CPU usage on the client is an indication that the system cannot keep up with the work that it has been asked to perform. High CPU is a problem because the CPU is busy and it can’t keep up with the work the application is asking it to do. The response from Redis can come very quickly, but because the CPU isn’t keeping up with the workload, the response sits in the socket’s kernel buffer waiting to be processed. If the delay is long enough, a timeout occurs in spite of the requested data having already arrived from the server.</p>
+<p><code>Measurement:</code></p>
+<p>Monitor the System Wide CPU usage through the azure portal or through the associated perf counter.<br>Be careful not to monitor process CPU because a single process can have low CPU usage at the same time that overall system CPU can be high.<br>Watch for spikes in CPU usage that correspond with timeouts. As a result of high CPU,<br>you may also see high “in: XXX” values in TimeoutException error messages as described above in the “Burst of traffic” section.<br>Note that in newer builds of StackExchange.Redis, the client-side CPU will be printed out in the timeout error message as long as the environment doesn’t block access to the CPU perf counter.</p>
+<p><code>Note:</code></p>
+<p>StackExchange.Redis version 1.1.603 or later now prints out “local-cpu” usage when a timeout occurs to help understand when client-side CPU usage may be affecting performance.</p>
+<p><code>Resolution:</code></p>
+<p>增加 CPU 或是找出 CPU 產生過載的原因<br>Upgrade to a larger VM size with more CPU capacity or investigate what is causing CPU spikes.</p>
+<hr>
+<h3 id="Client-Side-Bandwidth-Exceeded-頻寬不足"><a href="#Client-Side-Bandwidth-Exceeded-頻寬不足" class="headerlink" title="Client Side Bandwidth Exceeded (頻寬不足)"></a>Client Side Bandwidth Exceeded (頻寬不足)</h3><p><code>Problem:</code></p>
+<p>Different sized client machines have limitations on how much network bandwidth they have available.<br>If the client exceeds the available bandwidth, then data will not be processed on the client side as quickly as the server is sending it. This can lead to timeouts.</p>
+<p><code>Measurement:</code></p>
+<p>Monitor how your Bandwidth usage change over time using code like this. Note that this code may not run successfully in some environments with restricted permissions (like Azure WebSites).</p>
+<p><code>Resolution:</code></p>
+<p>加大頻寬或減少使用量<br>Increase Client VM size or reduce network bandwidth consumption.</p>
+<h3 id="Large-Request-Response-Size-過大的請求-回應量"><a href="#Large-Request-Response-Size-過大的請求-回應量" class="headerlink" title="Large Request&#x2F;Response Size (過大的請求&#x2F;回應量)"></a>Large Request&#x2F;Response Size (過大的請求&#x2F;回應量)</h3><p><code>Problem:</code></p>
+<p>如圖所示,A 與 B 兩個 Request 都太過龐大,當同時發動請求時,<br>A 回應的時間過長, 導致 B 的 Timeout<br>A large request&#x2F;response can cause timeouts. As an example, suppose your timeout value configured is 1 second.<br>Your application requests two keys (e.g. ‘A’ and ‘B’) at the same time using the same physical network connection.<br>Most clients support “Pipelining” of requests, such that both requests ‘A’ and ‘B’ are sent on the wire to the server one after the other without waiting for the responses.<br>The server will send the responses back in the same order. If response ‘A’ is large enough it can eat up most of the timeout for subsequent requests.</p>
+<p>Below, I will try to demonstrate this. In this scenario, Request ‘A’ and ‘B’ are sent quickly,<br>the server starts sending responses ‘A’ and ‘B’ quickly, but because of data transfer times,<br>‘B’ get stuck behind the other request and times out even though the server responded quickly.</p>
+<figure class="highlight text"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br></pre></td><td class="code"><pre><span class="line">|-------- 1 Second Timeout (A)----------|</span><br><span class="line">|-Request A-|</span><br><span class="line">     |-------- 1 Second Timeout (B) ----------|</span><br><span class="line">     |-Request B-|</span><br><span class="line">            |- Read Response A --------|</span><br><span class="line">                                       |- Read Response B-| (**TIMEOUT**)</span><br></pre></td></tr></table></figure>
+
+<p><code>Measurement:</code></p>
+<p>This is a difficult one to measure. You basically have to instrument your client code to track large requests and responses.</p>
+<p><code>Resolution:</code></p>
+<p>將所需要的資料分割成數個小片段 再分別取回<br>Redis is optimized for a large number of small values， rather than a few large values.<br>The preferred solution is to break up your data into related smaller values. See here for details around why smaller values are recommended.<br>Increase the size of your VM (for client and Redis Cache Server)， to get higher bandwidth capabilities，<br>reducing data transfer times for larger responses.<br>Note that getting more bandwidth on just the server or just on the client may not be enough.<br>Measure your bandwidth usage and compare it to the capabilities of the size of VM you currently have.<br>Increase the number of ConnectionMultiplexer objects you use and round-robin requests over different connections (e.g. use a connection pool).<br>If you go this route，make sure that you don’t create a brand new ConnectionMultiplexer for each request as the overhead of creating the new connection will kill your performance.</p>
+<p>(fin)</p>
+
+      
+    </div>
+    <footer class="article-footer">
+      <a data-url="https://blog.marsen.me/2016/11/21/2016/aspdotnet_threadpool_and_redis/" data-id="clqy39w9x000o3so32ij650bw" class="article-share-link">Share</a>
+      
+        <a href="https://blog.marsen.me/2016/11/21/2016/aspdotnet_threadpool_and_redis/#disqus_thread" class="article-comment-link">留言</a>
+      
+      
+  <ul class="article-tag-list" itemprop="keywords"><li class="article-tag-list-item"><a class="article-tag-list-link" href="/tags/Net-Framework/" rel="tag">.Net Framework</a></li><li class="article-tag-list-item"><a class="article-tag-list-link" href="/tags/IO/" rel="tag">IO</a></li><li class="article-tag-list-item"><a class="article-tag-list-link" href="/tags/Redis/" rel="tag">Redis</a></li><li class="article-tag-list-item"><a class="article-tag-list-link" href="/tags/Thread/" rel="tag">Thread</a></li></ul>
+
+    </footer>
+  </div>
+  
+</article>
+
+
+  
     <article id="post-2016/about_content_type" class="article article-type-post" itemscope itemprop="blogPost">
   <div class="article-meta">
     <a href="/2016/10/28/2016/about_content_type/" class="article-date">
@@ -155,7 +317,7 @@ j=d.createElement(s),dl=l!='dataLayer'?'&l='+l:'';j.async=true;j.src=
       
     </div>
     <footer class="article-footer">
-      <a data-url="https://blog.marsen.me/2016/10/28/2016/about_content_type/" data-id="clqxmo8a7000j3tp92gag0fqw" class="article-share-link">Share</a>
+      <a data-url="https://blog.marsen.me/2016/10/28/2016/about_content_type/" data-id="clqy39w9v000k3so35h823yjk" class="article-share-link">Share</a>
       
         <a href="https://blog.marsen.me/2016/10/28/2016/about_content_type/#disqus_thread" class="article-comment-link">留言</a>
       
@@ -238,7 +400,7 @@ j=d.createElement(s),dl=l!='dataLayer'?'&l='+l:'';j.async=true;j.src=
       
     </div>
     <footer class="article-footer">
-      <a data-url="https://blog.marsen.me/2016/10/21/2016/1st_time_with_powershell/" data-id="clqxmo8a7000i3tp98rjbbjp9" class="article-share-link">Share</a>
+      <a data-url="https://blog.marsen.me/2016/10/21/2016/1st_time_with_powershell/" data-id="clqy39w9t000h3so302tq6tl0" class="article-share-link">Share</a>
       
         <a href="https://blog.marsen.me/2016/10/21/2016/1st_time_with_powershell/#disqus_thread" class="article-comment-link">留言</a>
       
@@ -304,7 +466,7 @@ j=d.createElement(s),dl=l!='dataLayer'?'&l='+l:'';j.async=true;j.src=
       
     </div>
     <footer class="article-footer">
-      <a data-url="https://blog.marsen.me/2016/10/14/2016/todolist_by_typescript_2/" data-id="clqxmo8b000293tp9hqjh49zo" class="article-share-link">Share</a>
+      <a data-url="https://blog.marsen.me/2016/10/14/2016/todolist_by_typescript_2/" data-id="clqy39waj001y3so32nuo0f91" class="article-share-link">Share</a>
       
         <a href="https://blog.marsen.me/2016/10/14/2016/todolist_by_typescript_2/#disqus_thread" class="article-comment-link">留言</a>
       
@@ -399,7 +561,7 @@ j=d.createElement(s),dl=l!='dataLayer'?'&l='+l:'';j.async=true;j.src=
       
     </div>
     <footer class="article-footer">
-      <a data-url="https://blog.marsen.me/2016/10/08/2016/todolist_by_typescript_1/" data-id="clqxmo8az00263tp9fpymg65a" class="article-share-link">Share</a>
+      <a data-url="https://blog.marsen.me/2016/10/08/2016/todolist_by_typescript_1/" data-id="clqy39wai001t3so387i7aa5h" class="article-share-link">Share</a>
       
         <a href="https://blog.marsen.me/2016/10/08/2016/todolist_by_typescript_1/#disqus_thread" class="article-comment-link">留言</a>
       
@@ -493,7 +655,7 @@ j=d.createElement(s),dl=l!='dataLayer'?'&l='+l:'';j.async=true;j.src=
       
     </div>
     <footer class="article-footer">
-      <a data-url="https://blog.marsen.me/2016/09/03/2016/http2_by_cloudflare/" data-id="clqxmo8ax00203tp92evlc08q" class="article-share-link">Share</a>
+      <a data-url="https://blog.marsen.me/2016/09/03/2016/http2_by_cloudflare/" data-id="clqy39wag001o3so377zfaugh" class="article-share-link">Share</a>
       
         <a href="https://blog.marsen.me/2016/09/03/2016/http2_by_cloudflare/#disqus_thread" class="article-comment-link">留言</a>
       
@@ -561,7 +723,7 @@ j=d.createElement(s),dl=l!='dataLayer'?'&l='+l:'';j.async=true;j.src=
       
     </div>
     <footer class="article-footer">
-      <a data-url="https://blog.marsen.me/2016/08/29/2016/file_rowdata_import_mssql/" data-id="clqxmo8ac000s3tp9bcfpe9bp" class="article-share-link">Share</a>
+      <a data-url="https://blog.marsen.me/2016/08/29/2016/file_rowdata_import_mssql/" data-id="clqy39wac001g3so36a9e7p99" class="article-share-link">Share</a>
       
         <a href="https://blog.marsen.me/2016/08/29/2016/file_rowdata_import_mssql/#disqus_thread" class="article-comment-link">留言</a>
       
@@ -661,7 +823,7 @@ j=d.createElement(s),dl=l!='dataLayer'?'&l='+l:'';j.async=true;j.src=
       
     </div>
     <footer class="article-footer">
-      <a data-url="https://blog.marsen.me/2016/08/27/2016/how_to_use_github_page/" data-id="clqxmo8aw001z3tp9d0dhfc6z" class="article-share-link">Share</a>
+      <a data-url="https://blog.marsen.me/2016/08/27/2016/how_to_use_github_page/" data-id="clqy39waf001m3so3bzk4fj54" class="article-share-link">Share</a>
       
         <a href="https://blog.marsen.me/2016/08/27/2016/how_to_use_github_page/#disqus_thread" class="article-comment-link">留言</a>
       
@@ -713,7 +875,7 @@ j=d.createElement(s),dl=l!='dataLayer'?'&l='+l:'';j.async=true;j.src=
       
     </div>
     <footer class="article-footer">
-      <a data-url="https://blog.marsen.me/2016/08/25/2016/add_google_analytics_to_hexo_blog_1/" data-id="clqxmo8a9000l3tp906jc9zsw" class="article-share-link">Share</a>
+      <a data-url="https://blog.marsen.me/2016/08/25/2016/add_google_analytics_to_hexo_blog_1/" data-id="clqy39w9w000l3so37l1t9x2x" class="article-share-link">Share</a>
       
         <a href="https://blog.marsen.me/2016/08/25/2016/add_google_analytics_to_hexo_blog_1/#disqus_thread" class="article-comment-link">留言</a>
       
@@ -804,57 +966,13 @@ j=d.createElement(s),dl=l!='dataLayer'?'&l='+l:'';j.async=true;j.src=
       
     </div>
     <footer class="article-footer">
-      <a data-url="https://blog.marsen.me/2016/08/21/2016/setting_DNS_with_google/" data-id="clqxmo8ay00213tp9cfo980uv" class="article-share-link">Share</a>
+      <a data-url="https://blog.marsen.me/2016/08/21/2016/setting_DNS_with_google/" data-id="clqy39wah001q3so3cejl2q20" class="article-share-link">Share</a>
       
         <a href="https://blog.marsen.me/2016/08/21/2016/setting_DNS_with_google/#disqus_thread" class="article-comment-link">留言</a>
       
       
   <ul class="article-tag-list" itemprop="keywords"><li class="article-tag-list-item"><a class="article-tag-list-link" href="/tags/%E5%AF%A6%E4%BD%9C%E7%AD%86%E8%A8%98/" rel="tag">實作筆記</a></li></ul>
 
-    </footer>
-  </div>
-  
-</article>
-
-
-  
-    <article id="post-2016/sites_todo_list" class="article article-type-post" itemscope itemprop="blogPost">
-  <div class="article-meta">
-    <a href="/2016/08/19/2016/sites_todo_list/" class="article-date">
-  <time datetime="2016-08-19T18:09:07.000Z" itemprop="datePublished">2016-08-20</time>
-</a>
-    
-  </div>
-  <div class="article-inner">
-    
-    
-      <header class="article-header">
-        
-  
-    <h1 itemprop="name">
-      <a class="article-title" href="/2016/08/19/2016/sites_todo_list/">這個網站的待辦事項</a>
-    </h1>
-  
-
-      </header>
-    
-    <div class="article-entry" itemprop="articleBody">
-      
-        <ol>
-<li><del>github page &amp; hexo</del></li>
-<li><del>nodejs express &amp; Openshift</del></li>
-<li>DNS 原理簡介</li>
-<li>gulp學習筆記</li>
-</ol>
-
-      
-    </div>
-    <footer class="article-footer">
-      <a data-url="https://blog.marsen.me/2016/08/19/2016/sites_todo_list/" data-id="clqxmo8az00243tp95hgt2ax8" class="article-share-link">Share</a>
-      
-        <a href="https://blog.marsen.me/2016/08/19/2016/sites_todo_list/#disqus_thread" class="article-comment-link">留言</a>
-      
-      
     </footer>
   </div>
   
@@ -882,6 +1000,10 @@ j=d.createElement(s),dl=l!='dataLayer'?'&l='+l:'';j.async=true;j.src=
           </li>
         
           <li>
+            <a href="/2024/01/02/2024/2024_plan/"> [生活筆記] 2023 的回顧與展望</a>
+          </li>
+        
+          <li>
             <a href="/2023/12/15/2023/ac_defects_in_instructional_material/"> [生活筆記] 修正 A 校的題目缺陷</a>
           </li>
         
@@ -893,10 +1015,6 @@ j=d.createElement(s),dl=l!='dataLayer'?'&l='+l:'';j.async=true;j.src=
             <a href="/2023/11/19/2023/hexo_7_update_logs/"> [實作筆記] Hexo 7 升級的錯誤處理心得</a>
           </li>
         
-          <li>
-            <a href="/2023/11/16/2023/gitlab_ci_error_handle/"> [實作筆記] Gitlab CI/CD 與 GCP - 錯誤處理</a>
-          </li>
-        
       </ul>
     </div>
   </div>
@@ -906,7 +1024,7 @@ j=d.createElement(s),dl=l!='dataLayer'?'&l='+l:'';j.async=true;j.src=
   <div class="widget-wrap">
     <h3 class="widget-title">彙整</h3>
     <div class="widget">
-      <ul class="archive-list"><li class="archive-list-item"><a class="archive-list-link" href="/archives/2024/01/">一月 2024</a><span class="archive-list-count">1</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2023/12/">十二月 2023</a><span class="archive-list-count">2</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2023/11/">十一月 2023</a><span class="archive-list-count">3</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2023/10/">十月 2023</a><span class="archive-list-count">2</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2023/09/">九月 2023</a><span class="archive-list-count">3</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2023/08/">八月 2023</a><span class="archive-list-count">2</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2023/07/">七月 2023</a><span class="archive-list-count">5</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2023/06/">六月 2023</a><span class="archive-list-count">6</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2023/05/">五月 2023</a><span class="archive-list-count">1</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2023/04/">四月 2023</a><span class="archive-list-count">9</span></li><span id='list_archives2' style='display:none'><li class="archive-list-item"><a class="archive-list-link" href="/archives/2023/03/">三月 2023</a><span class="archive-list-count">4</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2023/02/">二月 2023</a><span class="archive-list-count">2</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2023/01/">一月 2023</a><span class="archive-list-count">2</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2022/12/">十二月 2022</a><span class="archive-list-count">1</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2022/10/">十月 2022</a><span class="archive-list-count">2</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2022/09/">九月 2022</a><span class="archive-list-count">6</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2022/08/">八月 2022</a><span class="archive-list-count">3</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2022/07/">七月 2022</a><span class="archive-list-count">2</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2022/06/">六月 2022</a><span class="archive-list-count">3</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2022/05/">五月 2022</a><span class="archive-list-count">7</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2022/04/">四月 2022</a><span class="archive-list-count">3</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2022/03/">三月 2022</a><span class="archive-list-count">3</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2022/02/">二月 2022</a><span class="archive-list-count">2</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2022/01/">一月 2022</a><span class="archive-list-count">3</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2021/12/">十二月 2021</a><span class="archive-list-count">2</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2021/11/">十一月 2021</a><span class="archive-list-count">2</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2021/10/">十月 2021</a><span class="archive-list-count">2</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2021/09/">九月 2021</a><span class="archive-list-count">1</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2021/08/">八月 2021</a><span class="archive-list-count">2</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2021/07/">七月 2021</a><span class="archive-list-count">4</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2021/06/">六月 2021</a><span class="archive-list-count">1</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2021/05/">五月 2021</a><span class="archive-list-count">2</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2021/04/">四月 2021</a><span class="archive-list-count">3</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2021/03/">三月 2021</a><span class="archive-list-count">3</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2021/02/">二月 2021</a><span class="archive-list-count">1</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2021/01/">一月 2021</a><span class="archive-list-count">7</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2020/12/">十二月 2020</a><span class="archive-list-count">1</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2020/11/">十一月 2020</a><span class="archive-list-count">2</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2020/10/">十月 2020</a><span class="archive-list-count">5</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2020/09/">九月 2020</a><span class="archive-list-count">5</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2020/08/">八月 2020</a><span class="archive-list-count">2</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2020/07/">七月 2020</a><span class="archive-list-count">3</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2020/06/">六月 2020</a><span class="archive-list-count">3</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2020/05/">五月 2020</a><span class="archive-list-count">3</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2020/04/">四月 2020</a><span class="archive-list-count">4</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2020/03/">三月 2020</a><span class="archive-list-count">1</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2020/02/">二月 2020</a><span class="archive-list-count">1</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2020/01/">一月 2020</a><span class="archive-list-count">5</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2019/12/">十二月 2019</a><span class="archive-list-count">1</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2019/11/">十一月 2019</a><span class="archive-list-count">2</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2019/10/">十月 2019</a><span class="archive-list-count">1</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2019/09/">九月 2019</a><span class="archive-list-count">2</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2019/08/">八月 2019</a><span class="archive-list-count">5</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2019/07/">七月 2019</a><span class="archive-list-count">1</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2019/06/">六月 2019</a><span class="archive-list-count">1</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2019/05/">五月 2019</a><span class="archive-list-count">2</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2019/04/">四月 2019</a><span class="archive-list-count">3</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2019/03/">三月 2019</a><span class="archive-list-count">1</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2019/02/">二月 2019</a><span class="archive-list-count">2</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2019/01/">一月 2019</a><span class="archive-list-count">4</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2018/12/">十二月 2018</a><span class="archive-list-count">5</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2018/11/">十一月 2018</a><span class="archive-list-count">7</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2018/10/">十月 2018</a><span class="archive-list-count">6</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2018/09/">九月 2018</a><span class="archive-list-count">3</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2018/08/">八月 2018</a><span class="archive-list-count">2</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2018/07/">七月 2018</a><span class="archive-list-count">6</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2018/06/">六月 2018</a><span class="archive-list-count">2</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2018/05/">五月 2018</a><span class="archive-list-count">1</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2018/04/">四月 2018</a><span class="archive-list-count">5</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2018/03/">三月 2018</a><span class="archive-list-count">5</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2018/02/">二月 2018</a><span class="archive-list-count">1</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2018/01/">一月 2018</a><span class="archive-list-count">5</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2017/12/">十二月 2017</a><span class="archive-list-count">3</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2017/10/">十月 2017</a><span class="archive-list-count">3</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2017/09/">九月 2017</a><span class="archive-list-count">2</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2017/08/">八月 2017</a><span class="archive-list-count">1</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2017/07/">七月 2017</a><span class="archive-list-count">2</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2017/05/">五月 2017</a><span class="archive-list-count">1</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2017/04/">四月 2017</a><span class="archive-list-count">2</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2017/03/">三月 2017</a><span class="archive-list-count">1</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2017/02/">二月 2017</a><span class="archive-list-count">1</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2017/01/">一月 2017</a><span class="archive-list-count">6</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2016/12/">十二月 2016</a><span class="archive-list-count">1</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2016/11/">十一月 2016</a><span class="archive-list-count">2</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2016/10/">十月 2016</a><span class="archive-list-count">4</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2016/09/">九月 2016</a><span class="archive-list-count">1</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2016/08/">八月 2016</a><span class="archive-list-count">6</span></li></span><span id=''></span><span onclick="var d=document.getElementById('list_archives2'); d.style.display===''?d.style='display:none':d.style=''">toggle...</span></ul>
+      <ul class="archive-list"><li class="archive-list-item"><a class="archive-list-link" href="/archives/2024/01/">一月 2024</a><span class="archive-list-count">2</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2023/12/">十二月 2023</a><span class="archive-list-count">2</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2023/11/">十一月 2023</a><span class="archive-list-count">3</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2023/10/">十月 2023</a><span class="archive-list-count">2</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2023/09/">九月 2023</a><span class="archive-list-count">3</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2023/08/">八月 2023</a><span class="archive-list-count">2</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2023/07/">七月 2023</a><span class="archive-list-count">5</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2023/06/">六月 2023</a><span class="archive-list-count">6</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2023/05/">五月 2023</a><span class="archive-list-count">1</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2023/04/">四月 2023</a><span class="archive-list-count">9</span></li><span id='list_archives2' style='display:none'><li class="archive-list-item"><a class="archive-list-link" href="/archives/2023/03/">三月 2023</a><span class="archive-list-count">4</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2023/02/">二月 2023</a><span class="archive-list-count">2</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2023/01/">一月 2023</a><span class="archive-list-count">2</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2022/12/">十二月 2022</a><span class="archive-list-count">1</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2022/10/">十月 2022</a><span class="archive-list-count">2</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2022/09/">九月 2022</a><span class="archive-list-count">6</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2022/08/">八月 2022</a><span class="archive-list-count">3</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2022/07/">七月 2022</a><span class="archive-list-count">2</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2022/06/">六月 2022</a><span class="archive-list-count">3</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2022/05/">五月 2022</a><span class="archive-list-count">7</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2022/04/">四月 2022</a><span class="archive-list-count">3</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2022/03/">三月 2022</a><span class="archive-list-count">3</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2022/02/">二月 2022</a><span class="archive-list-count">2</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2022/01/">一月 2022</a><span class="archive-list-count">3</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2021/12/">十二月 2021</a><span class="archive-list-count">2</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2021/11/">十一月 2021</a><span class="archive-list-count">2</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2021/10/">十月 2021</a><span class="archive-list-count">2</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2021/09/">九月 2021</a><span class="archive-list-count">1</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2021/08/">八月 2021</a><span class="archive-list-count">2</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2021/07/">七月 2021</a><span class="archive-list-count">4</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2021/06/">六月 2021</a><span class="archive-list-count">1</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2021/05/">五月 2021</a><span class="archive-list-count">2</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2021/04/">四月 2021</a><span class="archive-list-count">3</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2021/03/">三月 2021</a><span class="archive-list-count">3</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2021/02/">二月 2021</a><span class="archive-list-count">1</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2021/01/">一月 2021</a><span class="archive-list-count">7</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2020/12/">十二月 2020</a><span class="archive-list-count">1</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2020/11/">十一月 2020</a><span class="archive-list-count">2</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2020/10/">十月 2020</a><span class="archive-list-count">5</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2020/09/">九月 2020</a><span class="archive-list-count">5</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2020/08/">八月 2020</a><span class="archive-list-count">2</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2020/07/">七月 2020</a><span class="archive-list-count">3</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2020/06/">六月 2020</a><span class="archive-list-count">3</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2020/05/">五月 2020</a><span class="archive-list-count">3</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2020/04/">四月 2020</a><span class="archive-list-count">4</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2020/03/">三月 2020</a><span class="archive-list-count">1</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2020/02/">二月 2020</a><span class="archive-list-count">1</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2020/01/">一月 2020</a><span class="archive-list-count">5</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2019/12/">十二月 2019</a><span class="archive-list-count">1</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2019/11/">十一月 2019</a><span class="archive-list-count">2</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2019/10/">十月 2019</a><span class="archive-list-count">1</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2019/09/">九月 2019</a><span class="archive-list-count">2</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2019/08/">八月 2019</a><span class="archive-list-count">5</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2019/07/">七月 2019</a><span class="archive-list-count">1</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2019/06/">六月 2019</a><span class="archive-list-count">1</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2019/05/">五月 2019</a><span class="archive-list-count">2</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2019/04/">四月 2019</a><span class="archive-list-count">3</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2019/03/">三月 2019</a><span class="archive-list-count">1</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2019/02/">二月 2019</a><span class="archive-list-count">2</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2019/01/">一月 2019</a><span class="archive-list-count">4</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2018/12/">十二月 2018</a><span class="archive-list-count">5</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2018/11/">十一月 2018</a><span class="archive-list-count">7</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2018/10/">十月 2018</a><span class="archive-list-count">6</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2018/09/">九月 2018</a><span class="archive-list-count">3</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2018/08/">八月 2018</a><span class="archive-list-count">2</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2018/07/">七月 2018</a><span class="archive-list-count">6</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2018/06/">六月 2018</a><span class="archive-list-count">2</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2018/05/">五月 2018</a><span class="archive-list-count">1</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2018/04/">四月 2018</a><span class="archive-list-count">5</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2018/03/">三月 2018</a><span class="archive-list-count">5</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2018/02/">二月 2018</a><span class="archive-list-count">1</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2018/01/">一月 2018</a><span class="archive-list-count">5</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2017/12/">十二月 2017</a><span class="archive-list-count">3</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2017/10/">十月 2017</a><span class="archive-list-count">3</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2017/09/">九月 2017</a><span class="archive-list-count">2</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2017/08/">八月 2017</a><span class="archive-list-count">1</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2017/07/">七月 2017</a><span class="archive-list-count">2</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2017/05/">五月 2017</a><span class="archive-list-count">1</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2017/04/">四月 2017</a><span class="archive-list-count">2</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2017/03/">三月 2017</a><span class="archive-list-count">1</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2017/02/">二月 2017</a><span class="archive-list-count">1</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2017/01/">一月 2017</a><span class="archive-list-count">6</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2016/12/">十二月 2016</a><span class="archive-list-count">1</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2016/11/">十一月 2016</a><span class="archive-list-count">2</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2016/10/">十月 2016</a><span class="archive-list-count">4</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2016/09/">九月 2016</a><span class="archive-list-count">1</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2016/08/">八月 2016</a><span class="archive-list-count">6</span></li></span><span id=''></span><span onclick="var d=document.getElementById('list_archives2'); d.style.display===''?d.style='display:none':d.style=''">toggle...</span></ul>
     </div>
   </div>
 
