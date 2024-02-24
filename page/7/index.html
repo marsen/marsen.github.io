@@ -103,6 +103,112 @@ j=d.createElement(s),dl=l!='dataLayer'?'&l='+l:'';j.async=true;j.src=
       <div class="outer">
         <section id="main">
   
+    <article id="post-2022/golang_12factor_config_with_viper" class="article article-type-post" itemscope itemprop="blogPost">
+  <div class="article-meta">
+    <a href="/2022/07/19/2022/golang_12factor_config_with_viper/" class="article-date">
+  <time datetime="2022-07-19T10:00:08.000Z" itemprop="datePublished">2022-07-19</time>
+</a>
+    
+  </div>
+  <div class="article-inner">
+    
+    
+      <header class="article-header">
+        
+  
+    <h1 itemprop="name">
+      <a class="article-title" href="/2022/07/19/2022/golang_12factor_config_with_viper/"> [實作筆記] 12-Factor Config 使用 Golang (with Viper) I</a>
+    </h1>
+  
+
+      </header>
+    
+    <div class="article-entry" itemprop="articleBody">
+      
+        <h2 id="前情提要"><a href="#前情提要" class="headerlink" title="前情提要"></a>前情提要</h2><p>最近在開發需要以微服務的形式部署在雲端之上的 web service，<br>為此，被要求需符合雲原生的 <a target="_blank" rel="noopener" href="https://www.12factor.net/">12 Factory</a>，<br>在本篇只討論第三點 Config - Store config in the environment,<br>簡單介紹一下這個因子;</p>
+<p>組態應與程式分離<br>簡單的問自已程式是否可以立即開源，而不擔心洩露任何機敏資料??</p>
+<p>先說明一些非微服務的組態設定實踐方式:</p>
+<h3 id="將組態設定以常數寫在程式當中"><a href="#將組態設定以常數寫在程式當中" class="headerlink" title="將組態設定以常數寫在程式當中"></a>將組態設定以常數寫在程式當中</h3><blockquote>
+<p>最糟糕的實踐，你永遠不該在一個產品中這樣作<br>每次改變一個環境，就要修改程式，這會使得你的服務變得脆弱</p>
+</blockquote>
+<h3 id="使用不同環境的組態檔，但是不納入版本控制"><a href="#使用不同環境的組態檔，但是不納入版本控制" class="headerlink" title="使用不同環境的組態檔，但是不納入版本控制"></a>使用不同環境的組態檔，但是不納入版本控制</h3><blockquote>
+<p>這是個常見的實踐，但是有著以下的缺點</p>
+<ol>
+<li>開發人員將組態檔簽入版控(如果是 Git 應該可以透過 .gitignore 避免這些狀況)</li>
+<li>配置文件很有可能分散在不同的位置，依照你所使用的語言或框架很有可能會有不同的格式(xml、yaml、json 等等…)<br>這導致統一管理與維護的困難，特別是在擴展的時候。</li>
+</ol>
+<blockquote>
+<p>以前在開發單體服務的時候，一個組態會達上千個設定值，<br>而在擴展時，開發者永遠無法理解這上千個組態應該填入什麼值<br>這有點超出主題了，但是微服務的架構下，單一服務不應該有上千個組態設定</p>
+</blockquote>
+<p>有時候我們的環境不止有 <code>Prod</code>、<code>QA</code>、<code>Staging</code><br>比如說開發環境、多國&#x2F;語系&#x2F;開發人員、壓測，<br>都可能導致環境組態檔案數量爆增，而難以維護。</p>
+</blockquote>
+<h2 id="問題-12-Factor-與開發環境"><a href="#問題-12-Factor-與開發環境" class="headerlink" title="問題 12-Factor 與開發環境"></a>問題 12-Factor 與開發環境</h2><p>12-Factor 推薦的方式是，使用環境變數來避免上述的問題。<br>但在開發環境上這不是很理想的方式</p>
+<p>對於新進的開發者:<br>需要自行加上環境變數，而不是下載程式後即可使用，會形成一種門檻</p>
+<p>可以提供 script 或 bash 讓開發者執行後寫入環境變數<br>但很可能變成一個灰盒子(一次性執行的 script，只有需要編輯時才去會細看)，<br>而且新增、刪除、修改組態都要修改 script，而產生額外的工作</p>
+<p>開發者很可能同時開發多個不同服務，<br>這樣如果發生變數的命名衝突會難以解決。</p>
+<blockquote>
+<p>生產環境(Prod、QA、Staging)不會有這樣的問題，<br>因為微服務的一個單體(Pod)應該都是單純的<br>加上服務名的前綴或許可以解決開發環境的問題，<br>但是會讓<strong>變數名變得相對冗長</strong></p>
+</blockquote>
+<h2 id="解決方式"><a href="#解決方式" class="headerlink" title="解決方式"></a>解決方式</h2><ol>
+<li>提供<code>development.env</code>作為開發者的組態檔</li>
+<li>程式會優先讀取<strong>環境變數</strong>的值，才會讀取<code>development.env</code>的值</li>
+</ol>
+<p>Golang 的實作如下:<br>我們使用 <code>viper</code> package，viper 本身包含一定的順序規則去讀取組態，如下:</p>
+<ul>
+<li>explicit call to Set 顯示設定</li>
+<li>flag 命令提示字元參數</li>
+<li>env 環境變數</li>
+<li>config 設定檔</li>
+<li>key&#x2F;value store 遠端儲存</li>
+<li>default 默認值</li>
+</ul>
+<p>程式如下，先讀取設定檔或環境變數的順序並沒有差，<br><strong>因為 Viper 已經提供這樣功能實踐(env 環境變數優先於 config 設定檔)</strong></p>
+<figure class="highlight golang"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">var</span> instance *Config</span><br><span class="line"></span><br><span class="line"><span class="function"><span class="keyword">func</span> <span class="title">Load</span><span class="params">()</span></span> &#123;</span><br><span class="line">  <span class="comment">// new viper</span></span><br><span class="line">  vp := viper.New()</span><br><span class="line">  <span class="comment">// just for development environment</span></span><br><span class="line">  vp.SetConfigName(<span class="string">&quot;development.env&quot;</span>)</span><br><span class="line">  vp.SetConfigType(<span class="string">&quot;env&quot;</span>)</span><br><span class="line">  vp.AddConfigPath(<span class="string">&quot;.&quot;</span>)</span><br><span class="line">  vp.ReadInConfig()</span><br><span class="line">  <span class="comment">// follow 12 factors principles https://www.12factor.net/config</span></span><br><span class="line">  vp.AutomaticEnv()</span><br><span class="line">  <span class="comment">// bind to struct</span></span><br><span class="line">  vp.Unmarshal(&amp;instance)</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+<p><code>struct</code> 與 <code>development.env</code> ，純量或是巢狀結構都可以支援，<br>見以下的程式 <code>Config</code> 內部包含另一個 struct <code>NestConfig</code></p>
+<figure class="highlight go"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">type</span> Config <span class="keyword">struct</span> &#123;</span><br><span class="line">  Port <span class="type">string</span>     <span class="string">`env:&quot;PORT&quot;`</span></span><br><span class="line">  Nest NestConfig <span class="string">`env:&quot;NestConfig&quot;`</span></span><br><span class="line">&#125;</span><br><span class="line"></span><br><span class="line"><span class="keyword">type</span> NestConfig <span class="keyword">struct</span> &#123;</span><br><span class="line">  MarsenNo   <span class="type">int</span>  <span class="string">`env:&quot;MarsenNo&quot;`</span></span><br><span class="line">  MarsenFlag <span class="type">bool</span> <span class="string">`env:&quot;MarsenFlag&quot;`</span></span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+<p><code>development.env</code>範例如下</p>
+<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br></pre></td><td class="code"><pre><span class="line">Port=9009</span><br><span class="line">Nest.MarsenNo=1231456</span><br><span class="line">Nest.MarsenFlag=1</span><br></pre></td></tr></table></figure>
+
+<p>Config 的使用：<br>這裡用了 singleton 的方法實作，有查看了一些<a target="_blank" rel="noopener" href="https://blog.kennycoder.io/2021/08/22/Golang-Singleton-%E5%AF%A6%E7%8F%BE%E6%96%B9%E5%BC%8F%E6%8E%A2%E8%A8%8E/">文章</a>可能會有問題，未來可能會再調整</p>
+<figure class="highlight go"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">var</span> instance *Config</span><br><span class="line"></span><br><span class="line"><span class="function"><span class="keyword">func</span> <span class="title">Of</span><span class="params">()</span></span> *Config &#123;</span><br><span class="line">  <span class="keyword">if</span> instance == <span class="literal">nil</span> &#123;</span><br><span class="line">    Load()</span><br><span class="line">  &#125;</span><br><span class="line">  <span class="keyword">return</span> instance</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+<p><strong><a target="_blank" rel="noopener" href="https://gist.github.com/marsen/592d7aa1da912beffaad1e1f0c47b086#file-config-go">完整代碼可以見此</a></strong></p>
+<h3 id="未解之問題"><a href="#未解之問題" class="headerlink" title="未解之問題"></a>未解之問題</h3><p>提供給開發者使用的組態，仍有機敏資料進版的疑慮?<br>考慮使用 <a target="_blank" rel="noopener" href="https://www.consul.io/">Consul</a> ???<br>或是改成 docker image 並在其中寫入環境變數 ???</p>
+<h2 id="參考"><a href="#參考" class="headerlink" title="參考"></a>參考</h2><ul>
+<li><a target="_blank" rel="noopener" href="https://www.12factor.net/config">III. Config - Store config in the environment</a></li>
+<li><a target="_blank" rel="noopener" href="https://github.com/spf13/viper#why-viper">Viper</a><ul>
+<li><a target="_blank" rel="noopener" href="https://github.com/utain/go-12factor-example">GO 12factor Example (Web Service)</a></li>
+<li><a target="_blank" rel="noopener" href="https://github.com/devilsray/golang-viper-config-example">Golang Viper Config Example</a></li>
+<li><a target="_blank" rel="noopener" href="https://blog.wu-boy.com/2017/10/go-configuration-with-viper/">在 Go 語言使用 Viper 管理設定檔</a></li>
+<li><a target="_blank" rel="noopener" href="https://blog.logrocket.com/handling-go-configuration-viper/">Handling Go configuration with Viper</a></li>
+<li><a target="_blank" rel="noopener" href="https://dev.to/techschoolguru/load-config-from-file-environment-variables-in-golang-with-viper-2j2d">Load config from file &amp; environment variables in Golang with Viper</a></li>
+<li><a target="_blank" rel="noopener" href="https://www.youtube.com/watch?v=r9Qvr40H4eE">Go Application Configuration with Viper | Config with JSON</a></li>
+<li><a target="_blank" rel="noopener" href="https://www.readfog.com/a/1632554002629627904">Golang 的配置信息處理框架 Viper</a></li>
+</ul>
+</li>
+<li><a target="_blank" rel="noopener" href="https://blog.kennycoder.io/2021/08/22/Golang-Singleton-%E5%AF%A6%E7%8F%BE%E6%96%B9%E5%BC%8F%E6%8E%A2%E8%A8%8E/">Golang - Singleton 實現方式探討</a></li>
+</ul>
+<p>(fin)</p>
+
+      
+    </div>
+    <footer class="article-footer">
+      <a data-url="https://blog.marsen.me/2022/07/19/2022/golang_12factor_config_with_viper/" data-id="clt023p8x00ao3gnt4b6q77s0" class="article-share-link">Share</a>
+      
+        <a href="https://blog.marsen.me/2022/07/19/2022/golang_12factor_config_with_viper/#disqus_thread" class="article-comment-link">留言</a>
+      
+      
+  <ul class="article-tag-list" itemprop="keywords"><li class="article-tag-list-item"><a class="article-tag-list-link" href="/tags/Golang/" rel="tag">Golang</a></li><li class="article-tag-list-item"><a class="article-tag-list-link" href="/tags/%E5%AF%A6%E4%BD%9C%E7%AD%86%E8%A8%98/" rel="tag">實作筆記</a></li></ul>
+
+    </footer>
+  </div>
+  
+</article>
+
+
+  
     <article id="post-2022/learn_go_with_tests_reflection" class="article article-type-post" itemscope itemprop="blogPost">
   <div class="article-meta">
     <a href="/2022/06/27/2022/learn_go_with_tests_reflection/" class="article-date">
@@ -173,7 +279,7 @@ j=d.createElement(s),dl=l!='dataLayer'?'&l='+l:'';j.async=true;j.src=
       
     </div>
     <footer class="article-footer">
-      <a data-url="https://blog.marsen.me/2022/06/27/2022/learn_go_with_tests_reflection/" data-id="clsy045na00b92rqxf7f03i6x" class="article-share-link">Share</a>
+      <a data-url="https://blog.marsen.me/2022/06/27/2022/learn_go_with_tests_reflection/" data-id="clt023p9200ba3gntenfeemqa" class="article-share-link">Share</a>
       
         <a href="https://blog.marsen.me/2022/06/27/2022/learn_go_with_tests_reflection/#disqus_thread" class="article-comment-link">留言</a>
       
@@ -219,7 +325,7 @@ j=d.createElement(s),dl=l!='dataLayer'?'&l='+l:'';j.async=true;j.src=
       
     </div>
     <footer class="article-footer">
-      <a data-url="https://blog.marsen.me/2022/06/09/2022/error_dotnet_core_at_gke_with_grpc.core/" data-id="clsy045n200ac2rqx6gp8739n" class="article-share-link">Share</a>
+      <a data-url="https://blog.marsen.me/2022/06/09/2022/error_dotnet_core_at_gke_with_grpc.core/" data-id="clt023p8w00ag3gntbqwi0alz" class="article-share-link">Share</a>
       
         <a href="https://blog.marsen.me/2022/06/09/2022/error_dotnet_core_at_gke_with_grpc.core/#disqus_thread" class="article-comment-link">留言</a>
       
@@ -294,7 +400,7 @@ j=d.createElement(s),dl=l!='dataLayer'?'&l='+l:'';j.async=true;j.src=
       
     </div>
     <footer class="article-footer">
-      <a data-url="https://blog.marsen.me/2022/06/08/2022/the_gcp_auth_plugin_is_deprecated/" data-id="clsy045nd00bq2rqx49ctbvaq" class="article-share-link">Share</a>
+      <a data-url="https://blog.marsen.me/2022/06/08/2022/the_gcp_auth_plugin_is_deprecated/" data-id="clt023p9600br3gntg2wf7vsw" class="article-share-link">Share</a>
       
         <a href="https://blog.marsen.me/2022/06/08/2022/the_gcp_auth_plugin_is_deprecated/#disqus_thread" class="article-comment-link">留言</a>
       
@@ -352,7 +458,7 @@ j=d.createElement(s),dl=l!='dataLayer'?'&l='+l:'';j.async=true;j.src=
       
     </div>
     <footer class="article-footer">
-      <a data-url="https://blog.marsen.me/2022/05/26/2022/contributed_MSDN/" data-id="clsy045n100a72rqx469peq3k" class="article-share-link">Share</a>
+      <a data-url="https://blog.marsen.me/2022/05/26/2022/contributed_MSDN/" data-id="clt023p8v00a93gntcstp1aa6" class="article-share-link">Share</a>
       
         <a href="https://blog.marsen.me/2022/05/26/2022/contributed_MSDN/#disqus_thread" class="article-comment-link">留言</a>
       
@@ -503,7 +609,7 @@ j=d.createElement(s),dl=l!='dataLayer'?'&l='+l:'';j.async=true;j.src=
       
     </div>
     <footer class="article-footer">
-      <a data-url="https://blog.marsen.me/2022/05/24/2022/penetration_test/" data-id="clsy045nb00be2rqx3l785ntr" class="article-share-link">Share</a>
+      <a data-url="https://blog.marsen.me/2022/05/24/2022/penetration_test/" data-id="clt023p9300bf3gnt6orka4o7" class="article-share-link">Share</a>
       
         <a href="https://blog.marsen.me/2022/05/24/2022/penetration_test/#disqus_thread" class="article-comment-link">留言</a>
       
@@ -576,7 +682,7 @@ j=d.createElement(s),dl=l!='dataLayer'?'&l='+l:'';j.async=true;j.src=
       
     </div>
     <footer class="article-footer">
-      <a data-url="https://blog.marsen.me/2022/05/20/2022/about_covid_19_in_taiwan/" data-id="clsy045n000a22rqxa5fh0ws3" class="article-share-link">Share</a>
+      <a data-url="https://blog.marsen.me/2022/05/20/2022/about_covid_19_in_taiwan/" data-id="clt023p8u00a43gnt001bdegr" class="article-share-link">Share</a>
       
         <a href="https://blog.marsen.me/2022/05/20/2022/about_covid_19_in_taiwan/#disqus_thread" class="article-comment-link">留言</a>
       
@@ -703,7 +809,7 @@ j=d.createElement(s),dl=l!='dataLayer'?'&l='+l:'';j.async=true;j.src=
       
     </div>
     <footer class="article-footer">
-      <a data-url="https://blog.marsen.me/2022/05/15/2022/typescript_tips/" data-id="clsy045ne00bs2rqx89833qpc" class="article-share-link">Share</a>
+      <a data-url="https://blog.marsen.me/2022/05/15/2022/typescript_tips/" data-id="clt023p9600bu3gnt2iut9u18" class="article-share-link">Share</a>
       
         <a href="https://blog.marsen.me/2022/05/15/2022/typescript_tips/#disqus_thread" class="article-comment-link">留言</a>
       
@@ -764,7 +870,7 @@ j=d.createElement(s),dl=l!='dataLayer'?'&l='+l:'';j.async=true;j.src=
       
     </div>
     <footer class="article-footer">
-      <a data-url="https://blog.marsen.me/2022/05/10/2022/hexo_customerize_helper/" data-id="clsy045n600au2rqxashfh4w4" class="article-share-link">Share</a>
+      <a data-url="https://blog.marsen.me/2022/05/10/2022/hexo_customerize_helper/" data-id="clt023p8z00av3gntd4f53tnw" class="article-share-link">Share</a>
       
         <a href="https://blog.marsen.me/2022/05/10/2022/hexo_customerize_helper/#disqus_thread" class="article-comment-link">留言</a>
       
@@ -835,106 +941,9 @@ j=d.createElement(s),dl=l!='dataLayer'?'&l='+l:'';j.async=true;j.src=
       
     </div>
     <footer class="article-footer">
-      <a data-url="https://blog.marsen.me/2022/05/03/2022/dotnet_namespace/" data-id="clsy045n300af2rqxb9i84gf4" class="article-share-link">Share</a>
+      <a data-url="https://blog.marsen.me/2022/05/03/2022/dotnet_namespace/" data-id="clt023p8w00ae3gnt9jy7gqte" class="article-share-link">Share</a>
       
         <a href="https://blog.marsen.me/2022/05/03/2022/dotnet_namespace/#disqus_thread" class="article-comment-link">留言</a>
-      
-      
-  <ul class="article-tag-list" itemprop="keywords"><li class="article-tag-list-item"><a class="article-tag-list-link" href="/tags/%E5%AF%A6%E4%BD%9C%E7%AD%86%E8%A8%98/" rel="tag">實作筆記</a></li></ul>
-
-    </footer>
-  </div>
-  
-</article>
-
-
-  
-    <article id="post-2022/dotnet_configuration" class="article article-type-post" itemscope itemprop="blogPost">
-  <div class="article-meta">
-    <a href="/2022/05/01/2022/dotnet_configuration/" class="article-date">
-  <time datetime="2022-05-01T18:05:12.000Z" itemprop="datePublished">2022-05-02</time>
-</a>
-    
-  </div>
-  <div class="article-inner">
-    
-    
-      <header class="article-header">
-        
-  
-    <h1 itemprop="name">
-      <a class="article-title" href="/2022/05/01/2022/dotnet_configuration/"> [實作筆記] ASP.Net Core Config 的隨筆</a>
-    </h1>
-  
-
-      </header>
-    
-    <div class="article-entry" itemprop="articleBody">
-      
-        <h2 id="提要"><a href="#提要" class="headerlink" title="提要"></a>提要</h2><ul>
-<li>DI Configuration</li>
-<li>組態的層次</li>
-<li>Options Pattern</li>
-</ul>
-<h3 id="DI-Configuration"><a href="#DI-Configuration" class="headerlink" title="DI Configuration"></a>DI Configuration</h3><p>dotnet webapi 專案預設會注入 IConfiguration ，<br>在專案中的程式建構子放入 <code>IConfiguration</code> 就可以直接取得組態設定</p>
-<figure class="highlight csharp"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">private</span> <span class="keyword">readonly</span> IConfiguration _config;</span><br><span class="line"></span><br><span class="line"><span class="function"><span class="keyword">public</span> <span class="title">WeatherForecastController</span>(<span class="params">IConfiguration config</span>)</span></span><br><span class="line">&#123;</span><br><span class="line">    _config = config;</span><br><span class="line">&#125;</span><br><span class="line"></span><br><span class="line">[<span class="meta">HttpGet(Name = <span class="string">&quot;GetWeatherForecast&quot;</span>)</span>]</span><br><span class="line"><span class="function"><span class="keyword">public</span> <span class="built_in">string</span> <span class="title">Get</span>()</span></span><br><span class="line">&#123;</span><br><span class="line">    <span class="keyword">return</span> _config[<span class="string">&quot;ASPNETCORE_ENVIRONMENT&quot;</span>]!;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
-
-<p>你可以將組態設定在 <code>appsettings.json</code> 之中<br>或是透過環境變數，使用環境變數有幾種作法</p>
-<ul>
-<li>設定在機器上</li>
-<li>設定在 Cloud Service 所提供的組態管理工具之中</li>
-<li>使用 <code>launchSettings.json</code></li>
-</ul>
-<p>在開發環境我會使用 <code>launchSettings</code> 好處是可以不需要真的在開發機的環境中設定環境變數，<br>對同時擁有多個專案的開發者而言，可以有效隔離不同的專案變數，避免彼此影響污染</p>
-<h3 id="組態的層次"><a href="#組態的層次" class="headerlink" title="組態的層次"></a>組態的層次</h3><p>為了方便管理，我們可以透過組態的層次來加以分門別類。<br>比如說:</p>
-<figure class="highlight json"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br></pre></td><td class="code"><pre><span class="line"><span class="attr">&quot;Level&quot;</span><span class="punctuation">:</span> <span class="punctuation">&#123;</span></span><br><span class="line">  <span class="attr">&quot;First&quot;</span><span class="punctuation">:</span> <span class="punctuation">&#123;</span></span><br><span class="line">    <span class="attr">&quot;Key&quot;</span><span class="punctuation">:</span> <span class="string">&quot;1st Value&quot;</span></span><br><span class="line">  <span class="punctuation">&#125;</span><span class="punctuation">,</span></span><br><span class="line">  <span class="attr">&quot;Second&quot;</span><span class="punctuation">:</span> <span class="punctuation">&#123;</span></span><br><span class="line">    <span class="attr">&quot;Key&quot;</span><span class="punctuation">:</span> <span class="string">&quot;2nd Value&quot;</span></span><br><span class="line">  <span class="punctuation">&#125;</span></span><br><span class="line"><span class="punctuation">&#125;</span><span class="punctuation">,</span></span><br></pre></td></tr></table></figure>
-
-<p>一般的 JSON 或 XML 要作到這樣的層次結構都相當的簡單，<br>而要取用組態的方式如下:</p>
-<figure class="highlight csharp"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">var</span> key = _config[<span class="string">&quot;Level:First:Key&quot;</span>];</span><br></pre></td></tr></table></figure>
-
-<p>不過我們要注意環境變數並無法使用<code>:</code>字符，也沒有 JSON 或是 XML 所能提供的結構，<br>這裡要注意可以用 __(雙底線(Double underscore))來建立層次。</p>
-<figure class="highlight text"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br></pre></td><td class="code"><pre><span class="line">$Level__First__Key</span><br><span class="line">$Level__Second__Key</span><br></pre></td></tr></table></figure>
-
-<h3 id="Options-Pattern"><a href="#Options-Pattern" class="headerlink" title="Options Pattern"></a><a target="_blank" rel="noopener" href="https://docs.microsoft.com/zh-tw/aspnet/core/fundamentals/configuration/options?view=aspnetcore-6.0">Options Pattern</a></h3><p>Options Pattern 可以提供一種更物件導向的組態配置解決方案，<br>你只需要兩個步驟，即可實作 Options Pattern</p>
-<ol>
-<li><p>建立 Option 物件<br>我在這裡提供二種不同的方法，後面會再說明</p>
-<figure class="highlight csharp"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment">//方法一 Dictionary</span></span><br><span class="line"><span class="keyword">public</span> <span class="keyword">class</span> <span class="title">LevelOptions</span></span><br><span class="line">&#123;</span><br><span class="line">    <span class="keyword">public</span> <span class="keyword">const</span> <span class="built_in">string</span> Level = <span class="string">&quot;Level&quot;</span>;</span><br><span class="line"></span><br><span class="line">    <span class="keyword">public</span> Dictionary&lt;<span class="built_in">string</span>,<span class="built_in">string</span>&gt; First &#123; <span class="keyword">get</span>; <span class="keyword">set</span>; &#125;</span><br></pre></td></tr></table></figure>
-
-<figure class="highlight csharp"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment">//方法二 Object</span></span><br><span class="line"><span class="keyword">public</span> <span class="keyword">class</span> <span class="title">LevelOption</span></span><br><span class="line">&#123;</span><br><span class="line">    <span class="keyword">public</span> <span class="keyword">const</span> <span class="built_in">string</span> Level = <span class="string">&quot;Level&quot;</span>;</span><br><span class="line"></span><br><span class="line">    <span class="keyword">public</span> FirstOptions First &#123; <span class="keyword">get</span>; <span class="keyword">set</span>; &#125;</span><br><span class="line">&#125;</span><br><span class="line"></span><br><span class="line"><span class="keyword">public</span> <span class="keyword">class</span> <span class="title">FirstOptions</span></span><br><span class="line">&#123;</span><br><span class="line">    <span class="keyword">public</span> <span class="built_in">string</span> Key &#123; <span class="keyword">get</span>; <span class="keyword">set</span>; &#125; = <span class="built_in">string</span>.Empty;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
-</li>
-<li><p>註冊 Option 物件</p>
-</li>
-</ol>
-<figure class="highlight csharp"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">builder.Services.Configure&lt;LevelOptions&gt;(LevelOption.Level)</span><br></pre></td></tr></table></figure>
-
-<p>最後是讀取組態，在方法一(使用 Dictionary)的方法讀取</p>
-<figure class="highlight csharp"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">var</span> key = _options.Value.First[<span class="string">&quot;Key&quot;</span>];</span><br></pre></td></tr></table></figure>
-
-<p>或是方法二(使用 Object)的方法讀取</p>
-<figure class="highlight csharp"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">var</span> key = _options.Value.First.Key;</span><br></pre></td></tr></table></figure>
-
-<p>兩種方法都可以，物件化的方法需要建立多個物件，<br>但是在取用組態的過程就不會有 hard coding string;<br>反之 Dictionary 的方法可以少寫很多物件。</p>
-<p>對我而言我比較偏向使用 Object 的方法去處理，只要適當的分類，<br>物件多並不是問題，而且通常一次不會增加太多的組態，可以迭代增量。</p>
-<p>順代一提，如果組態檔層次太多，會是另一個困擾 ? 我的建議是，如果組態的深度到達 3 時，<br>需要考慮這是不是一個壞味道，是不是過度優化了 ?<br>實務上來說，我會避免建立超過 3 層，也很難會有一定要超過 3 層的情境，<br>如果你有什麼情境上需要超過 3 層，可以留言給我，我們可以一起討論。</p>
-<h3 id="在-Program-cs-使用"><a href="#在-Program-cs-使用" class="headerlink" title="在 Program.cs 使用"></a>在 Program.cs 使用</h3><p>如果在 <code>Program.cs</code> 的注入階段，如果要取得組態，<br>可以用<br><code>(new ConfigurationManager()).GetSection(&quot;First&quot;)[&quot;Key&quot;]</code><br>或是 <code>Environment.GetEnvironmentVariable(&quot;Level__First__Key&quot;);</code> 等方法取得組態。<br>但是我更推薦 ServiceProvider 的 GetRequiredService 取得 Options</p>
-<figure class="highlight csharp"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment">//注入在前</span></span><br><span class="line">builder.Services.Configure&lt;LevelOption&gt;(builder.Configuration.GetSection(LevelOption.Level));</span><br><span class="line">builder.Services.AddHttpClient(<span class="string">&quot;OtherService&quot;</span>, (provider, client) =&gt;</span><br><span class="line">&#123;</span><br><span class="line">    <span class="comment">//透過 provider 取得 config</span></span><br><span class="line">    <span class="keyword">var</span> o = provider.GetRequiredService&lt;IOptions&lt;LevelOptions&gt;&gt;();</span><br><span class="line">    client.BaseAddress = <span class="keyword">new</span> Uri(<span class="string">$&quot;<span class="subst">&#123;o.Value.Url&#125;</span>/&quot;</span>);</span><br><span class="line">    client.DefaultRequestHeaders.Accept.Add(<span class="keyword">new</span> MediaTypeWithQualityHeaderValue(<span class="string">&quot;application/json&quot;</span>));</span><br><span class="line">    client.DefaultRequestHeaders.Authorization = <span class="keyword">new</span> AuthenticationHeaderValue(<span class="string">&quot;Bearer&quot;</span>, o.Value.Token);</span><br><span class="line">&#125;);</span><br></pre></td></tr></table></figure>
-
-<p>這樣就可以用一致的方法取得組態了。</p>
-<h2 id="參考"><a href="#參考" class="headerlink" title="參考"></a>參考</h2><ul>
-<li><a target="_blank" rel="noopener" href="https://docs.microsoft.com/zh-tw/aspnet/core/fundamentals/configuration/?view=aspnetcore-6.0">ASP.NET Core 的設定</a></li>
-<li><a target="_blank" rel="noopener" href="https://docs.microsoft.com/zh-tw/aspnet/core/fundamentals/configuration/options?view=aspnetcore-6.0">ASP.NET Core 中的選項模式</a></li>
-<li><a target="_blank" rel="noopener" href="https://docs.microsoft.com/zh-tw/dotnet/core/extensions/options">.NET 中的選項模式</a></li>
-<li><a target="_blank" rel="noopener" href="https://andrewlock.net/exploring-dotnet-6-part-1-looking-inside-configurationmanager-in-dotnet-6/">Looking inside ConfigurationManager in .NET 6</a></li>
-<li><a target="_blank" rel="noopener" href="https://www.evernote.com/shard/s36/sh/20abd4ce-f7e2-47ef-9bc6-36971709348a/d0d0525f9b4b7e5dcf1493eca0b8c232">你可能不知道的.Net Core Configuration(Evernote 備份)</a></li>
-</ul>
-<p>(fin)</p>
-
-      
-    </div>
-    <footer class="article-footer">
-      <a data-url="https://blog.marsen.me/2022/05/01/2022/dotnet_configuration/" data-id="clsy045n200aa2rqxc70fgrfw" class="article-share-link">Share</a>
-      
-        <a href="https://blog.marsen.me/2022/05/01/2022/dotnet_configuration/#disqus_thread" class="article-comment-link">留言</a>
       
       
   <ul class="article-tag-list" itemprop="keywords"><li class="article-tag-list-item"><a class="article-tag-list-link" href="/tags/%E5%AF%A6%E4%BD%9C%E7%AD%86%E8%A8%98/" rel="tag">實作筆記</a></li></ul>
@@ -962,11 +971,15 @@ j=d.createElement(s),dl=l!='dataLayer'?'&l='+l:'';j.async=true;j.src=
       <ul>
         
           <li>
-            <a href="/2024/02/23/2024/mac_zip_password_automator/"> [實作筆記] Macbook 壓縮檔案</a>
+            <a href="/2024/02/24/2024/mac_zip_password_automator/"> [實作筆記] Macbook 壓縮檔案</a>
           </li>
         
           <li>
-            <a href="/2024/02/23/2024/vim_learning_source/"> [學習筆記] Vim 學習資源</a>
+            <a href="/2024/02/24/2024/typing_with_props/"> [學習筆記] 為前端框架 Component 建立 Props Typing 的幾種方式，以 React 為例</a>
+          </li>
+        
+          <li>
+            <a href="/2024/02/22/2024/vim_learning_source/"> [學習筆記] Vim 學習資源</a>
           </li>
         
           <li>
@@ -975,10 +988,6 @@ j=d.createElement(s),dl=l!='dataLayer'?'&l='+l:'';j.async=true;j.src=
         
           <li>
             <a href="/2024/01/03/2024/clamav_install/"> [實作筆記] ClamAV 安裝</a>
-          </li>
-        
-          <li>
-            <a href="/2024/01/02/2024/2024_plan/"> [生活筆記] 2023 的回顧與展望</a>
           </li>
         
       </ul>
@@ -990,7 +999,7 @@ j=d.createElement(s),dl=l!='dataLayer'?'&l='+l:'';j.async=true;j.src=
   <div class="widget-wrap">
     <h3 class="widget-title">彙整</h3>
     <div class="widget">
-      <ul class="archive-list"><li class="archive-list-item"><a class="archive-list-link" href="/archives/2024/02/">二月 2024</a><span class="archive-list-count">2</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2024/01/">一月 2024</a><span class="archive-list-count">3</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2023/12/">十二月 2023</a><span class="archive-list-count">2</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2023/11/">十一月 2023</a><span class="archive-list-count">3</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2023/10/">十月 2023</a><span class="archive-list-count">2</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2023/09/">九月 2023</a><span class="archive-list-count">3</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2023/08/">八月 2023</a><span class="archive-list-count">2</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2023/07/">七月 2023</a><span class="archive-list-count">5</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2023/06/">六月 2023</a><span class="archive-list-count">6</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2023/05/">五月 2023</a><span class="archive-list-count">1</span></li><span id='list_archives2' style='display:none'><li class="archive-list-item"><a class="archive-list-link" href="/archives/2023/04/">四月 2023</a><span class="archive-list-count">9</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2023/03/">三月 2023</a><span class="archive-list-count">4</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2023/02/">二月 2023</a><span class="archive-list-count">2</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2023/01/">一月 2023</a><span class="archive-list-count">2</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2022/12/">十二月 2022</a><span class="archive-list-count">1</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2022/10/">十月 2022</a><span class="archive-list-count">2</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2022/09/">九月 2022</a><span class="archive-list-count">6</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2022/08/">八月 2022</a><span class="archive-list-count">3</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2022/07/">七月 2022</a><span class="archive-list-count">2</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2022/06/">六月 2022</a><span class="archive-list-count">3</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2022/05/">五月 2022</a><span class="archive-list-count">7</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2022/04/">四月 2022</a><span class="archive-list-count">3</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2022/03/">三月 2022</a><span class="archive-list-count">3</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2022/02/">二月 2022</a><span class="archive-list-count">2</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2022/01/">一月 2022</a><span class="archive-list-count">3</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2021/12/">十二月 2021</a><span class="archive-list-count">2</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2021/11/">十一月 2021</a><span class="archive-list-count">2</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2021/10/">十月 2021</a><span class="archive-list-count">2</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2021/09/">九月 2021</a><span class="archive-list-count">1</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2021/08/">八月 2021</a><span class="archive-list-count">2</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2021/07/">七月 2021</a><span class="archive-list-count">4</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2021/06/">六月 2021</a><span class="archive-list-count">1</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2021/05/">五月 2021</a><span class="archive-list-count">2</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2021/04/">四月 2021</a><span class="archive-list-count">3</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2021/03/">三月 2021</a><span class="archive-list-count">3</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2021/02/">二月 2021</a><span class="archive-list-count">1</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2021/01/">一月 2021</a><span class="archive-list-count">7</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2020/12/">十二月 2020</a><span class="archive-list-count">1</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2020/11/">十一月 2020</a><span class="archive-list-count">2</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2020/10/">十月 2020</a><span class="archive-list-count">5</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2020/09/">九月 2020</a><span class="archive-list-count">5</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2020/08/">八月 2020</a><span class="archive-list-count">2</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2020/07/">七月 2020</a><span class="archive-list-count">3</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2020/06/">六月 2020</a><span class="archive-list-count">3</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2020/05/">五月 2020</a><span class="archive-list-count">3</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2020/04/">四月 2020</a><span class="archive-list-count">4</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2020/03/">三月 2020</a><span class="archive-list-count">1</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2020/02/">二月 2020</a><span class="archive-list-count">1</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2020/01/">一月 2020</a><span class="archive-list-count">5</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2019/12/">十二月 2019</a><span class="archive-list-count">1</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2019/11/">十一月 2019</a><span class="archive-list-count">2</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2019/10/">十月 2019</a><span class="archive-list-count">1</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2019/09/">九月 2019</a><span class="archive-list-count">2</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2019/08/">八月 2019</a><span class="archive-list-count">5</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2019/07/">七月 2019</a><span class="archive-list-count">1</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2019/06/">六月 2019</a><span class="archive-list-count">1</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2019/05/">五月 2019</a><span class="archive-list-count">2</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2019/04/">四月 2019</a><span class="archive-list-count">3</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2019/03/">三月 2019</a><span class="archive-list-count">1</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2019/02/">二月 2019</a><span class="archive-list-count">2</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2019/01/">一月 2019</a><span class="archive-list-count">4</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2018/12/">十二月 2018</a><span class="archive-list-count">5</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2018/11/">十一月 2018</a><span class="archive-list-count">7</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2018/10/">十月 2018</a><span class="archive-list-count">6</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2018/09/">九月 2018</a><span class="archive-list-count">3</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2018/08/">八月 2018</a><span class="archive-list-count">2</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2018/07/">七月 2018</a><span class="archive-list-count">6</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2018/06/">六月 2018</a><span class="archive-list-count">2</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2018/05/">五月 2018</a><span class="archive-list-count">1</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2018/04/">四月 2018</a><span class="archive-list-count">5</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2018/03/">三月 2018</a><span class="archive-list-count">5</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2018/02/">二月 2018</a><span class="archive-list-count">1</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2018/01/">一月 2018</a><span class="archive-list-count">5</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2017/12/">十二月 2017</a><span class="archive-list-count">3</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2017/10/">十月 2017</a><span class="archive-list-count">3</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2017/09/">九月 2017</a><span class="archive-list-count">2</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2017/08/">八月 2017</a><span class="archive-list-count">1</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2017/07/">七月 2017</a><span class="archive-list-count">2</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2017/05/">五月 2017</a><span class="archive-list-count">1</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2017/04/">四月 2017</a><span class="archive-list-count">2</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2017/03/">三月 2017</a><span class="archive-list-count">1</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2017/02/">二月 2017</a><span class="archive-list-count">1</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2017/01/">一月 2017</a><span class="archive-list-count">6</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2016/12/">十二月 2016</a><span class="archive-list-count">1</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2016/11/">十一月 2016</a><span class="archive-list-count">2</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2016/10/">十月 2016</a><span class="archive-list-count">4</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2016/09/">九月 2016</a><span class="archive-list-count">1</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2016/08/">八月 2016</a><span class="archive-list-count">6</span></li></span><span id=''></span><span onclick="var d=document.getElementById('list_archives2'); d.style.display===''?d.style='display:none':d.style=''">toggle...</span></ul>
+      <ul class="archive-list"><li class="archive-list-item"><a class="archive-list-link" href="/archives/2024/02/">二月 2024</a><span class="archive-list-count">3</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2024/01/">一月 2024</a><span class="archive-list-count">3</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2023/12/">十二月 2023</a><span class="archive-list-count">2</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2023/11/">十一月 2023</a><span class="archive-list-count">3</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2023/10/">十月 2023</a><span class="archive-list-count">2</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2023/09/">九月 2023</a><span class="archive-list-count">3</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2023/08/">八月 2023</a><span class="archive-list-count">2</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2023/07/">七月 2023</a><span class="archive-list-count">5</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2023/06/">六月 2023</a><span class="archive-list-count">6</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2023/05/">五月 2023</a><span class="archive-list-count">1</span></li><span id='list_archives2' style='display:none'><li class="archive-list-item"><a class="archive-list-link" href="/archives/2023/04/">四月 2023</a><span class="archive-list-count">9</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2023/03/">三月 2023</a><span class="archive-list-count">4</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2023/02/">二月 2023</a><span class="archive-list-count">2</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2023/01/">一月 2023</a><span class="archive-list-count">2</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2022/12/">十二月 2022</a><span class="archive-list-count">1</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2022/10/">十月 2022</a><span class="archive-list-count">2</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2022/09/">九月 2022</a><span class="archive-list-count">6</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2022/08/">八月 2022</a><span class="archive-list-count">3</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2022/07/">七月 2022</a><span class="archive-list-count">2</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2022/06/">六月 2022</a><span class="archive-list-count">3</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2022/05/">五月 2022</a><span class="archive-list-count">7</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2022/04/">四月 2022</a><span class="archive-list-count">3</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2022/03/">三月 2022</a><span class="archive-list-count">3</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2022/02/">二月 2022</a><span class="archive-list-count">2</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2022/01/">一月 2022</a><span class="archive-list-count">3</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2021/12/">十二月 2021</a><span class="archive-list-count">2</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2021/11/">十一月 2021</a><span class="archive-list-count">2</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2021/10/">十月 2021</a><span class="archive-list-count">2</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2021/09/">九月 2021</a><span class="archive-list-count">1</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2021/08/">八月 2021</a><span class="archive-list-count">2</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2021/07/">七月 2021</a><span class="archive-list-count">4</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2021/06/">六月 2021</a><span class="archive-list-count">1</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2021/05/">五月 2021</a><span class="archive-list-count">2</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2021/04/">四月 2021</a><span class="archive-list-count">3</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2021/03/">三月 2021</a><span class="archive-list-count">3</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2021/02/">二月 2021</a><span class="archive-list-count">1</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2021/01/">一月 2021</a><span class="archive-list-count">7</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2020/12/">十二月 2020</a><span class="archive-list-count">1</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2020/11/">十一月 2020</a><span class="archive-list-count">2</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2020/10/">十月 2020</a><span class="archive-list-count">5</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2020/09/">九月 2020</a><span class="archive-list-count">5</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2020/08/">八月 2020</a><span class="archive-list-count">2</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2020/07/">七月 2020</a><span class="archive-list-count">3</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2020/06/">六月 2020</a><span class="archive-list-count">3</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2020/05/">五月 2020</a><span class="archive-list-count">3</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2020/04/">四月 2020</a><span class="archive-list-count">4</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2020/03/">三月 2020</a><span class="archive-list-count">1</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2020/02/">二月 2020</a><span class="archive-list-count">1</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2020/01/">一月 2020</a><span class="archive-list-count">5</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2019/12/">十二月 2019</a><span class="archive-list-count">1</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2019/11/">十一月 2019</a><span class="archive-list-count">2</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2019/10/">十月 2019</a><span class="archive-list-count">1</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2019/09/">九月 2019</a><span class="archive-list-count">2</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2019/08/">八月 2019</a><span class="archive-list-count">5</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2019/07/">七月 2019</a><span class="archive-list-count">1</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2019/06/">六月 2019</a><span class="archive-list-count">1</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2019/05/">五月 2019</a><span class="archive-list-count">2</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2019/04/">四月 2019</a><span class="archive-list-count">3</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2019/03/">三月 2019</a><span class="archive-list-count">1</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2019/02/">二月 2019</a><span class="archive-list-count">2</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2019/01/">一月 2019</a><span class="archive-list-count">4</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2018/12/">十二月 2018</a><span class="archive-list-count">5</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2018/11/">十一月 2018</a><span class="archive-list-count">7</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2018/10/">十月 2018</a><span class="archive-list-count">6</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2018/09/">九月 2018</a><span class="archive-list-count">3</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2018/08/">八月 2018</a><span class="archive-list-count">2</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2018/07/">七月 2018</a><span class="archive-list-count">6</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2018/06/">六月 2018</a><span class="archive-list-count">2</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2018/05/">五月 2018</a><span class="archive-list-count">1</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2018/04/">四月 2018</a><span class="archive-list-count">5</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2018/03/">三月 2018</a><span class="archive-list-count">5</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2018/02/">二月 2018</a><span class="archive-list-count">1</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2018/01/">一月 2018</a><span class="archive-list-count">5</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2017/12/">十二月 2017</a><span class="archive-list-count">3</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2017/10/">十月 2017</a><span class="archive-list-count">3</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2017/09/">九月 2017</a><span class="archive-list-count">2</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2017/08/">八月 2017</a><span class="archive-list-count">1</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2017/07/">七月 2017</a><span class="archive-list-count">2</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2017/05/">五月 2017</a><span class="archive-list-count">1</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2017/04/">四月 2017</a><span class="archive-list-count">2</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2017/03/">三月 2017</a><span class="archive-list-count">1</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2017/02/">二月 2017</a><span class="archive-list-count">1</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2017/01/">一月 2017</a><span class="archive-list-count">6</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2016/12/">十二月 2016</a><span class="archive-list-count">1</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2016/11/">十一月 2016</a><span class="archive-list-count">2</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2016/10/">十月 2016</a><span class="archive-list-count">4</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2016/09/">九月 2016</a><span class="archive-list-count">1</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2016/08/">八月 2016</a><span class="archive-list-count">6</span></li></span><span id=''></span><span onclick="var d=document.getElementById('list_archives2'); d.style.display===''?d.style='display:none':d.style=''">toggle...</span></ul>
     </div>
   </div>
 
