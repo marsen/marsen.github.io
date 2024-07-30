@@ -103,6 +103,104 @@ j=d.createElement(s),dl=l!='dataLayer'?'&l='+l:'';j.async=true;j.src=
       <div class="outer">
         <section id="main">
   
+    <article id="post-2024/azure_vm_for_nvidia_error_records" class="article article-type-post" itemscope itemprop="blogPost">
+  <div class="article-meta">
+    <a href="/2024/07/30/2024/azure_vm_for_nvidia_error_records/" class="article-date">
+  <time datetime="2024-07-30T09:10:59.000Z" itemprop="datePublished">2024-07-30</time>
+</a>
+    
+  </div>
+  <div class="article-inner">
+    
+    
+      <header class="article-header">
+        
+  
+    <h1 itemprop="name">
+      <a class="article-title" href="/2024/07/30/2024/azure_vm_for_nvidia_error_records/">[實作筆記] 初體驗設定 Nvidia GPU 的 Azure VM -- 錯誤排除</a>
+    </h1>
+  
+
+      </header>
+    
+    <div class="article-entry" itemprop="articleBody">
+      
+        <h2 id="前情提要"><a href="#前情提要" class="headerlink" title="前情提要"></a>前情提要</h2><p>RD 們反應因為 Driver 更新導致服務異常，停止運作。<br>重新安裝時又遇到一些奇怪的問題，例如：<br>錯誤：</p>
+<figure class="highlight shell"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br></pre></td><td class="code"><pre><span class="line">sudo apt install -y linux-modules-nvidia-550-azure nvidia-driver-550</span><br><span class="line">Reading package lists... Done</span><br><span class="line">Building dependency tree       </span><br><span class="line">Reading state information... Done</span><br><span class="line">E: Unable to locate package linux-modules-nvidia-550-azure</span><br></pre></td></tr></table></figure>
+
+<p>或是</p>
+<figure class="highlight shell"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br></pre></td><td class="code"><pre><span class="line">Failed to initialize NVML: Driver/library version mismatch</span><br><span class="line">NVML library version: 535.183</span><br></pre></td></tr></table></figure>
+
+<p>依實際狀況與 RD 討論，發現他們沒有一個標準的作業程序，調研時也沒有任何記錄，<br>東作一塊，西作一塊，沒有辦法很清楚了交互的作用關係。<br>故由我重新實作一遍，記錄並排除相關錯誤。  </p>
+<h2 id="實作記錄"><a href="#實作記錄" class="headerlink" title="實作記錄"></a>實作記錄</h2><ol>
+<li><p>Azure 開機，指定作業系統為 Ubuntu 22.04，並且需注意 A100 系列機器只在特定的 Zone 才有資源開機，本次使用東日本 zone2 的資源</p>
+</li>
+<li><p>安裝 CUDA,　<a target="_blank" rel="noopener" href="https://docs.nvidia.com/cuda/cuda-installation-guide-linux/index.html#ubuntu">參考官方文件 <strong>3.9. Ubuntu</strong></a></p>
+</li>
+<li><p>安裝 ubuntu-drivers-common</p>
+<ul>
+<li><code>sudo apt install ubuntu-drivers-common</code></li>
+<li><code>sudo apt install alsa-utils</code> #音效相關，不一定要裝，但是可以減少指令時的錯誤訊息</li>
+<li><code>ubuntu-drivers device</code></li>
+</ul>
+ <figure class="highlight bash"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br></pre></td><td class="code"><pre><span class="line">$ ubuntu-drivers devices</span><br><span class="line">== /sys/devices/LNXSYSTM:00/LNXSYBUS:00/ACPI0004:00/VMBUS:00/00000041-0001-0000-3130-444532304235/pci0001:00/0001:00:00.0 ==</span><br><span class="line">modalias : pci:v000010DEd000020B5sv000010DEsd00001533bc03sc02i00</span><br><span class="line">vendor   : NVIDIA Corporation</span><br><span class="line">driver   : nvidia-driver-555-open - third-party non-free</span><br><span class="line">driver   : nvidia-driver-470-server - distro non-free</span><br><span class="line">driver   : nvidia-driver-535-server-open - distro non-free</span><br><span class="line">driver   : nvidia-driver-555 - third-party non-free recommended</span><br><span class="line">driver   : nvidia-driver-535-server - distro non-free</span><br><span class="line">driver   : nvidia-driver-470 - distro non-free</span><br><span class="line">driver   : nvidia-driver-550 - third-party non-free</span><br><span class="line">driver   : nvidia-driver-550-open - third-party non-free</span><br><span class="line">driver   : nvidia-driver-535-open - distro non-free</span><br><span class="line">driver   : nvidia-driver-545-open - third-party non-free</span><br><span class="line">driver   : xserver-xorg-video-nouveau - distro free <span class="built_in">builtin</span></span><br></pre></td></tr></table></figure>
+</li>
+<li><p>更新套件</p>
+<ol>
+<li>加上drivers的 repo 路徑<blockquote>
+<p><code>sudo add-apt-repository ppa:graphics-drivers/ppa</code></p>
+</blockquote>
+</li>
+<li>更新<blockquote>
+<p><code>sudo apt update</code></p>
+</blockquote>
+</li>
+<li>安裝趨動, 讓系統自已判斷安裝什麼版本, 參考 <a target="_blank" rel="noopener" href="https://ubuntu.com/server/docs/nvidia-drivers-installation">NVIDIA drivers installation | Ubuntu</a><blockquote>
+<p><code>sudo ubuntu-drivers install</code></p>
+</blockquote>
+</li>
+<li>重開機<blockquote>
+<p><code>sudo reboot</code></p>
+</blockquote>
+</li>
+<li>查一下，他幫你裝哪個版本<blockquote>
+<p><code>dpkg -l | grep nvidia-driver</code></p>
+</blockquote>
+</li>
+<li>再安裝指定版本的 Ubuntu Azure Package，也可以至 <a target="_blank" rel="noopener" href="https://packages.ubuntu.com/focal/kernel/">Ubuntu 網站</a> 搜尋確認<blockquote>
+<p><code>sudo apt install -y linux-modules-nvidia-&lt;version&gt;-azure</code></p>
+</blockquote>
+</li>
+</ol>
+</li>
+</ol>
+<h3 id="確認是否成功"><a href="#確認是否成功" class="headerlink" title="確認是否成功"></a>確認是否成功</h3>  <figure class="highlight bash"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">nvidia-smi</span><br></pre></td></tr></table></figure>
+
+<p>　看到下面的畫面就是成功</p>
+  <figure class="highlight sh"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br></pre></td><td class="code"><pre><span class="line">$ nvidia-smi</span><br><span class="line">Tue Jul 30 08:07:18 2024</span><br><span class="line">+-----------------------------------------------------------------------------------------+</span><br><span class="line">| NVIDIA-SMI 550.90.07              Driver Version: 550.90.07      CUDA Version: 12.4     |</span><br><span class="line">|-----------------------------------------+------------------------+----------------------+</span><br><span class="line">| GPU  Name                 Persistence-M | Bus-Id          Disp.A | Volatile Uncorr. ECC |</span><br><span class="line">| Fan  Temp   Perf          Pwr:Usage/Cap |           Memory-Usage | GPU-Util  Compute M. |</span><br><span class="line">|                                         |                        |               MIG M. |</span><br><span class="line">|=========================================+========================+======================|</span><br><span class="line">|   0  NVIDIA A100 80GB PCIe          Off |   00000001:00:00.0 Off |                    0 |</span><br><span class="line">| N/A   32C    P0             43W /  300W |       1MiB /  81920MiB |      0%      Default |</span><br><span class="line">|                                         |                        |             Disabled |</span><br><span class="line">+-----------------------------------------+------------------------+----------------------+</span><br><span class="line"></span><br><span class="line">+-----------------------------------------------------------------------------------------+</span><br><span class="line">| Processes:                                                                              |</span><br><span class="line">|  GPU   GI   CI        PID   Type   Process name                              GPU Memory |</span><br><span class="line">|        ID   ID                                                               Usage      |</span><br><span class="line">|=========================================================================================|</span><br><span class="line">|  No running processes found                                                             |</span><br><span class="line">+-----------------------------------------------------------------------------------------+</span><br></pre></td></tr></table></figure>
+
+<h2 id="參考"><a href="#參考" class="headerlink" title="參考"></a>參考</h2><ul>
+<li><a target="_blank" rel="noopener" href="https://packages.ubuntu.com/focal/kernel/">Ubuntu 網站</a></li>
+<li><a target="_blank" rel="noopener" href="https://ubuntu.com/server/docs/nvidia-drivers-installation">NVIDIA drivers installation | Ubuntu</a></li>
+<li><a target="_blank" rel="noopener" href="https://docs.nvidia.com/cuda/cuda-installation-guide-linux/index.html#ubuntu">參考官方文件 <strong>3.9. Ubuntu</strong></a></li>
+</ul>
+<p>(fin)</p>
+
+      
+    </div>
+    <footer class="article-footer">
+      <a data-url="https://blog.marsen.me/2024/07/30/2024/azure_vm_for_nvidia_error_records/" data-id="clz877ovd00f62st6ezu2boh1" class="article-share-link">Share</a>
+      
+        <a href="https://blog.marsen.me/2024/07/30/2024/azure_vm_for_nvidia_error_records/#disqus_thread" class="article-comment-link">留言</a>
+      
+      
+    </footer>
+  </div>
+  
+</article>
+
+
+  
     <article id="post-2024/azure_vm_for_nvidia" class="article article-type-post" itemscope itemprop="blogPost">
   <div class="article-meta">
     <a href="/2024/07/03/2024/azure_vm_for_nvidia/" class="article-date">
@@ -223,107 +321,9 @@ j=d.createElement(s),dl=l!='dataLayer'?'&l='+l:'';j.async=true;j.src=
       
     </div>
     <footer class="article-footer">
-      <a data-url="https://blog.marsen.me/2024/07/03/2024/azure_vm_for_nvidia/" data-id="clz876v3e00c72snp95n40yye" class="article-share-link">Share</a>
+      <a data-url="https://blog.marsen.me/2024/07/03/2024/azure_vm_for_nvidia/" data-id="clz877ovc00f42st678e12kvx" class="article-share-link">Share</a>
       
         <a href="https://blog.marsen.me/2024/07/03/2024/azure_vm_for_nvidia/#disqus_thread" class="article-comment-link">留言</a>
-      
-      
-    </footer>
-  </div>
-  
-</article>
-
-
-  
-    <article id="post-2024/azure_vm_for_nvidia_error_records" class="article article-type-post" itemscope itemprop="blogPost">
-  <div class="article-meta">
-    <a href="/2024/07/03/2024/azure_vm_for_nvidia_error_records/" class="article-date">
-  <time datetime="2024-07-03T07:59:02.000Z" itemprop="datePublished">2024-07-03</time>
-</a>
-    
-  </div>
-  <div class="article-inner">
-    
-    
-      <header class="article-header">
-        
-  
-    <h1 itemprop="name">
-      <a class="article-title" href="/2024/07/03/2024/azure_vm_for_nvidia_error_records/">[實作筆記] 初體驗設定 Nvidia GPU 的 Azure VM -- 錯誤排除</a>
-    </h1>
-  
-
-      </header>
-    
-    <div class="article-entry" itemprop="articleBody">
-      
-        <h2 id="前情提要"><a href="#前情提要" class="headerlink" title="前情提要"></a>前情提要</h2><p>RD 們反應因為 Driver 更新導致服務異常，停止運作。<br>重新安裝時又遇到一些奇怪的問題，例如：<br>錯誤：</p>
-<figure class="highlight shell"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br></pre></td><td class="code"><pre><span class="line">sudo apt install -y linux-modules-nvidia-550-azure nvidia-driver-550</span><br><span class="line">Reading package lists... Done</span><br><span class="line">Building dependency tree       </span><br><span class="line">Reading state information... Done</span><br><span class="line">E: Unable to locate package linux-modules-nvidia-550-azure</span><br></pre></td></tr></table></figure>
-
-<p>或是</p>
-<figure class="highlight shell"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br></pre></td><td class="code"><pre><span class="line">Failed to initialize NVML: Driver/library version mismatch</span><br><span class="line">NVML library version: 535.183</span><br></pre></td></tr></table></figure>
-
-<p>依實際狀況與 RD 討論，發現他們沒有一個標準的作業程序，調研時也沒有任何記錄，<br>東作一塊，西作一塊，沒有辦法很清楚了交互的作用關係。<br>故由我重新實作一遍，記錄並排除相關錯誤。  </p>
-<h2 id="實作記錄"><a href="#實作記錄" class="headerlink" title="實作記錄"></a>實作記錄</h2><ol>
-<li><p>Azure 開機，指定作業系統為 Ubuntu 22.04，並且需注意 A100 系列機器只在特定的 Zone 才有資源開機，本次使用東日本 zone2 的資源</p>
-</li>
-<li><p>安裝 CUDA,　<a target="_blank" rel="noopener" href="https://docs.nvidia.com/cuda/cuda-installation-guide-linux/index.html#ubuntu">參考官方文件 <strong>3.9. Ubuntu</strong></a></p>
-</li>
-<li><p>安裝 ubuntu-drivers-common</p>
-<ul>
-<li><code>sudo apt install ubuntu-drivers-common</code></li>
-<li><code>sudo apt install alsa-utils</code> #音效相關，不一定要裝，但是可以減少指令時的錯誤訊息</li>
-<li><code>ubuntu-drivers device</code></li>
-</ul>
- <figure class="highlight bash"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br></pre></td><td class="code"><pre><span class="line">$ ubuntu-drivers devices</span><br><span class="line">== /sys/devices/LNXSYSTM:00/LNXSYBUS:00/ACPI0004:00/VMBUS:00/00000041-0001-0000-3130-444532304235/pci0001:00/0001:00:00.0 ==</span><br><span class="line">modalias : pci:v000010DEd000020B5sv000010DEsd00001533bc03sc02i00</span><br><span class="line">vendor   : NVIDIA Corporation</span><br><span class="line">driver   : nvidia-driver-555-open - third-party non-free</span><br><span class="line">driver   : nvidia-driver-470-server - distro non-free</span><br><span class="line">driver   : nvidia-driver-535-server-open - distro non-free</span><br><span class="line">driver   : nvidia-driver-555 - third-party non-free recommended</span><br><span class="line">driver   : nvidia-driver-535-server - distro non-free</span><br><span class="line">driver   : nvidia-driver-470 - distro non-free</span><br><span class="line">driver   : nvidia-driver-550 - third-party non-free</span><br><span class="line">driver   : nvidia-driver-550-open - third-party non-free</span><br><span class="line">driver   : nvidia-driver-535-open - distro non-free</span><br><span class="line">driver   : nvidia-driver-545-open - third-party non-free</span><br><span class="line">driver   : xserver-xorg-video-nouveau - distro free <span class="built_in">builtin</span></span><br></pre></td></tr></table></figure>
-</li>
-<li><p>更新套件</p>
-<ol>
-<li>加上drivers的 repo 路徑<blockquote>
-<p><code>sudo add-apt-repository ppa:graphics-drivers/ppa</code></p>
-</blockquote>
-</li>
-<li>更新<blockquote>
-<p><code>sudo apt update</code></p>
-</blockquote>
-</li>
-<li>安裝趨動, 讓系統自已判斷安裝什麼版本, 參考 <a target="_blank" rel="noopener" href="https://ubuntu.com/server/docs/nvidia-drivers-installation">NVIDIA drivers installation | Ubuntu</a><blockquote>
-<p><code>sudo ubuntu-drivers install</code></p>
-</blockquote>
-</li>
-<li>重開機<blockquote>
-<p><code>sudo reboot</code></p>
-</blockquote>
-</li>
-<li>查一下，他幫你裝哪個版本<blockquote>
-<p><code>dpkg -l | grep nvidia-driver</code></p>
-</blockquote>
-</li>
-<li>再安裝指定版本的 Ubuntu Azure Package，也可以至 <a target="_blank" rel="noopener" href="https://packages.ubuntu.com/focal/kernel/">Ubuntu 網站</a> 搜尋確認<blockquote>
-<p><code>sudo apt install -y linux-modules-nvidia-&lt;version&gt;-azure</code></p>
-</blockquote>
-</li>
-</ol>
-</li>
-</ol>
-<h3 id="確認是否成功"><a href="#確認是否成功" class="headerlink" title="確認是否成功"></a>確認是否成功</h3>  <figure class="highlight bash"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">nvidia-smi</span><br></pre></td></tr></table></figure>
-
-<p>　看到下面的畫面就是成功</p>
-  <figure class="highlight sh"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br></pre></td><td class="code"><pre><span class="line">$ nvidia-smi</span><br><span class="line">Tue Jul 30 08:07:18 2024</span><br><span class="line">+-----------------------------------------------------------------------------------------+</span><br><span class="line">| NVIDIA-SMI 550.90.07              Driver Version: 550.90.07      CUDA Version: 12.4     |</span><br><span class="line">|-----------------------------------------+------------------------+----------------------+</span><br><span class="line">| GPU  Name                 Persistence-M | Bus-Id          Disp.A | Volatile Uncorr. ECC |</span><br><span class="line">| Fan  Temp   Perf          Pwr:Usage/Cap |           Memory-Usage | GPU-Util  Compute M. |</span><br><span class="line">|                                         |                        |               MIG M. |</span><br><span class="line">|=========================================+========================+======================|</span><br><span class="line">|   0  NVIDIA A100 80GB PCIe          Off |   00000001:00:00.0 Off |                    0 |</span><br><span class="line">| N/A   32C    P0             43W /  300W |       1MiB /  81920MiB |      0%      Default |</span><br><span class="line">|                                         |                        |             Disabled |</span><br><span class="line">+-----------------------------------------+------------------------+----------------------+</span><br><span class="line"></span><br><span class="line">+-----------------------------------------------------------------------------------------+</span><br><span class="line">| Processes:                                                                              |</span><br><span class="line">|  GPU   GI   CI        PID   Type   Process name                              GPU Memory |</span><br><span class="line">|        ID   ID                                                               Usage      |</span><br><span class="line">|=========================================================================================|</span><br><span class="line">|  No running processes found                                                             |</span><br><span class="line">+-----------------------------------------------------------------------------------------+</span><br></pre></td></tr></table></figure>
-
-<h2 id="參考"><a href="#參考" class="headerlink" title="參考"></a>參考</h2><ul>
-<li><a target="_blank" rel="noopener" href="https://packages.ubuntu.com/focal/kernel/">Ubuntu 網站</a></li>
-<li><a target="_blank" rel="noopener" href="https://ubuntu.com/server/docs/nvidia-drivers-installation">NVIDIA drivers installation | Ubuntu</a></li>
-<li><a target="_blank" rel="noopener" href="https://docs.nvidia.com/cuda/cuda-installation-guide-linux/index.html#ubuntu">參考官方文件 <strong>3.9. Ubuntu</strong></a></li>
-</ul>
-<p>(fin)</p>
-
-      
-    </div>
-    <footer class="article-footer">
-      <a data-url="https://blog.marsen.me/2024/07/03/2024/azure_vm_for_nvidia_error_records/" data-id="clz876v3f00ca2snpexgg3lwh" class="article-share-link">Share</a>
-      
-        <a href="https://blog.marsen.me/2024/07/03/2024/azure_vm_for_nvidia_error_records/#disqus_thread" class="article-comment-link">留言</a>
       
       
     </footer>
@@ -396,7 +396,7 @@ j=d.createElement(s),dl=l!='dataLayer'?'&l='+l:'';j.async=true;j.src=
       
     </div>
     <footer class="article-footer">
-      <a data-url="https://blog.marsen.me/2024/07/01/2024/azure_vm_snapshot/" data-id="clz876v3g00cf2snpgq255qtn" class="article-share-link">Share</a>
+      <a data-url="https://blog.marsen.me/2024/07/01/2024/azure_vm_snapshot/" data-id="clz877ovd00f92st6fxwy9fli" class="article-share-link">Share</a>
       
         <a href="https://blog.marsen.me/2024/07/01/2024/azure_vm_snapshot/#disqus_thread" class="article-comment-link">留言</a>
       
@@ -579,7 +579,7 @@ j=d.createElement(s),dl=l!='dataLayer'?'&l='+l:'';j.async=true;j.src=
       
     </div>
     <footer class="article-footer">
-      <a data-url="https://blog.marsen.me/2024/06/14/2024/my_tools_2024/" data-id="clz876v3l00cw2snp18w48k99" class="article-share-link">Share</a>
+      <a data-url="https://blog.marsen.me/2024/06/14/2024/my_tools_2024/" data-id="clz877ovi00ft2st6hhle7hqx" class="article-share-link">Share</a>
       
         <a href="https://blog.marsen.me/2024/06/14/2024/my_tools_2024/#disqus_thread" class="article-comment-link">留言</a>
       
@@ -649,7 +649,7 @@ j=d.createElement(s),dl=l!='dataLayer'?'&l='+l:'';j.async=true;j.src=
       
     </div>
     <footer class="article-footer">
-      <a data-url="https://blog.marsen.me/2024/06/07/2024/azure_email_communication_service/" data-id="clz876v3e00c52snp6egi9olx" class="article-share-link">Share</a>
+      <a data-url="https://blog.marsen.me/2024/06/07/2024/azure_email_communication_service/" data-id="clz877ovb00f12st6du946on1" class="article-share-link">Share</a>
       
         <a href="https://blog.marsen.me/2024/06/07/2024/azure_email_communication_service/#disqus_thread" class="article-comment-link">留言</a>
       
@@ -720,7 +720,7 @@ j=d.createElement(s),dl=l!='dataLayer'?'&l='+l:'';j.async=true;j.src=
       
     </div>
     <footer class="article-footer">
-      <a data-url="https://blog.marsen.me/2024/05/14/2024/gitlab_ci_and_gcs_as_static_site/" data-id="clz876v3j00cp2snp37m47m28" class="article-share-link">Share</a>
+      <a data-url="https://blog.marsen.me/2024/05/14/2024/gitlab_ci_and_gcs_as_static_site/" data-id="clz877ovg00fl2st6f68b2x21" class="article-share-link">Share</a>
       
         <a href="https://blog.marsen.me/2024/05/14/2024/gitlab_ci_and_gcs_as_static_site/#disqus_thread" class="article-comment-link">留言</a>
       
@@ -794,7 +794,7 @@ j=d.createElement(s),dl=l!='dataLayer'?'&l='+l:'';j.async=true;j.src=
       
     </div>
     <footer class="article-footer">
-      <a data-url="https://blog.marsen.me/2024/04/17/2024/clear_gitlab-runner/" data-id="clz876v3h00ch2snpemru6ecf" class="article-share-link">Share</a>
+      <a data-url="https://blog.marsen.me/2024/04/17/2024/clear_gitlab-runner/" data-id="clz877ove00fe2st67u9d2dt0" class="article-share-link">Share</a>
       
         <a href="https://blog.marsen.me/2024/04/17/2024/clear_gitlab-runner/#disqus_thread" class="article-comment-link">留言</a>
       
@@ -879,7 +879,7 @@ j=d.createElement(s),dl=l!='dataLayer'?'&l='+l:'';j.async=true;j.src=
       
     </div>
     <footer class="article-footer">
-      <a data-url="https://blog.marsen.me/2024/04/17/2024/gitlab_ci_and_gcp_cloud_run/" data-id="clz876v3i00ck2snp4jx7baxm" class="article-share-link">Share</a>
+      <a data-url="https://blog.marsen.me/2024/04/17/2024/gitlab_ci_and_gcp_cloud_run/" data-id="clz877ovf00fg2st60qm65ulh" class="article-share-link">Share</a>
       
         <a href="https://blog.marsen.me/2024/04/17/2024/gitlab_ci_and_gcp_cloud_run/#disqus_thread" class="article-comment-link">留言</a>
       
@@ -965,7 +965,7 @@ j=d.createElement(s),dl=l!='dataLayer'?'&l='+l:'';j.async=true;j.src=
       
     </div>
     <footer class="article-footer">
-      <a data-url="https://blog.marsen.me/2024/03/29/2024/mac_terminal_prompts_setting/" data-id="clz876v3k00cr2snp9i0ugq7m" class="article-share-link">Share</a>
+      <a data-url="https://blog.marsen.me/2024/03/29/2024/mac_terminal_prompts_setting/" data-id="clz877ovh00fo2st6fg9956ad" class="article-share-link">Share</a>
       
         <a href="https://blog.marsen.me/2024/03/29/2024/mac_terminal_prompts_setting/#disqus_thread" class="article-comment-link">留言</a>
       
@@ -1028,7 +1028,7 @@ j=d.createElement(s),dl=l!='dataLayer'?'&l='+l:'';j.async=true;j.src=
       
     </div>
     <footer class="article-footer">
-      <a data-url="https://blog.marsen.me/2024/03/19/2024/typescript_using/" data-id="clz876v3m00cz2snpawud0cux" class="article-share-link">Share</a>
+      <a data-url="https://blog.marsen.me/2024/03/19/2024/typescript_using/" data-id="clz877ovi00fv2st62h50h3xc" class="article-share-link">Share</a>
       
         <a href="https://blog.marsen.me/2024/03/19/2024/typescript_using/#disqus_thread" class="article-comment-link">留言</a>
       
@@ -1056,11 +1056,11 @@ j=d.createElement(s),dl=l!='dataLayer'?'&l='+l:'';j.async=true;j.src=
       <ul>
         
           <li>
-            <a href="/2024/07/03/2024/azure_vm_for_nvidia/">[實作筆記] 初體驗設定 Nvidia GPU 的 Azure VM</a>
+            <a href="/2024/07/30/2024/azure_vm_for_nvidia_error_records/">[實作筆記] 初體驗設定 Nvidia GPU 的 Azure VM -- 錯誤排除</a>
           </li>
         
           <li>
-            <a href="/2024/07/03/2024/azure_vm_for_nvidia_error_records/">[實作筆記] 初體驗設定 Nvidia GPU 的 Azure VM -- 錯誤排除</a>
+            <a href="/2024/07/03/2024/azure_vm_for_nvidia/">[實作筆記] 初體驗設定 Nvidia GPU 的 Azure VM</a>
           </li>
         
           <li>
