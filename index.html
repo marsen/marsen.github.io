@@ -165,6 +165,53 @@ j=d.createElement(s),dl=l!='dataLayer'?'&l='+l:'';j.async=true;j.src=
 <p>　看到下面的畫面就是成功</p>
   <figure class="highlight sh"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br></pre></td><td class="code"><pre><span class="line">&gt; nvidia-smi</span><br><span class="line">Mon Jul  1 09:21:24 2024</span><br><span class="line">+---------------------------------------------------------------------------------------+</span><br><span class="line">| NVIDIA-SMI 535.183.01             Driver Version: 535.183.01   CUDA Version: 12.2     |</span><br><span class="line">|-----------------------------------------+----------------------+----------------------+</span><br><span class="line">| GPU  Name                 Persistence-M | Bus-Id        Disp.A | Volatile Uncorr. ECC |</span><br><span class="line">| Fan  Temp   Perf          Pwr:Usage/Cap |         Memory-Usage | GPU-Util  Compute M. |</span><br><span class="line">|                                         |                      |               MIG M. |</span><br><span class="line">|=========================================+======================+======================|</span><br><span class="line">|   0  Tesla T4                       Off | 00000001:00:00.0 Off |                  Off |</span><br><span class="line">| N/A   31C    P8               9W /  70W |    140MiB / 16384MiB |      0%      Default |</span><br><span class="line">|                                         |                      |                  N/A |</span><br><span class="line">+-----------------------------------------+----------------------+----------------------+</span><br><span class="line"></span><br><span class="line">+---------------------------------------------------------------------------------------+</span><br><span class="line">| Processes:                                                                            |</span><br><span class="line">|  GPU   GI   CI        PID   Type   Process name                            GPU Memory |</span><br><span class="line">|        ID   ID                                                             Usage      |</span><br><span class="line">|=======================================================================================|</span><br><span class="line">|    0   N/A  N/A      1095      G   /usr/lib/xorg/Xorg                          130MiB |</span><br><span class="line">|    0   N/A  N/A      1356      G   /usr/bin/gnome-shell                          7MiB |</span><br><span class="line">+---------------------------------------------------------------------------------------+</span><br></pre></td></tr></table></figure>
 
+<h2 id="20240730-更新"><a href="#20240730-更新" class="headerlink" title="20240730 更新"></a>20240730 更新</h2><h3 id="原由"><a href="#原由" class="headerlink" title="原由"></a>原由</h3><p>RD 們反應因為 Driver 更新導致服務異常，停止運作。<br>重新安裝時又遇到一些奇怪的問題，例如：<br>錯誤：</p>
+<figure class="highlight shell"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br></pre></td><td class="code"><pre><span class="line">sudo apt install -y linux-modules-nvidia-550-azure nvidia-driver-550</span><br><span class="line">Reading package lists... Done</span><br><span class="line">Building dependency tree       </span><br><span class="line">Reading state information... Done</span><br><span class="line">E: Unable to locate package linux-modules-nvidia-550-azure</span><br></pre></td></tr></table></figure>
+
+<p>或是</p>
+<figure class="highlight shell"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br></pre></td><td class="code"><pre><span class="line">Failed to initialize NVML: Driver/library version mismatch</span><br><span class="line">NVML library version: 535.183</span><br></pre></td></tr></table></figure>
+
+<p>依實際狀況與 RD 討論，發現他們沒有一個標準的作業程序，調研時也沒有任何記錄，<br>東作一塊，西作一塊，沒有辦法很清楚了交互的作用關係。<br>故由我重新實作一遍，記錄並排除相關錯誤。  </p>
+<ul>
+<li><p>Azure 開機，指定作業系統為 Ubuntu 22.04，並且需注意 A100 系列機器只在特定的 Zone 才有資源開機</p>
+</li>
+<li><p>安裝 CUDA,　<a target="_blank" rel="noopener" href="https://docs.nvidia.com/cuda/cuda-installation-guide-linux/index.html#ubuntu">參考官方文件 <strong>3.9. Ubuntu</strong></a></p>
+</li>
+<li><p>安裝 ubuntu-drivers-common</p>
+<ul>
+<li><code>sudo apt install ubuntu-drivers-common</code></li>
+<li><code>sudo apt install alsa-utils</code> #音效相關，不一定要裝，但是可以減少指令時的錯誤訊息</li>
+<li><code>ubuntu-drivers device</code></li>
+</ul>
+<figure class="highlight bash"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br></pre></td><td class="code"><pre><span class="line">$ ubuntu-drivers devices</span><br><span class="line">== /sys/devices/LNXSYSTM:00/LNXSYBUS:00/ACPI0004:00/VMBUS:00/00000041-0001-0000-3130-444532304235/pci0001:00/0001:00:00.0 ==</span><br><span class="line">modalias : pci:v000010DEd000020B5sv000010DEsd00001533bc03sc02i00</span><br><span class="line">vendor   : NVIDIA Corporation</span><br><span class="line">driver   : nvidia-driver-555-open - third-party non-free</span><br><span class="line">driver   : nvidia-driver-470-server - distro non-free</span><br><span class="line">driver   : nvidia-driver-535-server-open - distro non-free</span><br><span class="line">driver   : nvidia-driver-555 - third-party non-free recommended</span><br><span class="line">driver   : nvidia-driver-535-server - distro non-free</span><br><span class="line">driver   : nvidia-driver-470 - distro non-free</span><br><span class="line">driver   : nvidia-driver-550 - third-party non-free</span><br><span class="line">driver   : nvidia-driver-550-open - third-party non-free</span><br><span class="line">driver   : nvidia-driver-535-open - distro non-free</span><br><span class="line">driver   : nvidia-driver-545-open - third-party non-free</span><br><span class="line">driver   : xserver-xorg-video-nouveau - distro free <span class="built_in">builtin</span></span><br></pre></td></tr></table></figure>
+</li>
+<li><p>更新套件資訊</p>
+<ul>
+<li>sudo add-apt-repository ppa:graphics-drivers&#x2F;ppa</li>
+<li>sudo apt update</li>
+</ul>
+</li>
+<li><p>安裝趨動, 讓系統自已判斷安裝什麼版本, 參考 <a target="_blank" rel="noopener" href="https://ubuntu.com/server/docs/nvidia-drivers-installation">NVIDIA drivers installation | Ubuntu</a></p>
+<blockquote>
+<p><code>sudo ubuntu-drivers install</code></p>
+</blockquote>
+</li>
+<li><p>重開機</p>
+<blockquote>
+<p><code>sudo reboot</code></p>
+</blockquote>
+</li>
+<li><p>查一下，他幫你裝哪個版本</p>
+<blockquote>
+<p><code>dpkg -l | grep nvidia-driver</code></p>
+</blockquote>
+</li>
+<li><p>再安裝指定版本的 Ubuntu Azure Package，也可以至 <a target="_blank" rel="noopener" href="https://packages.ubuntu.com/focal/kernel/">Ubuntu 網站</a> 搜尋確認</p>
+<blockquote>
+<p><code>sudo apt install -y linux-modules-nvidia-&lt;version&gt;-azure</code></p>
+</blockquote>
+</li>
+</ul>
 <h2 id="參考"><a href="#參考" class="headerlink" title="參考"></a>參考</h2><ul>
 <li><a target="_blank" rel="noopener" href="https://learn.microsoft.com/en-us/azure/virtual-machines/sizes/overview">Sizes for virtual machines in Azure</a></li>
 <li><a target="_blank" rel="noopener" href="https://learn.microsoft.com/en-us/azure/virtual-machines/linux/n-series-driver-setup">Install NVIDIA GPU drivers on N-series VMs running Linux</a></li>
@@ -176,7 +223,7 @@ j=d.createElement(s),dl=l!='dataLayer'?'&l='+l:'';j.async=true;j.src=
       
     </div>
     <footer class="article-footer">
-      <a data-url="https://blog.marsen.me/2024/07/03/2024/azure_vm_for_nvidia/" data-id="clz7u876n00c72sqqfx255wrt" class="article-share-link">Share</a>
+      <a data-url="https://blog.marsen.me/2024/07/03/2024/azure_vm_for_nvidia/" data-id="clz861y2t00f42sp5a6ov4qxw" class="article-share-link">Share</a>
       
         <a href="https://blog.marsen.me/2024/07/03/2024/azure_vm_for_nvidia/#disqus_thread" class="article-comment-link">留言</a>
       
@@ -251,7 +298,7 @@ j=d.createElement(s),dl=l!='dataLayer'?'&l='+l:'';j.async=true;j.src=
       
     </div>
     <footer class="article-footer">
-      <a data-url="https://blog.marsen.me/2024/07/01/2024/azure_vm_snapshot/" data-id="clz7u876o00ca2sqqdpoie0b3" class="article-share-link">Share</a>
+      <a data-url="https://blog.marsen.me/2024/07/01/2024/azure_vm_snapshot/" data-id="clz861y2u00f62sp52n6o3041" class="article-share-link">Share</a>
       
         <a href="https://blog.marsen.me/2024/07/01/2024/azure_vm_snapshot/#disqus_thread" class="article-comment-link">留言</a>
       
@@ -434,7 +481,7 @@ j=d.createElement(s),dl=l!='dataLayer'?'&l='+l:'';j.async=true;j.src=
       
     </div>
     <footer class="article-footer">
-      <a data-url="https://blog.marsen.me/2024/06/14/2024/my_tools_2024/" data-id="clz7u876s00cu2sqqghm71131" class="article-share-link">Share</a>
+      <a data-url="https://blog.marsen.me/2024/06/14/2024/my_tools_2024/" data-id="clz861y2y00fq2sp5ea7pa8g3" class="article-share-link">Share</a>
       
         <a href="https://blog.marsen.me/2024/06/14/2024/my_tools_2024/#disqus_thread" class="article-comment-link">留言</a>
       
@@ -504,7 +551,7 @@ j=d.createElement(s),dl=l!='dataLayer'?'&l='+l:'';j.async=true;j.src=
       
     </div>
     <footer class="article-footer">
-      <a data-url="https://blog.marsen.me/2024/06/07/2024/azure_email_communication_service/" data-id="clz7u876m00c52sqqfhagapj9" class="article-share-link">Share</a>
+      <a data-url="https://blog.marsen.me/2024/06/07/2024/azure_email_communication_service/" data-id="clz861y2s00f12sp542l38pql" class="article-share-link">Share</a>
       
         <a href="https://blog.marsen.me/2024/06/07/2024/azure_email_communication_service/#disqus_thread" class="article-comment-link">留言</a>
       
@@ -575,7 +622,7 @@ j=d.createElement(s),dl=l!='dataLayer'?'&l='+l:'';j.async=true;j.src=
       
     </div>
     <footer class="article-footer">
-      <a data-url="https://blog.marsen.me/2024/05/14/2024/gitlab_ci_and_gcs_as_static_site/" data-id="clz7u876r00cm2sqq0ersg9rs" class="article-share-link">Share</a>
+      <a data-url="https://blog.marsen.me/2024/05/14/2024/gitlab_ci_and_gcs_as_static_site/" data-id="clz861y2w00fj2sp52h4b6rq1" class="article-share-link">Share</a>
       
         <a href="https://blog.marsen.me/2024/05/14/2024/gitlab_ci_and_gcs_as_static_site/#disqus_thread" class="article-comment-link">留言</a>
       
@@ -649,7 +696,7 @@ j=d.createElement(s),dl=l!='dataLayer'?'&l='+l:'';j.async=true;j.src=
       
     </div>
     <footer class="article-footer">
-      <a data-url="https://blog.marsen.me/2024/04/17/2024/clear_gitlab-runner/" data-id="clz7u876p00cf2sqq2axycrud" class="article-share-link">Share</a>
+      <a data-url="https://blog.marsen.me/2024/04/17/2024/clear_gitlab-runner/" data-id="clz861y2v00fb2sp5ck5aaaet" class="article-share-link">Share</a>
       
         <a href="https://blog.marsen.me/2024/04/17/2024/clear_gitlab-runner/#disqus_thread" class="article-comment-link">留言</a>
       
@@ -734,7 +781,7 @@ j=d.createElement(s),dl=l!='dataLayer'?'&l='+l:'';j.async=true;j.src=
       
     </div>
     <footer class="article-footer">
-      <a data-url="https://blog.marsen.me/2024/04/17/2024/gitlab_ci_and_gcp_cloud_run/" data-id="clz7u876p00ch2sqqazeg8a32" class="article-share-link">Share</a>
+      <a data-url="https://blog.marsen.me/2024/04/17/2024/gitlab_ci_and_gcp_cloud_run/" data-id="clz861y2v00fe2sp52phfe8vv" class="article-share-link">Share</a>
       
         <a href="https://blog.marsen.me/2024/04/17/2024/gitlab_ci_and_gcp_cloud_run/#disqus_thread" class="article-comment-link">留言</a>
       
@@ -820,7 +867,7 @@ j=d.createElement(s),dl=l!='dataLayer'?'&l='+l:'';j.async=true;j.src=
       
     </div>
     <footer class="article-footer">
-      <a data-url="https://blog.marsen.me/2024/03/29/2024/mac_terminal_prompts_setting/" data-id="clz7u876r00cp2sqq9dws2qvn" class="article-share-link">Share</a>
+      <a data-url="https://blog.marsen.me/2024/03/29/2024/mac_terminal_prompts_setting/" data-id="clz861y2x00fl2sp5gu6u21j3" class="article-share-link">Share</a>
       
         <a href="https://blog.marsen.me/2024/03/29/2024/mac_terminal_prompts_setting/#disqus_thread" class="article-comment-link">留言</a>
       
@@ -883,7 +930,7 @@ j=d.createElement(s),dl=l!='dataLayer'?'&l='+l:'';j.async=true;j.src=
       
     </div>
     <footer class="article-footer">
-      <a data-url="https://blog.marsen.me/2024/03/19/2024/typescript_using/" data-id="clz7u876t00cw2sqq9rl191w6" class="article-share-link">Share</a>
+      <a data-url="https://blog.marsen.me/2024/03/19/2024/typescript_using/" data-id="clz861y2z00ft2sp53nxe481c" class="article-share-link">Share</a>
       
         <a href="https://blog.marsen.me/2024/03/19/2024/typescript_using/#disqus_thread" class="article-comment-link">留言</a>
       
@@ -987,7 +1034,7 @@ j=d.createElement(s),dl=l!='dataLayer'?'&l='+l:'';j.async=true;j.src=
       
     </div>
     <footer class="article-footer">
-      <a data-url="https://blog.marsen.me/2024/03/13/2024/gitlab_ci_and_gcp_workload_federation/" data-id="clz7u876q00ck2sqqfxpm9qta" class="article-share-link">Share</a>
+      <a data-url="https://blog.marsen.me/2024/03/13/2024/gitlab_ci_and_gcp_workload_federation/" data-id="clz861y2w00fg2sp5azmf0ohd" class="article-share-link">Share</a>
       
         <a href="https://blog.marsen.me/2024/03/13/2024/gitlab_ci_and_gcp_workload_federation/#disqus_thread" class="article-comment-link">留言</a>
       
