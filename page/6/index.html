@@ -103,6 +103,101 @@ j=d.createElement(s),dl=l!='dataLayer'?'&l='+l:'';j.async=true;j.src=
       <div class="outer">
         <section id="main">
   
+    <article id="post-2023/gitlab_ci_and_gcp_vm_create_server" class="article article-type-post" itemscope itemprop="blogPost">
+  <div class="article-meta">
+    <a href="/2023/04/14/2023/gitlab_ci_and_gcp_vm_create_server/" class="article-date">
+  <time datetime="2023-04-14T02:41:50.000Z" itemprop="datePublished">2023-04-14</time>
+</a>
+    
+  </div>
+  <div class="article-inner">
+    
+    
+      <header class="article-header">
+        
+  
+    <h1 itemprop="name">
+      <a class="article-title" href="/2023/04/14/2023/gitlab_ci_and_gcp_vm_create_server/"> [實作筆記] Gitlab CI/CD 與 GCP - 建立 Web Server VM</a>
+    </h1>
+  
+
+      </header>
+    
+    <div class="article-entry" itemprop="articleBody">
+      
+        <h2 id="前言"><a href="#前言" class="headerlink" title="前言"></a>前言</h2><p>請參考<a href="https://blog.marsen.me/2023/04/13/2023/gitlab_ci_and_gcp_vm/">前篇</a>，我們將建立兩台 VM，<br>一台作為 CI&#x2F;CD 用的 Gitlab Runner，另一台作為 Web Server，<br>本篇將介紹 Web Server 的相關設定，<br>架構如下<br><img src="/images/2023/gitlab-gcp.jpg" alt="GCP 與 Gitlab"></p>
+<h2 id="建立-VM"><a href="#建立-VM" class="headerlink" title="建立 VM"></a>建立 VM</h2><p>建立 GCP VM 步驟如下：</p>
+<ol>
+<li>登入 GCP 控制台並選擇適合的專案。</li>
+<li>在主選單中選擇「Compute Engine」，進入虛擬機器的管理頁面。</li>
+<li>點選「建立」(Create) 按鈕，開始建立新的虛擬機器。</li>
+<li>選擇適合的地區 (Region) 與區域 (Zone)，這會決定虛擬機器的物理位置與可用性。</li>
+<li>選擇適合的機器類型 (Machine type) 與規模 (Instance size)，這會決定虛擬機器的運算能力與資源配置。</li>
+<li>選擇適合的作業系統映像 (Operating System Image)，這會作為虛擬機器的基本作業系統。基本上我都選 Ubantu</li>
+<li>選擇適合的開機磁碟 (Boot disk) 配置與容量，這會作為虛擬機器的主要儲存空間。</li>
+<li>選擇適合的防火牆設定 (Firewall) 與網路 (Network) 設定，這會決定虛擬機器的網路連線與安全性設定。</li>
+<li>完成其他選項設定，例如使用者資料 (User data)、預設密鑰 (SSH Keys)、啟用擴展 (Enable extensibility) 等。</li>
+<li>檢閱與確認虛擬機器的設定，並按下「建立」(Create) 按鈕，開始建立虛擬機器。</li>
+<li>等待 GCP 完成虛擬機器的建立與啟動。</li>
+<li>成功建立虛擬機器後，可以透過 SSH 連線或其他遠端連線方式進入虛擬機器，並進行相關的設定與應用程式部署。</li>
+</ol>
+<h2 id="Web-Server"><a href="#Web-Server" class="headerlink" title="Web Server"></a>Web Server</h2><p>Web Server 我們建置得很簡單，<br>使用 Vue 建立的靜態網站，並且由 Nginx 來 host 它</p>
+<ul>
+<li>安裝 Nginx</li>
+</ul>
+<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br></pre></td><td class="code"><pre><span class="line">sudo apt update</span><br><span class="line">sudo apt install nginx</span><br></pre></td></tr></table></figure>
+
+<p>設定 Nginx：預設的 Nginx 設定檔通常位於 &#x2F;etc&#x2F;nginx&#x2F;nginx.conf.。<br>可以編輯此設定檔，設定 Nginx 如何處理 Vue 的靜態檔案。<br>以下是一個範例設定檔：</p>
+<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br></pre></td><td class="code"><pre><span class="line">server &#123;</span><br><span class="line">    listen 80;</span><br><span class="line">    server_name example.com;  # 替換為你的網域名稱</span><br><span class="line"></span><br><span class="line">    root /www/example_output;  # Vue 建置的靜態檔在 .output/public 之中</span><br><span class="line"></span><br><span class="line">    location / &#123;</span><br><span class="line">        try_files $uri $uri/ /index.html;  # 使用 Vue 的路由模式，將所有請求都導向 index.html</span><br><span class="line">    &#125;</span><br><span class="line">&#125;</span><br><span class="line"></span><br><span class="line">server &#123;</span><br><span class="line">    listen 443 ssl;</span><br><span class="line">    server_name example.com;</span><br><span class="line">    root /www/example_output;</span><br><span class="line">    index index.html;</span><br><span class="line"></span><br><span class="line">    ssl_certificate /etc/letsencrypt/live/example.com/full_chain.pem;</span><br><span class="line">    ssl_certificate_key /etc/letsencrypt/live/example.com/private_key.pem;</span><br><span class="line"></span><br><span class="line">  location /www/example_output &#123;</span><br><span class="line">    index index.html;</span><br><span class="line">  &#125;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+<p>在建立測試環境的 Web Server 時，需設定 public IP 以對外提供服務，<br>但同時需要建立防火牆以保障安全性。其他如 DNS、憑證、防火牆等設定，之後再補充。</p>
+<h2 id="建立-Vue-專案"><a href="#建立-Vue-專案" class="headerlink" title="建立 Vue 專案"></a>建立 Vue 專案</h2><p>將 Vue 應用程式編譯成靜態檔案：在 Vue 應用程式的專案目錄中，可以使用以下命令編譯 Vue 應用程式成靜態檔案：</p>
+<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">npm run generate</span><br></pre></td></tr></table></figure>
+
+<p>編譯完成後，靜態檔案會生成在 .&#x2F;output 目錄下。</p>
+<p>將編譯完成的靜態檔案放置到 Nginx 的目錄，<br>重新啟動 Nginx 即完成部署，如果有設定 Hot Reload 則不需要重新啟動<br>現在可以透過瀏覽器來測試 Vue 的靜態網站是否正常運作。</p>
+<h3 id="Tips"><a href="#Tips" class="headerlink" title="Tips"></a>Tips</h3><p>重啟 nginx</p>
+<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">systemctl restart nginx</span><br></pre></td></tr></table></figure>
+
+<p>Nginx hot reload</p>
+<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">nginx -s start</span><br></pre></td></tr></table></figure>
+
+<h2 id="參考"><a href="#參考" class="headerlink" title="參考"></a>參考</h2><ul>
+<li><a target="_blank" rel="noopener" href="https://cloud.google.com/compute">GCP-Compute Engine</a></li>
+<li><a target="_blank" rel="noopener" href="https://certbot.eff.org/">Certbot-get your site on Lock https:&#x2F;&#x2F;</a></li>
+<li>[實作筆記] Gitlab CI&#x2F;CD 與 GCP 相關文章<ul>
+<li><a href="https://blog.marsen.me/2023/04/13/2023/gitlab_ci_and_gcp_vm/">架構全貌</a></li>
+<li><a href="https://blog.marsen.me/2023/04/14/2023/gitlab_ci_and_gcp_vm_create_server/">建立 Web Server VM</a></li>
+<li><a href="https://blog.marsen.me/2023/04/14/2023/gitlab_ci_and_gcp_vm_cretae_runner/">建立 Gitlab Runner VM</a></li>
+<li><a href="https://blog.marsen.me/2023/04/14/2023/gitlab_ci_and_gcp_vm_firewall/">防火牆設定</a></li>
+<li><a href="https://blog.marsen.me/2023/04/24/2023/gitlab_ci_and_gcp_vm_account/">Linux User 與資料夾權限</a></li>
+<li><a href="https://blog.marsen.me/2023/05/29/2023/gitlab_ci_and_gcp_vm_secret_config/">機敏資料的處理</a></li>
+<li><a href="https://blog.marsen.me/2023/11/16/2023/gitlab_ci_error_handle/">錯誤處理</a></li>
+<li><a href="https://blog.marsen.me/2024/03/13/2024/gitlab_ci_and_gcp_workload_federation/">Workload Identity Federation</a></li>
+<li><a href="https://blog.marsen.me/2024/04/17/2024/gitlab_ci_and_gcp_cloud_run/">Cloud Run</a></li>
+</ul>
+</li>
+<li><a target="_blank" rel="noopener" href="https://vuejs.org/">Vue.js</a></li>
+</ul>
+<p>(fin)</p>
+
+      
+    </div>
+    <footer class="article-footer">
+      <a data-url="https://blog.marsen.me/2023/04/14/2023/gitlab_ci_and_gcp_vm_create_server/" data-id="clzgmdpuy00dg2sqtat4u99oi" class="article-share-link">Share</a>
+      
+        <a href="https://blog.marsen.me/2023/04/14/2023/gitlab_ci_and_gcp_vm_create_server/#disqus_thread" class="article-comment-link">留言</a>
+      
+      
+  <ul class="article-tag-list" itemprop="keywords"><li class="article-tag-list-item"><a class="article-tag-list-link" href="/tags/CI-CD/" rel="tag">CI&#x2F;CD</a></li><li class="article-tag-list-item"><a class="article-tag-list-link" href="/tags/%E5%AF%A6%E4%BD%9C%E7%AD%86%E8%A8%98/" rel="tag">實作筆記</a></li></ul>
+
+    </footer>
+  </div>
+  
+</article>
+
+
+  
     <article id="post-2023/gitlab_ci_and_gcp_vm" class="article article-type-post" itemscope itemprop="blogPost">
   <div class="article-meta">
     <a href="/2023/04/13/2023/gitlab_ci_and_gcp_vm/" class="article-date">
@@ -159,7 +254,7 @@ j=d.createElement(s),dl=l!='dataLayer'?'&l='+l:'';j.async=true;j.src=
       
     </div>
     <footer class="article-footer">
-      <a data-url="https://blog.marsen.me/2023/04/13/2023/gitlab_ci_and_gcp_vm/" data-id="clzaxybfa00ek2snp20p851ob" class="article-share-link">Share</a>
+      <a data-url="https://blog.marsen.me/2023/04/13/2023/gitlab_ci_and_gcp_vm/" data-id="clzgmdpux00db2sqt6s44blwm" class="article-share-link">Share</a>
       
         <a href="https://blog.marsen.me/2023/04/13/2023/gitlab_ci_and_gcp_vm/#disqus_thread" class="article-comment-link">留言</a>
       
@@ -243,7 +338,7 @@ j=d.createElement(s),dl=l!='dataLayer'?'&l='+l:'';j.async=true;j.src=
       
     </div>
     <footer class="article-footer">
-      <a data-url="https://blog.marsen.me/2023/04/09/2023/typescript_csharp_oop_compare/" data-id="clzaxybfn00g02snp9fxs0uk3" class="article-share-link">Share</a>
+      <a data-url="https://blog.marsen.me/2023/04/09/2023/typescript_csharp_oop_compare/" data-id="clzgmdpv800er2sqtbv7y3yor" class="article-share-link">Share</a>
       
         <a href="https://blog.marsen.me/2023/04/09/2023/typescript_csharp_oop_compare/#disqus_thread" class="article-comment-link">留言</a>
       
@@ -300,7 +395,7 @@ j=d.createElement(s),dl=l!='dataLayer'?'&l='+l:'';j.async=true;j.src=
       
     </div>
     <footer class="article-footer">
-      <a data-url="https://blog.marsen.me/2023/03/22/2023/dont_use_brew_install_nvm/" data-id="clzaxybf600e22snpban1fnen" class="article-share-link">Share</a>
+      <a data-url="https://blog.marsen.me/2023/03/22/2023/dont_use_brew_install_nvm/" data-id="clzgmdput00cu2sqtgzdc6t9y" class="article-share-link">Share</a>
       
         <a href="https://blog.marsen.me/2023/03/22/2023/dont_use_brew_install_nvm/#disqus_thread" class="article-comment-link">留言</a>
       
@@ -352,7 +447,7 @@ j=d.createElement(s),dl=l!='dataLayer'?'&l='+l:'';j.async=true;j.src=
       
     </div>
     <footer class="article-footer">
-      <a data-url="https://blog.marsen.me/2023/03/15/2023/macOS_Monterey_5000_Port_Occupancy_Cause_and_Solution/" data-id="clzaxybfh00fe2snp7ucs9n7r" class="article-share-link">Share</a>
+      <a data-url="https://blog.marsen.me/2023/03/15/2023/macOS_Monterey_5000_Port_Occupancy_Cause_and_Solution/" data-id="clzgmdpv300e52sqtf63rdr9e" class="article-share-link">Share</a>
       
         <a href="https://blog.marsen.me/2023/03/15/2023/macOS_Monterey_5000_Port_Occupancy_Cause_and_Solution/#disqus_thread" class="article-comment-link">留言</a>
       
@@ -400,7 +495,7 @@ j=d.createElement(s),dl=l!='dataLayer'?'&l='+l:'';j.async=true;j.src=
       
     </div>
     <footer class="article-footer">
-      <a data-url="https://blog.marsen.me/2023/03/14/2023/nodemon_vs_pm2/" data-id="clzaxybfj00fo2snpg71e5y2j" class="article-share-link">Share</a>
+      <a data-url="https://blog.marsen.me/2023/03/14/2023/nodemon_vs_pm2/" data-id="clzgmdpv600ef2sqt198dat6m" class="article-share-link">Share</a>
       
         <a href="https://blog.marsen.me/2023/03/14/2023/nodemon_vs_pm2/#disqus_thread" class="article-comment-link">留言</a>
       
@@ -454,7 +549,7 @@ j=d.createElement(s),dl=l!='dataLayer'?'&l='+l:'';j.async=true;j.src=
       
     </div>
     <footer class="article-footer">
-      <a data-url="https://blog.marsen.me/2023/03/12/2023/gpt_knows_typescript_config_jsx/" data-id="clzaxybfe00f12snp1pvpc48n" class="article-share-link">Share</a>
+      <a data-url="https://blog.marsen.me/2023/03/12/2023/gpt_knows_typescript_config_jsx/" data-id="clzgmdpv100dt2sqt5zv895oc" class="article-share-link">Share</a>
       
         <a href="https://blog.marsen.me/2023/03/12/2023/gpt_knows_typescript_config_jsx/#disqus_thread" class="article-comment-link">留言</a>
       
@@ -510,7 +605,7 @@ j=d.createElement(s),dl=l!='dataLayer'?'&l='+l:'';j.async=true;j.src=
       
     </div>
     <footer class="article-footer">
-      <a data-url="https://blog.marsen.me/2023/02/07/2023/nodejs_passport_local/" data-id="clzaxybfj00fl2snp9or81agq" class="article-share-link">Share</a>
+      <a data-url="https://blog.marsen.me/2023/02/07/2023/nodejs_passport_local/" data-id="clzgmdpv500ec2sqtbey41ign" class="article-share-link">Share</a>
       
         <a href="https://blog.marsen.me/2023/02/07/2023/nodejs_passport_local/#disqus_thread" class="article-comment-link">留言</a>
       
@@ -560,7 +655,7 @@ j=d.createElement(s),dl=l!='dataLayer'?'&l='+l:'';j.async=true;j.src=
       
     </div>
     <footer class="article-footer">
-      <a data-url="https://blog.marsen.me/2023/02/02/2023/sync_ssh_in_dropbox/" data-id="clzaxybfn00fy2snpfpur6tui" class="article-share-link">Share</a>
+      <a data-url="https://blog.marsen.me/2023/02/02/2023/sync_ssh_in_dropbox/" data-id="clzgmdpv800ep2sqt157f27ve" class="article-share-link">Share</a>
       
         <a href="https://blog.marsen.me/2023/02/02/2023/sync_ssh_in_dropbox/#disqus_thread" class="article-comment-link">留言</a>
       
@@ -621,58 +716,9 @@ j=d.createElement(s),dl=l!='dataLayer'?'&l='+l:'';j.async=true;j.src=
       
     </div>
     <footer class="article-footer">
-      <a data-url="https://blog.marsen.me/2023/01/29/2023/String.stringtify/" data-id="clzaxybf100de2snp9hi18kqw" class="article-share-link">Share</a>
+      <a data-url="https://blog.marsen.me/2023/01/29/2023/String.stringtify/" data-id="clzgmdpuo00c52sqtc2pm24fg" class="article-share-link">Share</a>
       
         <a href="https://blog.marsen.me/2023/01/29/2023/String.stringtify/#disqus_thread" class="article-comment-link">留言</a>
-      
-      
-    </footer>
-  </div>
-  
-</article>
-
-
-  
-    <article id="post-2023/2023_plan" class="article article-type-post" itemscope itemprop="blogPost">
-  <div class="article-meta">
-    <a href="/2023/01/06/2023/2023_plan/" class="article-date">
-  <time datetime="2023-01-06T01:12:42.000Z" itemprop="datePublished">2023-01-06</time>
-</a>
-    
-  </div>
-  <div class="article-inner">
-    
-    
-      <header class="article-header">
-        
-  
-    <h1 itemprop="name">
-      <a class="article-title" href="/2023/01/06/2023/2023_plan/"> [生活筆記] 2023 的展望與希望</a>
-    </h1>
-  
-
-      </header>
-    
-    <div class="article-entry" itemprop="articleBody">
-      
-        <h2 id="引言"><a href="#引言" class="headerlink" title="引言"></a>引言</h2><p>回顧過往的 Blog，我很少在作年度的計劃與回顧，<br>22 年末我個人發生比較大的變化。<br>甚至讓我斷了每個月都寫一篇 Blog 的紀錄…<br>下面就是我個人的回顧與反思。</p>
-<h2 id="工作相關"><a href="#工作相關" class="headerlink" title="工作相關"></a>工作相關</h2><p>我不打算在這裡寫太多細節，畢竟事情都還在進行中，未來有機會再細講。<br>簡單講是我會離開 T 社，回顧一年，不論是支援前端 Flutter 或是後台 React 的開發，<br>又或是離職同事的 golang 專案，我自認盡力了，但結果可能不如人意。<br>好處是我學會了 React、Golang、K8s 與部份 GCP 的服務<br>— Flutter 不算有掌握，畢竟公司內的專案實務上並無法接觸 —<br>但是這樣的技能樹是我現在該點的嗎 ? 我心中總有點疑惑…</p>
-<h3 id="我的觀察"><a href="#我的觀察" class="headerlink" title="我的觀察"></a>我的觀察</h3><p>找工作的過程中，發現了很多，<br>太多的公司(不論新舊、大小)都不具備技術審核的能力，<br>這樣的公司都會希望找一個資深的工程師，來帶領團隊，而我似乎是他們的人選，<br>實際上，我不太確定我是否能作好管理，但是無止的追求新技術，也不是我目前的高優先選項，<br>我還是追求匠人精神，技術總是 2~3 年一個大迭代，但是產品不可能不停的翻新，<br>而使用的技術，其實對招募會有很大的影響，畢竟市場上的人才很多會技術導向，<br>開發、維運、招募之間取得平衡是一個持續不斷的挑戰。</p>
-<p>跟很多開發者不一樣的地方，我開發的專案，<br>追求的是零知識的轉移，讓巴士因子儘可能與人脫勾，<br>說白話一點，我希望我開發的產品，透過工程的手段與必要的文件，<br>任何人都可以快速上手，只要搭配不同的組態，可以佈署到不同的環境上。<br>然後我很追求 XP 的開發精神，以前說蠻多的，以後也會再說，就不再佔本篇篇幅了。</p>
-<h3 id="面試感覺"><a href="#面試感覺" class="headerlink" title="面試感覺"></a>面試感覺</h3><p>如果要透過 Hunter，可以再看看他手上的機會，<br>如果都是人力銀行就找得到的機會，可以試試看自已投吧，<br>Hunter 或許可以談出比較高的薪水，但是我的感覺是在玩遊戲，<br>當我表達對工作有興趣，但是薪水可不可能再往上談的時候，講得很硬，<br>當我表達有其它的機會時，薪水就又都可以談了，無言…<br>至少 A 社與 S 社的 Hunter 我是不推的。</p>
-<p>一般的工程師職務都會考 LeetCode，<br>沒刷過的人去刷吧，也不用卡太久，但是一定要把答案看懂，<br>常見的資料結構與演算法寫個一輪吧，<br>是不是需要上百題，就見人見智了。</p>
-<h2 id="未來的走向"><a href="#未來的走向" class="headerlink" title="未來的走向"></a>未來的走向</h2><p>首先，我最理想的狀態，是找到一份遠端的工作機會，如果這個工作穩定，<br>或許我會開始數位遊牧的生活，每隔幾年會到不同的國家作線上的工作。<br>不過我現在有的選項當中，並沒有這個項目</p>
-<h3 id="保持現狀"><a href="#保持現狀" class="headerlink" title="保持現狀"></a>保持現狀</h3><p>A 社是一個老牌的公司了，系統就是 10 年來的累積，<br>感覺有要作很多新東西，但是老系統會放不掉，薪資 N 有符合預期，<br>離家也不算太遠，可以說如果選擇了這份工作，<br>會最接近我的現況。</p>
-<h3 id="出國"><a href="#出國" class="headerlink" title="出國"></a>出國</h3><p>另一個可能性是出國遊學，<br>與打工留學不同的是他沒有年齡限制，<br>剛好現在長輩健康、沒有家累，工作停下來一下，或許是我現階段需要的<br>缺點是這段時間不但沒有收入，半年內可能還會花費不少儲蓄。</p>
-<h3 id="主管職"><a href="#主管職" class="headerlink" title="主管職"></a>主管職</h3><p>另一間 A 社的工作機會是一個主管職，主要的技術棧也與我原本的不大相同。<br>但轉念一想，或許可以有更高的自由度與挑戰，<br>團隊的組成是年輕的新創團隊，2 個後端與 1 個前端，1 個全端與 1 個 AI 工程師。<br>有一種工程師的路走到了盡頭，是不是應該去接受這樣挑戰呢 ?</p>
-<p>(fin)</p>
-
-      
-    </div>
-    <footer class="article-footer">
-      <a data-url="https://blog.marsen.me/2023/01/06/2023/2023_plan/" data-id="clzaxybf000db2snpgtf99t7g" class="article-share-link">Share</a>
-      
-        <a href="https://blog.marsen.me/2023/01/06/2023/2023_plan/#disqus_thread" class="article-comment-link">留言</a>
       
       
     </footer>
@@ -698,6 +744,10 @@ j=d.createElement(s),dl=l!='dataLayer'?'&l='+l:'';j.async=true;j.src=
       <ul>
         
           <li>
+            <a href="/2024/08/05/2024/mysql_partial_index_and_soft_delete/">[學習筆記] SQL 軟刪除與索引 (MySQL/MSSQL/PostgreSQL)</a>
+          </li>
+        
+          <li>
             <a href="/2024/08/01/2024/bash_color/"> [實作筆記] Bash 輸出彩色技巧</a>
           </li>
         
@@ -713,10 +763,6 @@ j=d.createElement(s),dl=l!='dataLayer'?'&l='+l:'';j.async=true;j.src=
             <a href="/2024/07/01/2024/azure_vm_snapshot/"> [實作筆記] 建立 Azure VM 的快照(Snapshot)</a>
           </li>
         
-          <li>
-            <a href="/2024/06/14/2024/my_tools_2024/">[生活筆記] 2024 常用工具整理</a>
-          </li>
-        
       </ul>
     </div>
   </div>
@@ -726,7 +772,7 @@ j=d.createElement(s),dl=l!='dataLayer'?'&l='+l:'';j.async=true;j.src=
   <div class="widget-wrap">
     <h3 class="widget-title">彙整</h3>
     <div class="widget">
-      <ul class="archive-list"><li class="archive-list-item"><a class="archive-list-link" href="/archives/2024/08/">八月 2024</a><span class="archive-list-count">1</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2024/07/">七月 2024</a><span class="archive-list-count">3</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2024/06/">六月 2024</a><span class="archive-list-count">2</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2024/05/">五月 2024</a><span class="archive-list-count">1</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2024/04/">四月 2024</a><span class="archive-list-count">2</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2024/03/">三月 2024</a><span class="archive-list-count">3</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2024/02/">二月 2024</a><span class="archive-list-count">2</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2024/01/">一月 2024</a><span class="archive-list-count">4</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2023/12/">十二月 2023</a><span class="archive-list-count">2</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2023/11/">十一月 2023</a><span class="archive-list-count">3</span></li><span id='list_archives2' style='display:none'><li class="archive-list-item"><a class="archive-list-link" href="/archives/2023/10/">十月 2023</a><span class="archive-list-count">2</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2023/09/">九月 2023</a><span class="archive-list-count">3</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2023/08/">八月 2023</a><span class="archive-list-count">2</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2023/07/">七月 2023</a><span class="archive-list-count">6</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2023/06/">六月 2023</a><span class="archive-list-count">6</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2023/05/">五月 2023</a><span class="archive-list-count">1</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2023/04/">四月 2023</a><span class="archive-list-count">9</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2023/03/">三月 2023</a><span class="archive-list-count">4</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2023/02/">二月 2023</a><span class="archive-list-count">2</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2023/01/">一月 2023</a><span class="archive-list-count">2</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2022/12/">十二月 2022</a><span class="archive-list-count">1</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2022/10/">十月 2022</a><span class="archive-list-count">2</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2022/09/">九月 2022</a><span class="archive-list-count">6</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2022/08/">八月 2022</a><span class="archive-list-count">3</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2022/07/">七月 2022</a><span class="archive-list-count">2</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2022/06/">六月 2022</a><span class="archive-list-count">3</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2022/05/">五月 2022</a><span class="archive-list-count">7</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2022/04/">四月 2022</a><span class="archive-list-count">3</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2022/03/">三月 2022</a><span class="archive-list-count">3</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2022/02/">二月 2022</a><span class="archive-list-count">2</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2022/01/">一月 2022</a><span class="archive-list-count">3</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2021/12/">十二月 2021</a><span class="archive-list-count">2</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2021/11/">十一月 2021</a><span class="archive-list-count">2</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2021/10/">十月 2021</a><span class="archive-list-count">2</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2021/09/">九月 2021</a><span class="archive-list-count">1</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2021/08/">八月 2021</a><span class="archive-list-count">2</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2021/07/">七月 2021</a><span class="archive-list-count">4</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2021/06/">六月 2021</a><span class="archive-list-count">1</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2021/05/">五月 2021</a><span class="archive-list-count">2</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2021/04/">四月 2021</a><span class="archive-list-count">3</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2021/03/">三月 2021</a><span class="archive-list-count">3</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2021/02/">二月 2021</a><span class="archive-list-count">1</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2021/01/">一月 2021</a><span class="archive-list-count">7</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2020/12/">十二月 2020</a><span class="archive-list-count">1</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2020/11/">十一月 2020</a><span class="archive-list-count">2</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2020/10/">十月 2020</a><span class="archive-list-count">5</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2020/09/">九月 2020</a><span class="archive-list-count">5</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2020/08/">八月 2020</a><span class="archive-list-count">2</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2020/07/">七月 2020</a><span class="archive-list-count">3</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2020/06/">六月 2020</a><span class="archive-list-count">3</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2020/05/">五月 2020</a><span class="archive-list-count">3</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2020/04/">四月 2020</a><span class="archive-list-count">4</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2020/03/">三月 2020</a><span class="archive-list-count">1</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2020/02/">二月 2020</a><span class="archive-list-count">1</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2020/01/">一月 2020</a><span class="archive-list-count">5</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2019/12/">十二月 2019</a><span class="archive-list-count">1</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2019/11/">十一月 2019</a><span class="archive-list-count">2</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2019/10/">十月 2019</a><span class="archive-list-count">1</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2019/09/">九月 2019</a><span class="archive-list-count">2</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2019/08/">八月 2019</a><span class="archive-list-count">5</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2019/07/">七月 2019</a><span class="archive-list-count">1</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2019/06/">六月 2019</a><span class="archive-list-count">1</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2019/05/">五月 2019</a><span class="archive-list-count">2</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2019/04/">四月 2019</a><span class="archive-list-count">3</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2019/03/">三月 2019</a><span class="archive-list-count">1</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2019/02/">二月 2019</a><span class="archive-list-count">2</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2019/01/">一月 2019</a><span class="archive-list-count">4</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2018/12/">十二月 2018</a><span class="archive-list-count">5</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2018/11/">十一月 2018</a><span class="archive-list-count">7</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2018/10/">十月 2018</a><span class="archive-list-count">6</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2018/09/">九月 2018</a><span class="archive-list-count">3</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2018/08/">八月 2018</a><span class="archive-list-count">2</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2018/07/">七月 2018</a><span class="archive-list-count">6</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2018/06/">六月 2018</a><span class="archive-list-count">2</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2018/05/">五月 2018</a><span class="archive-list-count">1</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2018/04/">四月 2018</a><span class="archive-list-count">5</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2018/03/">三月 2018</a><span class="archive-list-count">5</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2018/02/">二月 2018</a><span class="archive-list-count">1</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2018/01/">一月 2018</a><span class="archive-list-count">5</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2017/12/">十二月 2017</a><span class="archive-list-count">3</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2017/10/">十月 2017</a><span class="archive-list-count">3</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2017/09/">九月 2017</a><span class="archive-list-count">2</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2017/08/">八月 2017</a><span class="archive-list-count">1</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2017/07/">七月 2017</a><span class="archive-list-count">2</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2017/05/">五月 2017</a><span class="archive-list-count">1</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2017/04/">四月 2017</a><span class="archive-list-count">2</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2017/03/">三月 2017</a><span class="archive-list-count">1</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2017/02/">二月 2017</a><span class="archive-list-count">1</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2017/01/">一月 2017</a><span class="archive-list-count">6</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2016/12/">十二月 2016</a><span class="archive-list-count">1</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2016/11/">十一月 2016</a><span class="archive-list-count">2</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2016/10/">十月 2016</a><span class="archive-list-count">4</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2016/09/">九月 2016</a><span class="archive-list-count">1</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2016/08/">八月 2016</a><span class="archive-list-count">6</span></li></span><span id=''></span><span onclick="var d=document.getElementById('list_archives2'); d.style.display===''?d.style='display:none':d.style=''">toggle...</span></ul>
+      <ul class="archive-list"><li class="archive-list-item"><a class="archive-list-link" href="/archives/2024/08/">八月 2024</a><span class="archive-list-count">2</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2024/07/">七月 2024</a><span class="archive-list-count">3</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2024/06/">六月 2024</a><span class="archive-list-count">2</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2024/05/">五月 2024</a><span class="archive-list-count">1</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2024/04/">四月 2024</a><span class="archive-list-count">2</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2024/03/">三月 2024</a><span class="archive-list-count">3</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2024/02/">二月 2024</a><span class="archive-list-count">2</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2024/01/">一月 2024</a><span class="archive-list-count">4</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2023/12/">十二月 2023</a><span class="archive-list-count">2</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2023/11/">十一月 2023</a><span class="archive-list-count">3</span></li><span id='list_archives2' style='display:none'><li class="archive-list-item"><a class="archive-list-link" href="/archives/2023/10/">十月 2023</a><span class="archive-list-count">2</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2023/09/">九月 2023</a><span class="archive-list-count">3</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2023/08/">八月 2023</a><span class="archive-list-count">2</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2023/07/">七月 2023</a><span class="archive-list-count">6</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2023/06/">六月 2023</a><span class="archive-list-count">6</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2023/05/">五月 2023</a><span class="archive-list-count">1</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2023/04/">四月 2023</a><span class="archive-list-count">9</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2023/03/">三月 2023</a><span class="archive-list-count">4</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2023/02/">二月 2023</a><span class="archive-list-count">2</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2023/01/">一月 2023</a><span class="archive-list-count">2</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2022/12/">十二月 2022</a><span class="archive-list-count">1</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2022/10/">十月 2022</a><span class="archive-list-count">2</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2022/09/">九月 2022</a><span class="archive-list-count">6</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2022/08/">八月 2022</a><span class="archive-list-count">3</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2022/07/">七月 2022</a><span class="archive-list-count">2</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2022/06/">六月 2022</a><span class="archive-list-count">3</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2022/05/">五月 2022</a><span class="archive-list-count">7</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2022/04/">四月 2022</a><span class="archive-list-count">3</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2022/03/">三月 2022</a><span class="archive-list-count">3</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2022/02/">二月 2022</a><span class="archive-list-count">2</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2022/01/">一月 2022</a><span class="archive-list-count">3</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2021/12/">十二月 2021</a><span class="archive-list-count">2</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2021/11/">十一月 2021</a><span class="archive-list-count">2</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2021/10/">十月 2021</a><span class="archive-list-count">2</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2021/09/">九月 2021</a><span class="archive-list-count">1</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2021/08/">八月 2021</a><span class="archive-list-count">2</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2021/07/">七月 2021</a><span class="archive-list-count">4</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2021/06/">六月 2021</a><span class="archive-list-count">1</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2021/05/">五月 2021</a><span class="archive-list-count">2</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2021/04/">四月 2021</a><span class="archive-list-count">3</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2021/03/">三月 2021</a><span class="archive-list-count">3</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2021/02/">二月 2021</a><span class="archive-list-count">1</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2021/01/">一月 2021</a><span class="archive-list-count">7</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2020/12/">十二月 2020</a><span class="archive-list-count">1</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2020/11/">十一月 2020</a><span class="archive-list-count">2</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2020/10/">十月 2020</a><span class="archive-list-count">5</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2020/09/">九月 2020</a><span class="archive-list-count">5</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2020/08/">八月 2020</a><span class="archive-list-count">2</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2020/07/">七月 2020</a><span class="archive-list-count">3</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2020/06/">六月 2020</a><span class="archive-list-count">3</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2020/05/">五月 2020</a><span class="archive-list-count">3</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2020/04/">四月 2020</a><span class="archive-list-count">4</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2020/03/">三月 2020</a><span class="archive-list-count">1</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2020/02/">二月 2020</a><span class="archive-list-count">1</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2020/01/">一月 2020</a><span class="archive-list-count">5</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2019/12/">十二月 2019</a><span class="archive-list-count">1</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2019/11/">十一月 2019</a><span class="archive-list-count">2</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2019/10/">十月 2019</a><span class="archive-list-count">1</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2019/09/">九月 2019</a><span class="archive-list-count">2</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2019/08/">八月 2019</a><span class="archive-list-count">5</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2019/07/">七月 2019</a><span class="archive-list-count">1</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2019/06/">六月 2019</a><span class="archive-list-count">1</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2019/05/">五月 2019</a><span class="archive-list-count">2</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2019/04/">四月 2019</a><span class="archive-list-count">3</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2019/03/">三月 2019</a><span class="archive-list-count">1</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2019/02/">二月 2019</a><span class="archive-list-count">2</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2019/01/">一月 2019</a><span class="archive-list-count">4</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2018/12/">十二月 2018</a><span class="archive-list-count">5</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2018/11/">十一月 2018</a><span class="archive-list-count">7</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2018/10/">十月 2018</a><span class="archive-list-count">6</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2018/09/">九月 2018</a><span class="archive-list-count">3</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2018/08/">八月 2018</a><span class="archive-list-count">2</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2018/07/">七月 2018</a><span class="archive-list-count">6</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2018/06/">六月 2018</a><span class="archive-list-count">2</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2018/05/">五月 2018</a><span class="archive-list-count">1</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2018/04/">四月 2018</a><span class="archive-list-count">5</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2018/03/">三月 2018</a><span class="archive-list-count">5</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2018/02/">二月 2018</a><span class="archive-list-count">1</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2018/01/">一月 2018</a><span class="archive-list-count">5</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2017/12/">十二月 2017</a><span class="archive-list-count">3</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2017/10/">十月 2017</a><span class="archive-list-count">3</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2017/09/">九月 2017</a><span class="archive-list-count">2</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2017/08/">八月 2017</a><span class="archive-list-count">1</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2017/07/">七月 2017</a><span class="archive-list-count">2</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2017/05/">五月 2017</a><span class="archive-list-count">1</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2017/04/">四月 2017</a><span class="archive-list-count">2</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2017/03/">三月 2017</a><span class="archive-list-count">1</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2017/02/">二月 2017</a><span class="archive-list-count">1</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2017/01/">一月 2017</a><span class="archive-list-count">6</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2016/12/">十二月 2016</a><span class="archive-list-count">1</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2016/11/">十一月 2016</a><span class="archive-list-count">2</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2016/10/">十月 2016</a><span class="archive-list-count">4</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2016/09/">九月 2016</a><span class="archive-list-count">1</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2016/08/">八月 2016</a><span class="archive-list-count">6</span></li></span><span id=''></span><span onclick="var d=document.getElementById('list_archives2'); d.style.display===''?d.style='display:none':d.style=''">toggle...</span></ul>
     </div>
   </div>
 
@@ -814,12 +860,20 @@ This work is licensed under a
 <script src="/js/script.js?v=0.js"></script>
 
 <div id="likecoin">
-  <script type="text/javascript">
-    document.write(
-      "<iframe scrolling='no' frameborder='0' sandbox='allow-scripts allow-same-origin allow-popups allow-popups-to-escape-sandbox allow-storage-access-by-user-activation' style='height: 212px; width: 100%;' src='https://button.like.co/in/embed/marsenlin/button?referrer=" +
-      encodeURIComponent(location.href.split("?")[0].split("#")[0]) + "'></iframe>");
-  </script>
+Please enable JavaScript to view the LikeCoin. :P
 </div>
+<script>
+
+  (function(){
+    var ifrm = document.createElement("iframe");
+    ifrm.setAttribute("src", "https://button.like.co/in/embed/marsenlin/button?referrer=undefined");      
+    ifrm.setAttribute("sandbox","allow-scripts allow-same-origin allow-popups allow-popups-to-escape-sandbox");
+    ifrm.frameborder = "0";
+    ifrm.scrolling = "no";
+    (document.getElementById("likecoin").replaceChild(ifrm, document.getElementById("likecoin").childNodes[0]));
+  })();
+
+</script>
 <script>
 
   var disqus_shortname = 'marsenlin';
