@@ -125,34 +125,40 @@ j=d.createElement(s),dl=l!='dataLayer'?'&l='+l:'';j.async=true;j.src=
     
     <div class="article-entry" itemprop="articleBody">
       
-        <h2 id="前情提要"><a href="#前情提要" class="headerlink" title="前情提要"></a>前情提要</h2><p>在 Azure Functions 與 Queue 架構，來開關虛擬機器節省費用。因為這些有 GPU 的機器很貴，而建立 AI 服務又不能沒有它們。</p>
-<h2 id="實作記錄"><a href="#實作記錄" class="headerlink" title="實作記錄"></a>實作記錄</h2><p>一開始的構想很簡單：透過 Queue 接收特定的工作項，並由 Azure Function 來判斷所需要的資源，如果需要 AI 服務，就需要將虛擬機器的打開，<br>並由另一個程式進行後續工作。當工作完成後，再將機器關機。</p>
-<p>程式(python)大致如下,內含開關機的實作</p>
+        <h2 id="前情提要"><a href="#前情提要" class="headerlink" title="前情提要"></a>前情提要</h2><p>在 Azure Functions 和 Queue 的架構下，我們試圖通過自動化開關虛擬機器來節省成本。　　<br>這是因為 GPU 設備的價格相當高昂，而我們的 AI 服務又離不開這些昂貴的機器。</p>
+<p>實作記錄</p>
+<h2 id="實作記錄"><a href="#實作記錄" class="headerlink" title="實作記錄"></a>實作記錄</h2><p>最初的構想非常簡單：通過 Queue 接收特定的任務，然後由 Azure Function 根據需要決定資源的使用。<br>如果需要進行 AI 計算，就必須啟動虛擬機器，而在任務完成後，再將機器關閉。<br>這樣的方式不僅能夠節省資源，還能有效控制成本。</p>
+<p>以下是 Python 程式碼的大致實作，主要為虛擬機器的開關控制邏輯：</p>
 <figure class="highlight python"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br><span class="line">29</span><br><span class="line">30</span><br><span class="line">31</span><br><span class="line">32</span><br><span class="line">33</span><br><span class="line">34</span><br><span class="line">35</span><br><span class="line">36</span><br><span class="line">37</span><br><span class="line">38</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">import</span> azure.functions <span class="keyword">as</span> func</span><br><span class="line"><span class="keyword">from</span> azure.identity <span class="keyword">import</span> DefaultAzureCredential</span><br><span class="line"><span class="keyword">from</span> azure.mgmt.compute <span class="keyword">import</span> ComputeManagementClient</span><br><span class="line"><span class="keyword">import</span> logging, os</span><br><span class="line"></span><br><span class="line">app = func.FunctionApp()</span><br><span class="line"></span><br><span class="line"><span class="meta">@app.queue_trigger(<span class="params">arg_name=<span class="string">&quot;args&quot;</span>, queue_name=<span class="string">&quot;vm-queue&quot;</span>, connection=<span class="string">&quot;CONNECTION_STRING&quot;</span></span>) </span></span><br><span class="line"><span class="keyword">def</span> <span class="title function_">main</span>(<span class="params">args: func.QueueMessage</span>):</span><br><span class="line">    logging.info(<span class="string">&#x27;Queue Msg: %s&#x27;</span>, args.get_body().decode(<span class="string">&#x27;utf-8&#x27;</span>))</span><br><span class="line">    </span><br><span class="line">    <span class="keyword">try</span>:</span><br><span class="line">        credential = DefaultAzureCredential()</span><br><span class="line">        subscription_id = os.getenv(<span class="string">&quot;SUBSCRIPTION&quot;</span>)</span><br><span class="line">        resource_group = os.getenv(<span class="string">&quot;RG&quot;</span>)</span><br><span class="line">        vm_name = os.getenv(<span class="string">&quot;VM_NAME&quot;</span>)</span><br><span class="line"></span><br><span class="line">        compute_client = ComputeManagementClient(credential, subscription_id)</span><br><span class="line">        vm = compute_client.virtual_machines.get(resource_group, vm_name, expand=<span class="string">&#x27;instanceView&#x27;</span>)</span><br><span class="line">        vm_status = vm.instance_view.statuses[<span class="number">1</span>].display_status</span><br><span class="line">        logging.info(<span class="string">&#x27;VM 狀態: %s&#x27;</span>, vm_status)</span><br><span class="line">        </span><br><span class="line">        <span class="keyword">if</span> vm_status == <span class="string">&quot;VM running&quot;</span>:</span><br><span class="line">            logging.info(<span class="string">&#x27;正在關閉VM: %s&#x27;</span>, vm_name)</span><br><span class="line">            operation = compute_client.virtual_machines.begin_deallocate(resource_group, vm_name)</span><br><span class="line">            operation.result()</span><br><span class="line">            logging.info(<span class="string">&#x27;%s 已關閉&#x27;</span>, vm_name)</span><br><span class="line">        <span class="keyword">elif</span> vm_status <span class="keyword">in</span> [<span class="string">&quot;VM deallocated&quot;</span>, <span class="string">&quot;VM stopped&quot;</span>]:</span><br><span class="line">            logging.info(<span class="string">&#x27;正在啟動VM: %s&#x27;</span>, vm_name)</span><br><span class="line">            operation = compute_client.virtual_machines.begin_start(resource_group, vm_name)</span><br><span class="line">            operation.result()</span><br><span class="line">            logging.info(<span class="string">&#x27;VM %s 已啟動&#x27;</span>, vm_name)</span><br><span class="line">        <span class="keyword">else</span>:</span><br><span class="line">            logging.info(<span class="string">&#x27;非預期的 VM 狀態: %s&#x27;</span>, vm_status)</span><br><span class="line"></span><br><span class="line">    <span class="keyword">except</span> Exception <span class="keyword">as</span> e:</span><br><span class="line">        logging.error(<span class="string">&#x27;異常錯誤: %s&#x27;</span>, <span class="built_in">str</span>(e))</span><br><span class="line"></span><br></pre></td></tr></table></figure>
 
-<h3 id="雷-EnvironmentCredential"><a href="#雷-EnvironmentCredential" class="headerlink" title="雷:EnvironmentCredential"></a>雷:EnvironmentCredential</h3><figure class="highlight shell"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br></pre></td><td class="code"><pre><span class="line">DefaultAzureCredential failed to retrieve a token from the included credentials.</span><br><span class="line">Attempted credentials:</span><br><span class="line"> EnvironmentCredential: EnvironmentCredential authentication unavailable. Environment variables are not fully configured.</span><br><span class="line">Visit https://aka.ms/azsdk/python/identity/environmentcredential/troubleshoot to troubleshoot this issue.</span><br><span class="line"> ManagedIdentityCredential: ManagedIdentityCredential authentication unavailable, no response from the IMDS endpoint.</span><br><span class="line"> SharedTokenCacheCredential: SharedTokenCacheCredential authentication unavailable. No accounts were found in the cache.</span><br><span class="line"> AzureCliCredential: Azure CLI not found on path</span><br><span class="line"> AzurePowerShellCredential: PowerShell is not installed</span><br><span class="line"> AzureDeveloperCliCredential: Azure Developer CLI could not be found. Please visit https://aka.ms/azure-dev for installation instructions and then,once installed, authenticate to your Azure account using &#x27;azd auth login&#x27;.</span><br><span class="line">To mitigate this issue, please refer to the troubleshooting guidelines here at https://aka.ms/azsdk/python/identity/defaultazurecredential/troubleshoot.</span><br></pre></td></tr></table></figure>
+<h3 id="異常問題-EnvironmentCredential"><a href="#異常問題-EnvironmentCredential" class="headerlink" title="異常問題:EnvironmentCredential"></a>異常問題:EnvironmentCredential</h3><figure class="highlight shell"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br></pre></td><td class="code"><pre><span class="line">DefaultAzureCredential failed to retrieve a token from the included credentials.</span><br><span class="line">Attempted credentials:</span><br><span class="line"> EnvironmentCredential: EnvironmentCredential authentication unavailable. Environment variables are not fully configured.</span><br><span class="line">Visit https://aka.ms/azsdk/python/identity/environmentcredential/troubleshoot to troubleshoot this issue.</span><br><span class="line"> ManagedIdentityCredential: ManagedIdentityCredential authentication unavailable, no response from the IMDS endpoint.</span><br><span class="line"> SharedTokenCacheCredential: SharedTokenCacheCredential authentication unavailable. No accounts were found in the cache.</span><br><span class="line"> AzureCliCredential: Azure CLI not found on path</span><br><span class="line"> AzurePowerShellCredential: PowerShell is not installed</span><br><span class="line"> AzureDeveloperCliCredential: Azure Developer CLI could not be found. Please visit https://aka.ms/azure-dev for installation instructions and then,once installed, authenticate to your Azure account using &#x27;azd auth login&#x27;.</span><br><span class="line">To mitigate this issue, please refer to the troubleshooting guidelines here at https://aka.ms/azsdk/python/identity/defaultazurecredential/troubleshoot.</span><br></pre></td></tr></table></figure>
 
-<p>表面的原因是權限不足，底層的原因是需要為 Azure Function 配置環境變數，才能取到權限。</p>
-<p>如果要使用 Service Principal 的 Client Secret，配置  </p>
-<ul>
+<p><strong>這個問題表面上看似由於權限不足引起的，但實際上根本原因是缺乏正確的環境變數配置。</strong><br>要使 Azure Function 能夠正常運作並獲得所需的權限，我們需要在 Function 的環境設置中正確配置相應的環境變數。<br>這些環境變數包括關鍵的憑證和授權信息，它們使得 Azure Function 能夠在執行過程中獲取必要的存取權限，從而能夠正常與 Azure 資源進行交互。<br>如果環境變數配置不當或缺失，Azure Function 將無法獲得所需的授權，從而導致權限不足的錯誤。<br>確保這些環境變數被正確設置和管理，是解決此類問題的關鍵步驟</p>
+<p>配置的方式有三種</p>
+<h4 id="如果要使用-Service-Principal-的-Client-Secret，配置"><a href="#如果要使用-Service-Principal-的-Client-Secret，配置" class="headerlink" title="如果要使用 Service Principal 的 Client Secret，配置"></a>如果要使用 Service Principal 的 Client Secret，配置</h4><ul>
 <li>AZURE_CLIENT_ID</li>
 <li>AZURE_TENANT_ID</li>
 <li>AZURE_CLIENT_SECRET</li>
 </ul>
-<p>如果要使用 Service Principal 的　Certificate 驗證，配置  </p>
-<ul>
+<h4 id="如果要使用-Service-Principal-的-Certificate-驗證，配置"><a href="#如果要使用-Service-Principal-的-Certificate-驗證，配置" class="headerlink" title="如果要使用 Service Principal 的　Certificate 驗證，配置"></a>如果要使用 Service Principal 的　Certificate 驗證，配置</h4><ul>
 <li>AZURE_CLIENT_ID</li>
 <li>AZURE_TENANT_ID</li>
 <li>AZURE_CLIENT_CERTIFICATE_PATH</li>
 <li>AZURE_CLIENT_CERTIFICATE_PASSWORD (Optional)</li>
 </ul>
-<p>若要使用密碼進行用戶身份驗證，配置</p>
-<ul>
+<h4 id="若要使用密碼進行用戶身份驗證，配置"><a href="#若要使用密碼進行用戶身份驗證，配置" class="headerlink" title="若要使用密碼進行用戶身份驗證，配置"></a>若要使用密碼進行用戶身份驗證，配置</h4><ul>
 <li>AZURE_USERNAME</li>
 <li>AZURE_PASSWORD</li>
 </ul>
 <p>我選擇第一種配置，需要先加上 App registrations<br>具體流程如下：</p>
-<p>在 Azure Portal 上建立一個新的 Azure Registration。<br>選擇 Certificates &amp; secrets，建立一組 Certificates &amp; secrets。<br>接下來到 Azure Function　Apps 設定環境變數 AZURE_CLIENT_ID 與　AZURE_CLIENT_SECRET,<br>Tenant_ID 可以在透過 Azure Portal 找 Tenant Properties 查詢，一樣設定到環境變數。<br>接下來將 Registration 設定為 Virtual Machine 的 Contributor<br>(待確認開關機是不是有更小的權限？ex:Virtual Machine Contributor、Virtual Machine Operator：)<br>如此一來在開關機時就能有足夠的權限。</p>
+<ul>
+<li>在 Azure Portal 上建立一個新的 Azure Registration。  </li>
+<li>選擇 Certificates &amp; secrets，建立一組 Certificates &amp; secrets。  </li>
+<li>到 Azure Function　Apps 設定環境變數 AZURE_CLIENT_ID 與　AZURE_CLIENT_SECRET,  </li>
+<li>Tenant_ID 可以在透過 Azure Portal 找 Tenant Properties 查詢，一樣設定到環境變數。  </li>
+<li>接下來將 Registration 設定為 Virtual Machine 的 Contributor<br>(待確認開關機是不是有更小的權限？ex:Virtual Machine Contributor、Virtual Machine Operator：)</li>
+</ul>
+<p>如此一來在開關機時就能有足夠的權限。</p>
 <h2 id="參考"><a href="#參考" class="headerlink" title="參考"></a>參考</h2><ul>
 <li><a target="_blank" rel="noopener" href="https://aka.ms/azsdk/python/identity/environmentcredential/troubleshoot">https://aka.ms/azsdk/python/identity/environmentcredential/troubleshoot</a></li>
 <li><a target="_blank" rel="noopener" href="https://github.com/Azure/azure-sdk-for-python/blob/main/sdk/identity/azure-identity/TROUBLESHOOTING.md#troubleshoot-environmentcredential-authentication-issues">https://github.com/Azure/azure-sdk-for-python/blob/main/sdk/identity/azure-identity/TROUBLESHOOTING.md#troubleshoot-environmentcredential-authentication-issues</a></li>
@@ -163,7 +169,7 @@ j=d.createElement(s),dl=l!='dataLayer'?'&l='+l:'';j.async=true;j.src=
       
     </div>
     <footer class="article-footer">
-      <a data-url="https://blog.marsen.me/2024/08/12/2024/azure_function_toggle_virtual_machine/" data-id="clzqlhh3x00ey2sp75qy10dp9" class="article-share-link">Share</a>
+      <a data-url="https://blog.marsen.me/2024/08/12/2024/azure_function_toggle_virtual_machine/" data-id="clzqm0a7w00c72srs7r1n4fn0" class="article-share-link">Share</a>
       
         <a href="https://blog.marsen.me/2024/08/12/2024/azure_function_toggle_virtual_machine/#disqus_thread" class="article-comment-link">留言</a>
       
@@ -220,7 +226,7 @@ j=d.createElement(s),dl=l!='dataLayer'?'&l='+l:'';j.async=true;j.src=
       
     </div>
     <footer class="article-footer">
-      <a data-url="https://blog.marsen.me/2024/08/05/2024/mysql_partial_index_and_soft_delete/" data-id="clzqlhh4600fx2sp72cm9c7dq" class="article-share-link">Share</a>
+      <a data-url="https://blog.marsen.me/2024/08/05/2024/mysql_partial_index_and_soft_delete/" data-id="clzqm0a8400d42srs2u7e9fur" class="article-share-link">Share</a>
       
         <a href="https://blog.marsen.me/2024/08/05/2024/mysql_partial_index_and_soft_delete/#disqus_thread" class="article-comment-link">留言</a>
       
@@ -292,7 +298,7 @@ j=d.createElement(s),dl=l!='dataLayer'?'&l='+l:'';j.async=true;j.src=
       
     </div>
     <footer class="article-footer">
-      <a data-url="https://blog.marsen.me/2024/08/01/2024/bash_color/" data-id="clzqlhh4100fa2sp7d6qfgeka" class="article-share-link">Share</a>
+      <a data-url="https://blog.marsen.me/2024/08/01/2024/bash_color/" data-id="clzqm0a7z00ch2srs4h7lggco" class="article-share-link">Share</a>
       
         <a href="https://blog.marsen.me/2024/08/01/2024/bash_color/#disqus_thread" class="article-comment-link">留言</a>
       
@@ -393,7 +399,7 @@ j=d.createElement(s),dl=l!='dataLayer'?'&l='+l:'';j.async=true;j.src=
       
     </div>
     <footer class="article-footer">
-      <a data-url="https://blog.marsen.me/2024/07/30/2024/azure_virtual_machine_for_nvidia_error_records/" data-id="clzqlhh4000f52sp71nun5a5h" class="article-share-link">Share</a>
+      <a data-url="https://blog.marsen.me/2024/07/30/2024/azure_virtual_machine_for_nvidia_error_records/" data-id="clzqm0a7y00cc2srs29gpgfbr" class="article-share-link">Share</a>
       
         <a href="https://blog.marsen.me/2024/07/30/2024/azure_virtual_machine_for_nvidia_error_records/#disqus_thread" class="article-comment-link">留言</a>
       
@@ -479,7 +485,7 @@ j=d.createElement(s),dl=l!='dataLayer'?'&l='+l:'';j.async=true;j.src=
       
     </div>
     <footer class="article-footer">
-      <a data-url="https://blog.marsen.me/2024/07/03/2024/azure_virtual_machine_for_nvidia/" data-id="clzqlhh3z00f32sp7hpxd7412" class="article-share-link">Share</a>
+      <a data-url="https://blog.marsen.me/2024/07/03/2024/azure_virtual_machine_for_nvidia/" data-id="clzqm0a7x00ca2srs66zy14q5" class="article-share-link">Share</a>
       
         <a href="https://blog.marsen.me/2024/07/03/2024/azure_virtual_machine_for_nvidia/#disqus_thread" class="article-comment-link">留言</a>
       
@@ -554,7 +560,7 @@ j=d.createElement(s),dl=l!='dataLayer'?'&l='+l:'';j.async=true;j.src=
       
     </div>
     <footer class="article-footer">
-      <a data-url="https://blog.marsen.me/2024/07/01/2024/azure_virtual_machine_snapshot/" data-id="clzqlhh4000f82sp78xu1auds" class="article-share-link">Share</a>
+      <a data-url="https://blog.marsen.me/2024/07/01/2024/azure_virtual_machine_snapshot/" data-id="clzqm0a7z00cf2srs4gx3e74p" class="article-share-link">Share</a>
       
         <a href="https://blog.marsen.me/2024/07/01/2024/azure_virtual_machine_snapshot/#disqus_thread" class="article-comment-link">留言</a>
       
@@ -737,7 +743,7 @@ j=d.createElement(s),dl=l!='dataLayer'?'&l='+l:'';j.async=true;j.src=
       
     </div>
     <footer class="article-footer">
-      <a data-url="https://blog.marsen.me/2024/06/14/2024/my_tools_2024/" data-id="clzqlhh4500fu2sp7bcl2bvqv" class="article-share-link">Share</a>
+      <a data-url="https://blog.marsen.me/2024/06/14/2024/my_tools_2024/" data-id="clzqm0a8400d12srs3zxsa2ac" class="article-share-link">Share</a>
       
         <a href="https://blog.marsen.me/2024/06/14/2024/my_tools_2024/#disqus_thread" class="article-comment-link">留言</a>
       
@@ -807,7 +813,7 @@ j=d.createElement(s),dl=l!='dataLayer'?'&l='+l:'';j.async=true;j.src=
       
     </div>
     <footer class="article-footer">
-      <a data-url="https://blog.marsen.me/2024/06/07/2024/azure_email_communication_service/" data-id="clzqlhh3y00f02sp7c6ez9se4" class="article-share-link">Share</a>
+      <a data-url="https://blog.marsen.me/2024/06/07/2024/azure_email_communication_service/" data-id="clzqm0a7w00c52srs693w51e0" class="article-share-link">Share</a>
       
         <a href="https://blog.marsen.me/2024/06/07/2024/azure_email_communication_service/#disqus_thread" class="article-comment-link">留言</a>
       
@@ -878,7 +884,7 @@ j=d.createElement(s),dl=l!='dataLayer'?'&l='+l:'';j.async=true;j.src=
       
     </div>
     <footer class="article-footer">
-      <a data-url="https://blog.marsen.me/2024/05/14/2024/gitlab_ci_and_gcs_as_static_site/" data-id="clzqlhh4400fn2sp7epe4gy4m" class="article-share-link">Share</a>
+      <a data-url="https://blog.marsen.me/2024/05/14/2024/gitlab_ci_and_gcs_as_static_site/" data-id="clzqm0a8200cu2srs4ta7cha2" class="article-share-link">Share</a>
       
         <a href="https://blog.marsen.me/2024/05/14/2024/gitlab_ci_and_gcs_as_static_site/#disqus_thread" class="article-comment-link">留言</a>
       
@@ -952,7 +958,7 @@ j=d.createElement(s),dl=l!='dataLayer'?'&l='+l:'';j.async=true;j.src=
       
     </div>
     <footer class="article-footer">
-      <a data-url="https://blog.marsen.me/2024/04/17/2024/clear_gitlab-runner/" data-id="clzqlhh4200ff2sp70zwe25b7" class="article-share-link">Share</a>
+      <a data-url="https://blog.marsen.me/2024/04/17/2024/clear_gitlab-runner/" data-id="clzqm0a8100cm2srs9yrldksg" class="article-share-link">Share</a>
       
         <a href="https://blog.marsen.me/2024/04/17/2024/clear_gitlab-runner/#disqus_thread" class="article-comment-link">留言</a>
       
