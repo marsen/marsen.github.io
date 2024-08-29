@@ -154,6 +154,37 @@ j=d.createElement(s),dl=l!='dataLayer'?'&l='+l:'';j.async=true;j.src=
 </li>
 <li>log 與 cache 也有看到較高的資料成長曲線，未來也要納入評估</li>
 </ul>
+<h3 id="20240829-更新設置定期清理腳本"><a href="#20240829-更新設置定期清理腳本" class="headerlink" title="20240829 更新設置定期清理腳本"></a>20240829 更新設置定期清理腳本</h3><p>建立 cleanup.sh，並將其放置在 root 根目錄下：</p>
+<figure class="highlight bash"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br></pre></td><td class="code"><pre><span class="line">sudo <span class="built_in">cp</span> /path/to/cleanup.sh /root/</span><br><span class="line">sudo <span class="built_in">chmod</span> +x /root/cleanup.sh</span><br></pre></td></tr></table></figure>
+
+<p>cleanup.sh 的內容：</p>
+<figure class="highlight bash"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br></pre></td><td class="code"><pre><span class="line"><span class="meta">#!/bin/bash</span></span><br><span class="line"></span><br><span class="line"><span class="comment"># 清理未使用的 Docker 資源</span></span><br><span class="line">sudo docker system prune -a --force --volumes</span><br><span class="line"></span><br><span class="line"><span class="comment"># 清理未使用的 Docker 卷</span></span><br><span class="line">sudo docker volume prune --force</span><br><span class="line"></span><br><span class="line"><span class="comment"># 縮減系統日誌大小</span></span><br><span class="line">sudo journalctl --vacuum-time=30d</span><br></pre></td></tr></table></figure>
+
+<h4 id="設置排程"><a href="#設置排程" class="headerlink" title="設置排程"></a>設置排程</h4><p>以 root 用戶創建定期排程以每月執行清理腳本：</p>
+<p>打開 cron 編輯器：</p>
+<figure class="highlight bash"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">sudo crontab -e</span><br></pre></td></tr></table></figure>
+
+<p>在 cron 編輯器中添加以下行：</p>
+<figure class="highlight bash"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">0 0 1 * * /root/cleanup.sh &gt; /root/cleanup.log 2&gt;&amp;1</span><br></pre></td></tr></table></figure>
+
+<ul>
+<li>0 0 1 * *：每月的第一天午夜執行。</li>
+<li>&#x2F;root&#x2F;cleanup.sh：執行清理腳本。</li>
+<li><blockquote>
+<p>&#x2F;root&#x2F;cleanup.log 2&gt;&amp;1：將輸出和錯誤重定向到 &#x2F;root&#x2F;cleanup.log。</p>
+</blockquote>
+</li>
+</ul>
+<h4 id="驗證和檢查"><a href="#驗證和檢查" class="headerlink" title="驗證和檢查"></a>驗證和檢查</h4><p>手動運行清理腳本以驗證它是否按預期工作：</p>
+<figure class="highlight bash"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">sudo /root/cleanup.sh</span><br></pre></td></tr></table></figure>
+
+<h4 id="查看-cron-日誌"><a href="#查看-cron-日誌" class="headerlink" title="查看 cron 日誌"></a>查看 cron 日誌</h4><p>檢查 cron 日誌以確保定期任務已成功運行：</p>
+<p>在 Ubuntu&#x2F;Debian 系統上：</p>
+<figure class="highlight bash"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">sudo grep CRON /var/log/syslog</span><br></pre></td></tr></table></figure>
+
+<p>使用 journalctl（如果使用 systemd）：</p>
+<figure class="highlight bash"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">sudo journalctl -u cron</span><br></pre></td></tr></table></figure>
+
 <h2 id="註解"><a href="#註解" class="headerlink" title="註解"></a>註解</h2><ol>
 <li>Gitlab-Runner 是　Gitlab Solution 中執行工作的實體，可以是多台，此案只有單台</li>
 <li>Dind: Docker In Docker,如同字面意思，在 Docker 中跑 Docker，是 Gitlab-runner 的實作方法之一</li>
@@ -163,7 +194,7 @@ j=d.createElement(s),dl=l!='dataLayer'?'&l='+l:'';j.async=true;j.src=
       
     </div>
     <footer class="article-footer">
-      <a data-url="https://blog.marsen.me/2024/04/17/2024/clear_gitlab-runner/" data-id="clzt5ugty00fi2soz6vxbdgi9" class="article-share-link">Share</a>
+      <a data-url="https://blog.marsen.me/2024/04/17/2024/clear_gitlab-runner/" data-id="cm0ex8ws400cp2sqp85ilgryf" class="article-share-link">Share</a>
       
         <a href="https://blog.marsen.me/2024/04/17/2024/clear_gitlab-runner/#disqus_thread" class="article-comment-link">留言</a>
       
@@ -248,7 +279,7 @@ j=d.createElement(s),dl=l!='dataLayer'?'&l='+l:'';j.async=true;j.src=
       
     </div>
     <footer class="article-footer">
-      <a data-url="https://blog.marsen.me/2024/04/17/2024/gitlab_ci_and_gcp_cloud_run/" data-id="clzt5ugty00fk2soz8y295a0c" class="article-share-link">Share</a>
+      <a data-url="https://blog.marsen.me/2024/04/17/2024/gitlab_ci_and_gcp_cloud_run/" data-id="cm0ex8ws400cr2sqp74uobfyi" class="article-share-link">Share</a>
       
         <a href="https://blog.marsen.me/2024/04/17/2024/gitlab_ci_and_gcp_cloud_run/#disqus_thread" class="article-comment-link">留言</a>
       
@@ -334,7 +365,7 @@ j=d.createElement(s),dl=l!='dataLayer'?'&l='+l:'';j.async=true;j.src=
       
     </div>
     <footer class="article-footer">
-      <a data-url="https://blog.marsen.me/2024/03/29/2024/mac_terminal_prompts_setting/" data-id="clzt5ugu000fs2soz1jpq9iki" class="article-share-link">Share</a>
+      <a data-url="https://blog.marsen.me/2024/03/29/2024/mac_terminal_prompts_setting/" data-id="cm0ex8ws700cz2sqpg93qao3n" class="article-share-link">Share</a>
       
         <a href="https://blog.marsen.me/2024/03/29/2024/mac_terminal_prompts_setting/#disqus_thread" class="article-comment-link">留言</a>
       
@@ -397,7 +428,7 @@ j=d.createElement(s),dl=l!='dataLayer'?'&l='+l:'';j.async=true;j.src=
       
     </div>
     <footer class="article-footer">
-      <a data-url="https://blog.marsen.me/2024/03/19/2024/typescript_using/" data-id="clzt5ugu200g12soz23ud3x4a" class="article-share-link">Share</a>
+      <a data-url="https://blog.marsen.me/2024/03/19/2024/typescript_using/" data-id="cm0ex8wsa00db2sqpg1lweosa" class="article-share-link">Share</a>
       
         <a href="https://blog.marsen.me/2024/03/19/2024/typescript_using/#disqus_thread" class="article-comment-link">留言</a>
       
@@ -501,7 +532,7 @@ j=d.createElement(s),dl=l!='dataLayer'?'&l='+l:'';j.async=true;j.src=
       
     </div>
     <footer class="article-footer">
-      <a data-url="https://blog.marsen.me/2024/03/13/2024/gitlab_ci_and_gcp_workload_federation/" data-id="clzt5ugtz00fn2soz8b8g32fb" class="article-share-link">Share</a>
+      <a data-url="https://blog.marsen.me/2024/03/13/2024/gitlab_ci_and_gcp_workload_federation/" data-id="cm0ex8ws500cu2sqp3bc771d6" class="article-share-link">Share</a>
       
         <a href="https://blog.marsen.me/2024/03/13/2024/gitlab_ci_and_gcp_workload_federation/#disqus_thread" class="article-comment-link">留言</a>
       
@@ -564,7 +595,7 @@ j=d.createElement(s),dl=l!='dataLayer'?'&l='+l:'';j.async=true;j.src=
       
     </div>
     <footer class="article-footer">
-      <a data-url="https://blog.marsen.me/2024/02/24/2024/typing_with_props/" data-id="clzt5ugu200g42sozeprm6wkd" class="article-share-link">Share</a>
+      <a data-url="https://blog.marsen.me/2024/02/24/2024/typing_with_props/" data-id="cm0ex8wsa00d92sqp1tf7ffoc" class="article-share-link">Share</a>
       
         <a href="https://blog.marsen.me/2024/02/24/2024/typing_with_props/#disqus_thread" class="article-comment-link">留言</a>
       
@@ -665,7 +696,7 @@ j=d.createElement(s),dl=l!='dataLayer'?'&l='+l:'';j.async=true;j.src=
       
     </div>
     <footer class="article-footer">
-      <a data-url="https://blog.marsen.me/2024/02/22/2024/vim_learning_source/" data-id="clzt5ugu300g62sozbajacexh" class="article-share-link">Share</a>
+      <a data-url="https://blog.marsen.me/2024/02/22/2024/vim_learning_source/" data-id="cm0ex8wsb00de2sqp0bhz6pt2" class="article-share-link">Share</a>
       
         <a href="https://blog.marsen.me/2024/02/22/2024/vim_learning_source/#disqus_thread" class="article-comment-link">留言</a>
       
@@ -717,7 +748,7 @@ j=d.createElement(s),dl=l!='dataLayer'?'&l='+l:'';j.async=true;j.src=
       
     </div>
     <footer class="article-footer">
-      <a data-url="https://blog.marsen.me/2024/01/25/2024/all_about_azure_resource_group/" data-id="clzt5ugts00ev2soz1fye403h" class="article-share-link">Share</a>
+      <a data-url="https://blog.marsen.me/2024/01/25/2024/all_about_azure_resource_group/" data-id="cm0ex8wry00c02sqpfnlrg5x1" class="article-share-link">Share</a>
       
         <a href="https://blog.marsen.me/2024/01/25/2024/all_about_azure_resource_group/#disqus_thread" class="article-comment-link">留言</a>
       
@@ -785,7 +816,7 @@ j=d.createElement(s),dl=l!='dataLayer'?'&l='+l:'';j.async=true;j.src=
       
     </div>
     <footer class="article-footer">
-      <a data-url="https://blog.marsen.me/2024/01/25/2024/mac_zip_password_automator/" data-id="clzt5ugu000fu2soz4gan1viq" class="article-share-link">Share</a>
+      <a data-url="https://blog.marsen.me/2024/01/25/2024/mac_zip_password_automator/" data-id="cm0ex8ws700d12sqp5taoh6du" class="article-share-link">Share</a>
       
         <a href="https://blog.marsen.me/2024/01/25/2024/mac_zip_password_automator/#disqus_thread" class="article-comment-link">留言</a>
       
@@ -859,7 +890,7 @@ j=d.createElement(s),dl=l!='dataLayer'?'&l='+l:'';j.async=true;j.src=
       
     </div>
     <footer class="article-footer">
-      <a data-url="https://blog.marsen.me/2024/01/03/2024/clamav_install/" data-id="clzt5ugtx00ff2soz6rkfc6kw" class="article-share-link">Share</a>
+      <a data-url="https://blog.marsen.me/2024/01/03/2024/clamav_install/" data-id="cm0ex8ws300cm2sqpahhudceo" class="article-share-link">Share</a>
       
         <a href="https://blog.marsen.me/2024/01/03/2024/clamav_install/#disqus_thread" class="article-comment-link">留言</a>
       
