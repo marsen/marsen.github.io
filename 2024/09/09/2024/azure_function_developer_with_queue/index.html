@@ -43,7 +43,7 @@ j=d.createElement(s),dl=l!='dataLayer'?'&l='+l:'';j.async=true;j.src=
 <meta property="og:description" content="前情提要Azure Functions 提供了在雲端執行無伺服器函數的強大能力，但在本地環境中開發和測試這些函數可以大大提高開發效率。為了模擬 Azure Storage 服務，我們可以使用 Azurite，這是一個 Storage 的本地模擬器。本文將指導你如何在本機上設置 Azure Functions 開發環境建立本機的 Queue 進行開發。 實作記錄1. 建立和設定本機開發環境安裝 Az">
 <meta property="og:locale" content="zh_TW">
 <meta property="article:published_time" content="2024-09-09T09:47:01.000Z">
-<meta property="article:modified_time" content="2024-09-09T10:03:53.569Z">
+<meta property="article:modified_time" content="2024-09-09T10:12:13.573Z">
 <meta property="article:author" content="Marsen L.">
 <meta name="twitter:card" content="summary">
   
@@ -172,6 +172,29 @@ j=d.createElement(s),dl=l!='dataLayer'?'&l='+l:'';j.async=true;j.src=
 <figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">func start</span><br></pre></td></tr></table></figure>
 
 <p>這條命令會啟動你的本地 Azure Functions 執行環境，使你可以在本機上測試和調試你的函數。</p>
+<h3 id="3-代碼檢查和格式化"><a href="#3-代碼檢查和格式化" class="headerlink" title="3. 代碼檢查和格式化"></a>3. 代碼檢查和格式化</h3><h4 id="安裝與配置-Pylint"><a href="#安裝與配置-Pylint" class="headerlink" title="安裝與配置 Pylint"></a>安裝與配置 Pylint</h4><p>Pylint 是一個 Python 代碼靜態分析工具，可以檢查代碼中的錯誤和不符合最佳實踐的地方。首先，安裝 Pylint：</p>
+<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">pip install pylint</span><br></pre></td></tr></table></figure>
+
+<p>配置 Pylint，創建或修改 .pylintrc 文件來包含你的檢查規則：</p>
+<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br></pre></td><td class="code"><pre><span class="line">[MESSAGES CONTROL]</span><br><span class="line">disable=C0114,C0115,C0116</span><br><span class="line"></span><br><span class="line">[FORMAT]</span><br><span class="line">max-line-length=120</span><br></pre></td></tr></table></figure>
+
+<p>使用 Pylint 進行代碼檢查</p>
+<p>運行以下命令來檢查所有 Python 文件：</p>
+<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">pylint *.py</span><br></pre></td></tr></table></figure>
+
+<h4 id="安裝與使用-Black-進行代碼格式化"><a href="#安裝與使用-Black-進行代碼格式化" class="headerlink" title="安裝與使用 Black 進行代碼格式化"></a>安裝與使用 Black 進行代碼格式化</h4><p>Black 是一個自動格式化 Python 代碼的工具，能夠保持代碼風格的一致性。首先，安裝 Black：</p>
+<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">pip install black</span><br></pre></td></tr></table></figure>
+
+<p>格式化整個專案的所有 Python 文件：</p>
+<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">black .</span><br></pre></td></tr></table></figure>
+
+<p>整合檢查和格式化工具</p>
+<p>你可以將代碼檢查和格式化工具整合到一個命令中，這樣可以簡化工作流程：</p>
+<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">pylint *.py &amp;&amp; black .</span><br></pre></td></tr></table></figure>
+
+<h4 id="例外"><a href="#例外" class="headerlink" title="例外"></a>例外</h4><p>在 Azure Functions 中，某些函數參數不符合 Pylint 的命名規則，這可能會導致部署失敗。你可以忽略這些特定的 Pylint 警告，例如：</p>
+<figure class="highlight python"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment"># pylint: disable=C0103</span></span><br><span class="line"><span class="keyword">def</span> <span class="title function_">dispatch_worker</span>(<span class="params">inputQueue: func.QueueMessage, watchQueue: func.Out[<span class="built_in">str</span>]</span>):</span><br></pre></td></tr></table></figure>
+
 <h2 id="問題與排除"><a href="#問題與排除" class="headerlink" title="問題與排除"></a>問題與排除</h2><ul>
 <li>如果 Azurite 無法啟動，請檢查是否已正確安裝 Azurite 以及是否有其他應用程序佔用了相關端口。</li>
 <li>如果 Azure Functions 無法啟動，請確保所有相關的配置文件和依賴項已正確設置。</li>
@@ -185,7 +208,7 @@ j=d.createElement(s),dl=l!='dataLayer'?'&l='+l:'';j.async=true;j.src=
       
     </div>
     <footer class="article-footer">
-      <a data-url="https://blog.marsen.me/2024/09/09/2024/azure_function_developer_with_queue/" data-id="cm0uu5u9z00f42sswg26lg3sb" class="article-share-link">Share</a>
+      <a data-url="https://blog.marsen.me/2024/09/09/2024/azure_function_developer_with_queue/" data-id="cm0uughqf00f42sl972kh2qfp" class="article-share-link">Share</a>
       
         <a href="https://blog.marsen.me/2024/09/09/2024/azure_function_developer_with_queue/#disqus_thread" class="article-comment-link">留言</a>
       
