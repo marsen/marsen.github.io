@@ -103,6 +103,75 @@ j=d.createElement(s),dl=l!='dataLayer'?'&l='+l:'';j.async=true;j.src=
       <div class="outer">
         <section id="main">
   
+    <article id="post-2024/typescript_string_intersection_trick" class="article article-type-post" itemscope itemprop="blogPost">
+  <div class="article-meta">
+    <a href="/2024/09/30/2024/typescript_string_intersection_trick/" class="article-date">
+  <time datetime="2024-09-30T06:00:14.000Z" itemprop="datePublished">2024-09-30</time>
+</a>
+    
+  </div>
+  <div class="article-inner">
+    
+    
+      <header class="article-header">
+        
+  
+    <h1 itemprop="name">
+      <a class="article-title" href="/2024/09/30/2024/typescript_string_intersection_trick/"> [學習筆記] TypeScript 字串建議的小技巧</a>
+    </h1>
+  
+
+      </header>
+    
+    <div class="article-entry" itemprop="articleBody">
+      
+        <h2 id="前情提要"><a href="#前情提要" class="headerlink" title="前情提要"></a>前情提要</h2><p>最近在寫一個 Hero component，需求是讓使用者能指定英雄的種族。<br>我們的設計有一些既定的種族，例如 human 和 demon，同時也希望讓使用者能輸入任何自定義的種族名稱。<br>最初的想法是用以下的定義：  </p>
+<figure class="highlight typescript"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">type</span> <span class="title class_">Race</span> = <span class="string">&#x27;human&#x27;</span> | <span class="string">&#x27;demon&#x27;</span> | <span class="built_in">string</span>;</span><br></pre></td></tr></table></figure>
+
+<p>並在 Hero 的 props 中使用這個型別：  </p>
+<figure class="highlight ts"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">export</span> <span class="keyword">type</span> <span class="title class_">HeroProps</span> = &#123;</span><br><span class="line">  <span class="attr">name</span>: <span class="built_in">string</span>;</span><br><span class="line">  <span class="attr">race</span>: <span class="title class_">Race</span>;</span><br><span class="line">&#125;</span><br><span class="line"></span><br><span class="line"><span class="comment">// component 大概如下</span></span><br><span class="line"><span class="keyword">export</span> <span class="keyword">const</span> <span class="title function_">Hero</span> = (<span class="params">&#123; race,name &#125;: HeroProps</span>) =&gt; &#123;</span><br><span class="line">  <span class="keyword">return</span> (</span><br><span class="line">    <span class="language-xml"><span class="tag">&lt;<span class="name">h1</span>&gt;</span>Hero: &#123;name&#125; is &#123;race&#125;<span class="tag">&lt;/<span class="name">h1</span>&gt;</span></span></span><br><span class="line">  );</span><br><span class="line">&#125;;</span><br></pre></td></tr></table></figure>
+
+<p>這樣一來，使用者可以像這樣使用：  </p>
+<figure class="highlight ts"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment">// src/components/HeroDisplay.tsx</span></span><br><span class="line"></span><br><span class="line"><span class="keyword">import</span> <span class="title class_">React</span> <span class="keyword">from</span> <span class="string">&#x27;react&#x27;</span>;</span><br><span class="line"><span class="keyword">import</span> &#123; <span class="title class_">Hero</span> &#125; <span class="keyword">from</span> <span class="string">&#x27;../components/hero&#x27;</span>; <span class="comment">// 引入 Hero 型別</span></span><br><span class="line"></span><br><span class="line"><span class="keyword">const</span> <span class="title function_">HeroDisplay</span> = (<span class="params"></span>) =&gt; &#123;</span><br><span class="line">  <span class="keyword">return</span> (</span><br><span class="line">    <span class="language-xml"><span class="tag">&lt;<span class="name">div</span>&gt;</span></span></span><br><span class="line"><span class="language-xml">      <span class="tag">&lt;<span class="name">Hero</span> <span class="attr">name</span>=<span class="string">&quot;alice&quot;</span> <span class="attr">race</span>=<span class="string">&quot;human&quot;</span> /&gt;</span></span></span><br><span class="line"><span class="language-xml">      <span class="tag">&lt;<span class="name">Hero</span> <span class="attr">name</span>=<span class="string">&quot;mark&quot;</span> <span class="attr">race</span>=<span class="string">&quot;demon&quot;</span> /&gt;</span></span></span><br><span class="line"><span class="language-xml">      <span class="comment">&lt;!--more heros --&gt;</span></span></span><br><span class="line"><span class="language-xml">    <span class="tag">&lt;/<span class="name">div</span>&gt;</span></span></span><br><span class="line">  );</span><br><span class="line">&#125;;</span><br><span class="line"></span><br><span class="line"><span class="keyword">export</span> <span class="keyword">default</span> <span class="title class_">HeroDisplay</span>;</span><br></pre></td></tr></table></figure>
+
+<p>一切看似沒問題，但問題是——在使用 Hero component 時，TypeScript 並不會自動給出 human 或 demon 這樣的建議。  </p>
+<p><strong>既然我們希望能提供建議，該怎麼解決這個問題呢？</strong>  </p>
+<h2 id="實作記錄"><a href="#實作記錄" class="headerlink" title="實作記錄"></a>實作記錄</h2><p>解決方法看起來有些奇怪，我們可以透過將字串類型與一個空的物件相交來達成目標：  </p>
+<figure class="highlight ts"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">type</span> <span class="title class_">Race</span> = <span class="string">&#x27;human&#x27;</span> | <span class="string">&#x27;demon&#x27;</span> | (<span class="built_in">string</span> &amp; &#123;&#125;);</span><br></pre></td></tr></table></figure>
+
+<p>這樣一來，在使用 Hero component 時，TypeScript 就會正確地給出 primary 和 secondary 的建議。<br>為什麼這會起作用？這其實是 TypeScript 編譯器的一個小「怪癖」。<br>當你把字串常值類型（例如 “human”）與字串類型（string）進行聯集時，<br>TypeScript 會急切地將其轉換為單純的 string，因此在 Hover 時會看到類似這樣的結果：  </p>
+<figure class="highlight ts"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">type</span> <span class="title class_">Race</span> = <span class="string">&#x27;human&#x27;</span> | <span class="string">&#x27;demon&#x27;</span> | <span class="built_in">string</span> ;</span><br><span class="line"><span class="comment">// Hover 時會顯示：</span></span><br><span class="line"><span class="keyword">type</span> <span class="title class_">Race</span> = <span class="built_in">string</span></span><br></pre></td></tr></table></figure>
+
+<p>換句話說，TypeScript 在使用前就忘記了 human 和 demon。<br>而透過與空物件 &amp; {} 進行相交，我們能「欺騙」 TypeScript，讓它在更長時間內保留這些字串常值類型。  </p>
+<figure class="highlight ts"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">type</span> <span class="title class_">Race</span> = <span class="string">&#x27;human&#x27;</span> | <span class="string">&#x27;demon&#x27;</span> | (<span class="built_in">string</span> &amp; &#123;&#125;);</span><br><span class="line"><span class="comment">// Hover 時會顯示：</span></span><br><span class="line"><span class="keyword">type</span> <span class="title class_">Race</span> = <span class="string">&#x27;human&#x27;</span> | <span class="string">&#x27;demon&#x27;</span> | (<span class="built_in">string</span> &amp; &#123;&#125;);</span><br></pre></td></tr></table></figure>
+
+<p>這樣，我們在使用 Race 型別時，TypeScript 就能記得 human 和 demon，並給出對應的建議。</p>
+<p>值得注意的是，string &amp; {} 實際上和單純的 string 是相同的類型，因此不會影響我們傳入的任何字串：</p>
+<figure class="highlight ts"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br></pre></td><td class="code"><pre><span class="line">&lt;<span class="title class_">Hero</span> name=<span class="string">&quot;alice&quot;</span> race=<span class="string">&quot;human&quot;</span> /&gt;</span><br><span class="line"><span class="language-xml"><span class="tag">&lt;<span class="name">Hero</span> <span class="attr">name</span>=<span class="string">&quot;mark&quot;</span> <span class="attr">race</span>=<span class="string">&quot;demon&quot;</span> /&gt;</span></span></span><br></pre></td></tr></table></figure>
+
+<p>這感覺像是在利用 TypeScript 的漏洞。<br>不過，TypeScript 團隊其實是知道這個「技巧」的，他們甚至針對這種情況進行測試。<br>或許將來，TypeScript 會原生支援這樣的功能，但在那之前，這仍是一個實用的小技巧。  </p>
+<p><a target="_blank" rel="noopener" href="https://gist.github.com/marsen/9b6f041177d736f36c42a372ff684f66">範例 Code</a></p>
+<h2 id="小結"><a href="#小結" class="headerlink" title="小結"></a>小結</h2><p>總結來說，當你想允許使用者輸入任意字串但又想提供已知字串常值的自動補全建議時，可以考慮使用 <code>string &amp; &#123;&#125;</code> 這個技巧：  </p>
+<p>它防止 TypeScript 過早將 string | “literal” 合併成單純的 string。<br>實際使用時行為與 string 一樣，但會多提供自動補全功能。<br>這或許不是最正式的解法，但目前仍是一個可以信賴的方式。<br>也許未來 TypeScript 能夠原生解決這個問題，但在那之前，這個小技巧可以為開發帶來便利。  </p>
+<p>(fin)</p>
+
+      
+    </div>
+    <footer class="article-footer">
+      <a data-url="https://blog.marsen.me/2024/09/30/2024/typescript_string_intersection_trick/" data-id="cm1olsts000g72srvgxm11hro" class="article-share-link">Share</a>
+      
+        <a href="https://blog.marsen.me/2024/09/30/2024/typescript_string_intersection_trick/#disqus_thread" class="article-comment-link">留言</a>
+      
+      
+  <ul class="article-tag-list" itemprop="keywords"><li class="article-tag-list-item"><a class="article-tag-list-link" href="/tags/%E5%AD%B8%E7%BF%92%E7%AD%86%E8%A8%98/" rel="tag">學習筆記</a></li></ul>
+
+    </footer>
+  </div>
+  
+</article>
+
+
+  
     <article id="post-2024/type_vs_object_method_syntax_typescript" class="article article-type-post" itemscope itemprop="blogPost">
   <div class="article-meta">
     <a href="/2024/09/26/2024/type_vs_object_method_syntax_typescript/" class="article-date">
@@ -153,78 +222,9 @@ j=d.createElement(s),dl=l!='dataLayer'?'&l='+l:'';j.async=true;j.src=
       
     </div>
     <footer class="article-footer">
-      <a data-url="https://blog.marsen.me/2024/09/26/2024/type_vs_object_method_syntax_typescript/" data-id="cm1oli6xw00ga2sqk8004gf01" class="article-share-link">Share</a>
+      <a data-url="https://blog.marsen.me/2024/09/26/2024/type_vs_object_method_syntax_typescript/" data-id="cm1olstrz00g42srvg9jh8dyj" class="article-share-link">Share</a>
       
         <a href="https://blog.marsen.me/2024/09/26/2024/type_vs_object_method_syntax_typescript/#disqus_thread" class="article-comment-link">留言</a>
-      
-      
-  <ul class="article-tag-list" itemprop="keywords"><li class="article-tag-list-item"><a class="article-tag-list-link" href="/tags/%E5%AD%B8%E7%BF%92%E7%AD%86%E8%A8%98/" rel="tag">學習筆記</a></li></ul>
-
-    </footer>
-  </div>
-  
-</article>
-
-
-  
-    <article id="post-2024/typescript_string_intersection_trick" class="article article-type-post" itemscope itemprop="blogPost">
-  <div class="article-meta">
-    <a href="/2024/09/26/2024/typescript_string_intersection_trick/" class="article-date">
-  <time datetime="2024-09-26T03:14:58.000Z" itemprop="datePublished">2024-09-26</time>
-</a>
-    
-  </div>
-  <div class="article-inner">
-    
-    
-      <header class="article-header">
-        
-  
-    <h1 itemprop="name">
-      <a class="article-title" href="/2024/09/26/2024/typescript_string_intersection_trick/"> [學習筆記] TypeScript 字串建議的小技巧</a>
-    </h1>
-  
-
-      </header>
-    
-    <div class="article-entry" itemprop="articleBody">
-      
-        <h2 id="前情提要"><a href="#前情提要" class="headerlink" title="前情提要"></a>前情提要</h2><p>最近在寫一個 Hero component，需求是讓使用者能指定英雄的種族。<br>我們的設計有一些既定的種族，例如 human 和 demon，同時也希望讓使用者能輸入任何自定義的種族名稱。<br>最初的想法是用以下的定義：  </p>
-<figure class="highlight typescript"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">type</span> <span class="title class_">Race</span> = <span class="string">&#x27;human&#x27;</span> | <span class="string">&#x27;demon&#x27;</span> | <span class="built_in">string</span>;</span><br></pre></td></tr></table></figure>
-
-<p>並在 Hero 的 props 中使用這個型別：  </p>
-<figure class="highlight ts"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">export</span> <span class="keyword">type</span> <span class="title class_">HeroProps</span> = &#123;</span><br><span class="line">  <span class="attr">name</span>: <span class="built_in">string</span>;</span><br><span class="line">  <span class="attr">race</span>: <span class="title class_">Race</span>;</span><br><span class="line">&#125;</span><br><span class="line"></span><br><span class="line"><span class="comment">// component 大概如下</span></span><br><span class="line"><span class="keyword">export</span> <span class="keyword">const</span> <span class="title function_">Hero</span> = (<span class="params">&#123; race,name &#125;: HeroProps</span>) =&gt; &#123;</span><br><span class="line">  <span class="keyword">return</span> (</span><br><span class="line">    <span class="language-xml"><span class="tag">&lt;<span class="name">h1</span>&gt;</span>Hero: &#123;name&#125; is &#123;race&#125;<span class="tag">&lt;/<span class="name">h1</span>&gt;</span></span></span><br><span class="line">  );</span><br><span class="line">&#125;;</span><br></pre></td></tr></table></figure>
-
-<p>這樣一來，使用者可以像這樣使用：  </p>
-<figure class="highlight ts"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment">// src/components/HeroDisplay.tsx</span></span><br><span class="line"></span><br><span class="line"><span class="keyword">import</span> <span class="title class_">React</span> <span class="keyword">from</span> <span class="string">&#x27;react&#x27;</span>;</span><br><span class="line"><span class="keyword">import</span> &#123; <span class="title class_">Hero</span> &#125; <span class="keyword">from</span> <span class="string">&#x27;../components/hero&#x27;</span>; <span class="comment">// 引入 Hero 型別</span></span><br><span class="line"></span><br><span class="line"><span class="keyword">const</span> <span class="title function_">HeroDisplay</span> = (<span class="params"></span>) =&gt; &#123;</span><br><span class="line">  <span class="keyword">return</span> (</span><br><span class="line">    <span class="language-xml"><span class="tag">&lt;<span class="name">div</span>&gt;</span></span></span><br><span class="line"><span class="language-xml">      <span class="tag">&lt;<span class="name">Hero</span> <span class="attr">name</span>=<span class="string">&quot;alice&quot;</span> <span class="attr">race</span>=<span class="string">&quot;human&quot;</span> /&gt;</span></span></span><br><span class="line"><span class="language-xml">      <span class="tag">&lt;<span class="name">Hero</span> <span class="attr">name</span>=<span class="string">&quot;mark&quot;</span> <span class="attr">race</span>=<span class="string">&quot;demon&quot;</span> /&gt;</span></span></span><br><span class="line"><span class="language-xml">      <span class="comment">&lt;!--more heros --&gt;</span></span></span><br><span class="line"><span class="language-xml">    <span class="tag">&lt;/<span class="name">div</span>&gt;</span></span></span><br><span class="line">  );</span><br><span class="line">&#125;;</span><br><span class="line"></span><br><span class="line"><span class="keyword">export</span> <span class="keyword">default</span> <span class="title class_">HeroDisplay</span>;</span><br></pre></td></tr></table></figure>
-
-<p>一切看似沒問題，但問題是——在使用 Hero component 時，TypeScript 並不會自動給出 human 或 demon 這樣的建議。  </p>
-<p><strong>既然我們希望能提供建議，該怎麼解決這個問題呢？</strong>  </p>
-<h2 id="實作記錄"><a href="#實作記錄" class="headerlink" title="實作記錄"></a>實作記錄</h2><p>解決方法看起來有些奇怪，我們可以透過將字串類型與一個空的物件相交來達成目標：  </p>
-<figure class="highlight ts"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">type</span> <span class="title class_">Race</span> = <span class="string">&#x27;human&#x27;</span> | <span class="string">&#x27;demon&#x27;</span> | (<span class="built_in">string</span> &amp; &#123;&#125;);</span><br></pre></td></tr></table></figure>
-
-<p>這樣一來，在使用 Hero component 時，TypeScript 就會正確地給出 primary 和 secondary 的建議。<br>為什麼這會起作用？這其實是 TypeScript 編譯器的一個小「怪癖」。<br>當你把字串常值類型（例如 “human”）與字串類型（string）進行聯集時，<br>TypeScript 會急切地將其轉換為單純的 string，因此在 Hover 時會看到類似這樣的結果：  </p>
-<figure class="highlight ts"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">type</span> <span class="title class_">Race</span> = <span class="string">&#x27;human&#x27;</span> | <span class="string">&#x27;demon&#x27;</span> | <span class="built_in">string</span> ;</span><br><span class="line"><span class="comment">// Hover 時會顯示：</span></span><br><span class="line"><span class="keyword">type</span> <span class="title class_">Race</span> = <span class="built_in">string</span></span><br></pre></td></tr></table></figure>
-
-<p>換句話說，TypeScript 在使用前就忘記了 human 和 demon。<br>而透過與空物件 &amp; {} 進行相交，我們能「欺騙」 TypeScript，讓它在更長時間內保留這些字串常值類型。  </p>
-<figure class="highlight ts"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">type</span> <span class="title class_">Race</span> = <span class="string">&#x27;human&#x27;</span> | <span class="string">&#x27;demon&#x27;</span> | (<span class="built_in">string</span> &amp; &#123;&#125;);</span><br><span class="line"><span class="comment">// Hover 時會顯示：</span></span><br><span class="line"><span class="keyword">type</span> <span class="title class_">Race</span> = <span class="string">&#x27;human&#x27;</span> | <span class="string">&#x27;demon&#x27;</span> | (<span class="built_in">string</span> &amp; &#123;&#125;);</span><br></pre></td></tr></table></figure>
-
-<p>這樣，我們在使用 Race 型別時，TypeScript 就能記得 human 和 demon，並給出對應的建議。</p>
-<p>值得注意的是，string &amp; {} 實際上和單純的 string 是相同的類型，因此不會影響我們傳入的任何字串：</p>
-<figure class="highlight ts"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br></pre></td><td class="code"><pre><span class="line">&lt;<span class="title class_">Hero</span> name=<span class="string">&quot;alice&quot;</span> race=<span class="string">&quot;human&quot;</span> /&gt;</span><br><span class="line"><span class="language-xml"><span class="tag">&lt;<span class="name">Hero</span> <span class="attr">name</span>=<span class="string">&quot;mark&quot;</span> <span class="attr">race</span>=<span class="string">&quot;demon&quot;</span> /&gt;</span></span></span><br></pre></td></tr></table></figure>
-
-<p>這感覺像是在利用 TypeScript 的漏洞。<br>不過，TypeScript 團隊其實是知道這個「技巧」的，他們甚至針對這種情況進行測試。<br>或許將來，TypeScript 會原生支援這樣的功能，但在那之前，這仍是一個實用的小技巧。  </p>
-<p><a target="_blank" rel="noopener" href="https://gist.github.com/marsen/9b6f041177d736f36c42a372ff684f66">範例 Code</a></p>
-<h2 id="小結"><a href="#小結" class="headerlink" title="小結"></a>小結</h2><p>總結來說，當你想允許使用者輸入任意字串但又想提供已知字串常值的自動補全建議時，可以考慮使用 <code>string &amp; &#123;&#125;</code> 這個技巧：  </p>
-<p>它防止 TypeScript 過早將 string | “literal” 合併成單純的 string。<br>實際使用時行為與 string 一樣，但會多提供自動補全功能。<br>這或許不是最正式的解法，但目前仍是一個可以信賴的方式。<br>也許未來 TypeScript 能夠原生解決這個問題，但在那之前，這個小技巧可以為開發帶來便利。  </p>
-<p>(fin)</p>
-
-      
-    </div>
-    <footer class="article-footer">
-      <a data-url="https://blog.marsen.me/2024/09/26/2024/typescript_string_intersection_trick/" data-id="cm1oli6xx00gd2sqk26mied8s" class="article-share-link">Share</a>
-      
-        <a href="https://blog.marsen.me/2024/09/26/2024/typescript_string_intersection_trick/#disqus_thread" class="article-comment-link">留言</a>
       
       
   <ul class="article-tag-list" itemprop="keywords"><li class="article-tag-list-item"><a class="article-tag-list-link" href="/tags/%E5%AD%B8%E7%BF%92%E7%AD%86%E8%A8%98/" rel="tag">學習筆記</a></li></ul>
@@ -336,7 +336,7 @@ j=d.createElement(s),dl=l!='dataLayer'?'&l='+l:'';j.async=true;j.src=
       
     </div>
     <footer class="article-footer">
-      <a data-url="https://blog.marsen.me/2024/09/17/2024/different_FUPAN_ways/" data-id="cm1oli6xs00fq2sqkdjyidwty" class="article-share-link">Share</a>
+      <a data-url="https://blog.marsen.me/2024/09/17/2024/different_FUPAN_ways/" data-id="cm1olstrv00fk2srvf2hgb0g8" class="article-share-link">Share</a>
       
         <a href="https://blog.marsen.me/2024/09/17/2024/different_FUPAN_ways/#disqus_thread" class="article-comment-link">留言</a>
       
@@ -449,7 +449,7 @@ j=d.createElement(s),dl=l!='dataLayer'?'&l='+l:'';j.async=true;j.src=
       
     </div>
     <footer class="article-footer">
-      <a data-url="https://blog.marsen.me/2024/09/09/2024/azure_function_developer_with_queue/" data-id="cm1oli6xo00f42sqk4a74hr4v" class="article-share-link">Share</a>
+      <a data-url="https://blog.marsen.me/2024/09/09/2024/azure_function_developer_with_queue/" data-id="cm1olstrq00ey2srvg3h1f2dd" class="article-share-link">Share</a>
       
         <a href="https://blog.marsen.me/2024/09/09/2024/azure_function_developer_with_queue/#disqus_thread" class="article-comment-link">留言</a>
       
@@ -573,7 +573,7 @@ j=d.createElement(s),dl=l!='dataLayer'?'&l='+l:'';j.async=true;j.src=
       
     </div>
     <footer class="article-footer">
-      <a data-url="https://blog.marsen.me/2024/08/13/2024/azure_function_python_deploy_with_devops_pipeline/" data-id="cm1oli6xo00f62sqkfa3cg6p5" class="article-share-link">Share</a>
+      <a data-url="https://blog.marsen.me/2024/08/13/2024/azure_function_python_deploy_with_devops_pipeline/" data-id="cm1olstrq00f02srvgpp380xa" class="article-share-link">Share</a>
       
         <a href="https://blog.marsen.me/2024/08/13/2024/azure_function_python_deploy_with_devops_pipeline/#disqus_thread" class="article-comment-link">留言</a>
       
@@ -650,7 +650,7 @@ j=d.createElement(s),dl=l!='dataLayer'?'&l='+l:'';j.async=true;j.src=
       
     </div>
     <footer class="article-footer">
-      <a data-url="https://blog.marsen.me/2024/08/12/2024/azure_function_toggle_virtual_machine/" data-id="cm1oli6xp00f92sqk21cbgoiu" class="article-share-link">Share</a>
+      <a data-url="https://blog.marsen.me/2024/08/12/2024/azure_function_toggle_virtual_machine/" data-id="cm1olstrr00f32srv7ruy1qyx" class="article-share-link">Share</a>
       
         <a href="https://blog.marsen.me/2024/08/12/2024/azure_function_toggle_virtual_machine/#disqus_thread" class="article-comment-link">留言</a>
       
@@ -707,7 +707,7 @@ j=d.createElement(s),dl=l!='dataLayer'?'&l='+l:'';j.async=true;j.src=
       
     </div>
     <footer class="article-footer">
-      <a data-url="https://blog.marsen.me/2024/08/05/2024/mysql_partial_index_and_soft_delete/" data-id="cm1oli6xw00g82sqk9vuccqe4" class="article-share-link">Share</a>
+      <a data-url="https://blog.marsen.me/2024/08/05/2024/mysql_partial_index_and_soft_delete/" data-id="cm1olstry00g22srv1toscgkw" class="article-share-link">Share</a>
       
         <a href="https://blog.marsen.me/2024/08/05/2024/mysql_partial_index_and_soft_delete/#disqus_thread" class="article-comment-link">留言</a>
       
@@ -779,7 +779,7 @@ j=d.createElement(s),dl=l!='dataLayer'?'&l='+l:'';j.async=true;j.src=
       
     </div>
     <footer class="article-footer">
-      <a data-url="https://blog.marsen.me/2024/08/01/2024/bash_color/" data-id="cm1oli6xr00fj2sqkc9am52d6" class="article-share-link">Share</a>
+      <a data-url="https://blog.marsen.me/2024/08/01/2024/bash_color/" data-id="cm1olstrt00fd2srv8nj8h73p" class="article-share-link">Share</a>
       
         <a href="https://blog.marsen.me/2024/08/01/2024/bash_color/#disqus_thread" class="article-comment-link">留言</a>
       
@@ -880,7 +880,7 @@ j=d.createElement(s),dl=l!='dataLayer'?'&l='+l:'';j.async=true;j.src=
       
     </div>
     <footer class="article-footer">
-      <a data-url="https://blog.marsen.me/2024/07/30/2024/azure_virtual_machine_for_nvidia_error_records/" data-id="cm1oli6xq00fe2sqkdzwj8gfe" class="article-share-link">Share</a>
+      <a data-url="https://blog.marsen.me/2024/07/30/2024/azure_virtual_machine_for_nvidia_error_records/" data-id="cm1olstrs00f82srv7llmcz6a" class="article-share-link">Share</a>
       
         <a href="https://blog.marsen.me/2024/07/30/2024/azure_virtual_machine_for_nvidia_error_records/#disqus_thread" class="article-comment-link">留言</a>
       
@@ -966,7 +966,7 @@ j=d.createElement(s),dl=l!='dataLayer'?'&l='+l:'';j.async=true;j.src=
       
     </div>
     <footer class="article-footer">
-      <a data-url="https://blog.marsen.me/2024/07/03/2024/azure_virtual_machine_for_nvidia/" data-id="cm1oli6xp00fb2sqkc657d7qj" class="article-share-link">Share</a>
+      <a data-url="https://blog.marsen.me/2024/07/03/2024/azure_virtual_machine_for_nvidia/" data-id="cm1olstrr00f52srv8we2cv3c" class="article-share-link">Share</a>
       
         <a href="https://blog.marsen.me/2024/07/03/2024/azure_virtual_machine_for_nvidia/#disqus_thread" class="article-comment-link">留言</a>
       
@@ -994,11 +994,11 @@ j=d.createElement(s),dl=l!='dataLayer'?'&l='+l:'';j.async=true;j.src=
       <ul>
         
           <li>
-            <a href="/2024/09/26/2024/type_vs_object_method_syntax_typescript/"> [學習筆記] 淺談 TypeScript 方法簡寫與物件屬性語法的差異</a>
+            <a href="/2024/09/30/2024/typescript_string_intersection_trick/"> [學習筆記] TypeScript 字串建議的小技巧</a>
           </li>
         
           <li>
-            <a href="/2024/09/26/2024/typescript_string_intersection_trick/"> [學習筆記] TypeScript 字串建議的小技巧</a>
+            <a href="/2024/09/26/2024/type_vs_object_method_syntax_typescript/"> [學習筆記] 淺談 TypeScript 方法簡寫與物件屬性語法的差異</a>
           </li>
         
           <li>
