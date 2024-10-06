@@ -133,7 +133,7 @@ j=d.createElement(s),dl=l!='dataLayer'?'&l='+l:'';j.async=true;j.src=
 <h2 id="問題：Union-Types-中的-Omit-行為"><a href="#問題：Union-Types-中的-Omit-行為" class="headerlink" title="問題：Union Types 中的 Omit 行為"></a>問題：Union Types 中的 Omit 行為</h2><p>假設我們有三個型別：Game、VideoGame 和 PCGame。<br>它們的 id 和 name 屬性相同，但每個型別都有其獨特的屬性。</p>
 <figure class="highlight typescript"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br></pre></td><td class="code"><pre><span class="line"></span><br><span class="line"><span class="keyword">type</span> <span class="title class_">Game</span> = &#123;</span><br><span class="line">  <span class="attr">id</span>: <span class="built_in">string</span>;        <span class="comment">// 遊戲的唯一識別碼</span></span><br><span class="line">  <span class="attr">name</span>: <span class="built_in">string</span>;      <span class="comment">// 遊戲名稱</span></span><br><span class="line">&#125;;</span><br><span class="line"></span><br><span class="line"><span class="keyword">type</span> <span class="title class_">VideoGame</span> = &#123;</span><br><span class="line">  <span class="attr">id</span>: <span class="built_in">string</span>;              <span class="comment">// 遊戲的唯一識別碼</span></span><br><span class="line">  <span class="attr">name</span>: <span class="built_in">string</span>;            <span class="comment">// 遊戲名稱</span></span><br><span class="line">  <span class="attr">platform</span>: <span class="built_in">string</span>;        <span class="comment">// 遊戲平台</span></span><br><span class="line">  <span class="attr">genre</span>: <span class="built_in">string</span>;           <span class="comment">// 遊戲類型</span></span><br><span class="line">&#125;;</span><br><span class="line"></span><br><span class="line"><span class="keyword">type</span> <span class="title class_">PCGame</span> = &#123;</span><br><span class="line">  <span class="attr">id</span>: <span class="built_in">string</span>;                    <span class="comment">// 遊戲的唯一識別碼</span></span><br><span class="line">  <span class="attr">name</span>: <span class="built_in">string</span>;                  <span class="comment">// 遊戲名稱</span></span><br><span class="line">  <span class="attr">systemRequirements</span>: <span class="built_in">string</span>;    <span class="comment">// 系統需求</span></span><br><span class="line">  <span class="attr">hasDLC</span>: <span class="built_in">boolean</span>;              <span class="comment">// 是否有 DLC</span></span><br><span class="line">&#125;;</span><br><span class="line"></span><br></pre></td></tr></table></figure>
 
-<p>當我們將這三個型別聯合起來形成 MusicProduct 並嘗試使用 Omit 排除 id 時，結果卻不是我們預期的。</p>
+<p>當我們將這三個型別聯合起來形成 GameProduct 並嘗試使用 Omit 排除 id 時，結果卻不是我們預期的。</p>
 <figure class="highlight typescript"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">type</span> <span class="title class_">GameProduct</span> = <span class="title class_">Game</span> | <span class="title class_">VideoGame</span> | <span class="title class_">PCGame</span>;</span><br><span class="line"><span class="keyword">type</span> <span class="title class_">GameProduct</span> = <span class="title class_">Omit</span>&lt;<span class="title class_">GameProduct</span>, <span class="string">&quot;id&quot;</span>&gt;;</span><br></pre></td></tr></table></figure>
 
 <p>你可能期望 GameProductWithoutId 是三個型別排除 id 屬性的 Union Type，但實際上，我們只得到了這樣的結構：</p>
@@ -153,7 +153,7 @@ j=d.createElement(s),dl=l!='dataLayer'?'&l='+l:'';j.async=true;j.src=
 <p>這將生成以下結構：</p>
 <figure class="highlight typescript"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment">// 所以</span></span><br><span class="line"><span class="keyword">type</span> <span class="title class_">GameProductWithoutId</span> = </span><br><span class="line">  &#123; <span class="attr">name</span>: <span class="built_in">string</span> &#125; | </span><br><span class="line">  &#123; <span class="attr">name</span>: <span class="built_in">string</span>; <span class="attr">platform</span>: <span class="built_in">string</span>; <span class="attr">genre</span>: <span class="built_in">string</span> &#125; | </span><br><span class="line">  &#123; <span class="attr">name</span>: <span class="built_in">string</span>; <span class="attr">systemRequirements</span>: <span class="built_in">string</span>; <span class="attr">hasDLC</span>: <span class="built_in">boolean</span> &#125;;</span><br></pre></td></tr></table></figure>
 
-<p>現在，MusicProductWithoutId 正確地成為了每個型別的 Union Type，並且成功地排除了 id 屬性。</p>
+<p>現在，GameProductWithoutId 正確地成為了每個型別的 Union Type，並且成功地排除了 id 屬性。</p>
 <h3 id="Distributive-Pick"><a href="#Distributive-Pick" class="headerlink" title="Distributive Pick"></a>Distributive Pick</h3><p>類似的，我們也可以定義一個 Distributive 的 Pick：</p>
 <figure class="highlight typescript"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">type</span> <span class="title class_">DistributivePick</span>&lt;T, K <span class="keyword">extends</span> keyof T&gt; = T <span class="keyword">extends</span> <span class="built_in">any</span></span><br><span class="line">  ? <span class="title class_">Pick</span>&lt;T, K&gt;</span><br><span class="line">  : <span class="built_in">never</span>;</span><br></pre></td></tr></table></figure>
 
@@ -164,7 +164,7 @@ j=d.createElement(s),dl=l!='dataLayer'?'&l='+l:'';j.async=true;j.src=
       
     </div>
     <footer class="article-footer">
-      <a data-url="https://blog.marsen.me/2024/10/05/2024/typescript_omit_pick_distributive_union_issue/" data-id="cm1w3qtui00gf2soo8hln86ao" class="article-share-link">Share</a>
+      <a data-url="https://blog.marsen.me/2024/10/05/2024/typescript_omit_pick_distributive_union_issue/" data-id="cm1xvbags00gf2slfevmacpn6" class="article-share-link">Share</a>
       
         <a href="https://blog.marsen.me/2024/10/05/2024/typescript_omit_pick_distributive_union_issue/#disqus_thread" class="article-comment-link">留言</a>
       
@@ -245,7 +245,7 @@ j=d.createElement(s),dl=l!='dataLayer'?'&l='+l:'';j.async=true;j.src=
       
     </div>
     <footer class="article-footer">
-      <a data-url="https://blog.marsen.me/2024/10/04/2024/typescript_type_narrowing_example/" data-id="cm1w3qtum00gn2soofl1v03gm" class="article-share-link">Share</a>
+      <a data-url="https://blog.marsen.me/2024/10/04/2024/typescript_type_narrowing_example/" data-id="cm1xvbagu00gp2slff11d9ymx" class="article-share-link">Share</a>
       
         <a href="https://blog.marsen.me/2024/10/04/2024/typescript_type_narrowing_example/#disqus_thread" class="article-comment-link">留言</a>
       
@@ -315,7 +315,7 @@ j=d.createElement(s),dl=l!='dataLayer'?'&l='+l:'';j.async=true;j.src=
       
     </div>
     <footer class="article-footer">
-      <a data-url="https://blog.marsen.me/2024/10/04/2024/typescript_discriminated_unions_guide/" data-id="cm1w3qtui00gd2soo8p0g5mrh" class="article-share-link">Share</a>
+      <a data-url="https://blog.marsen.me/2024/10/04/2024/typescript_discriminated_unions_guide/" data-id="cm1xvbags00gd2slf0z3vc3pg" class="article-share-link">Share</a>
       
         <a href="https://blog.marsen.me/2024/10/04/2024/typescript_discriminated_unions_guide/#disqus_thread" class="article-comment-link">留言</a>
       
@@ -420,7 +420,7 @@ j=d.createElement(s),dl=l!='dataLayer'?'&l='+l:'';j.async=true;j.src=
       
     </div>
     <footer class="article-footer">
-      <a data-url="https://blog.marsen.me/2024/09/30/2024/typescript_template_literals/" data-id="cm1w3qtul00gk2soo15ao9bz3" class="article-share-link">Share</a>
+      <a data-url="https://blog.marsen.me/2024/09/30/2024/typescript_template_literals/" data-id="cm1xvbagt00gk2slf7yoi0m2d" class="article-share-link">Share</a>
       
         <a href="https://blog.marsen.me/2024/09/30/2024/typescript_template_literals/#disqus_thread" class="article-comment-link">留言</a>
       
@@ -489,7 +489,7 @@ j=d.createElement(s),dl=l!='dataLayer'?'&l='+l:'';j.async=true;j.src=
       
     </div>
     <footer class="article-footer">
-      <a data-url="https://blog.marsen.me/2024/09/30/2024/typescript_string_intersection_trick/" data-id="cm1w3qtuj00gi2sooaykg9xaq" class="article-share-link">Share</a>
+      <a data-url="https://blog.marsen.me/2024/09/30/2024/typescript_string_intersection_trick/" data-id="cm1xvbagt00gi2slf87ng9mif" class="article-share-link">Share</a>
       
         <a href="https://blog.marsen.me/2024/09/30/2024/typescript_string_intersection_trick/#disqus_thread" class="article-comment-link">留言</a>
       
@@ -553,7 +553,7 @@ j=d.createElement(s),dl=l!='dataLayer'?'&l='+l:'';j.async=true;j.src=
       
     </div>
     <footer class="article-footer">
-      <a data-url="https://blog.marsen.me/2024/09/26/2024/type_vs_object_method_syntax_typescript/" data-id="cm1w3qtuh00ga2soo0fuxd1m6" class="article-share-link">Share</a>
+      <a data-url="https://blog.marsen.me/2024/09/26/2024/type_vs_object_method_syntax_typescript/" data-id="cm1xvbagr00ga2slf3515763c" class="article-share-link">Share</a>
       
         <a href="https://blog.marsen.me/2024/09/26/2024/type_vs_object_method_syntax_typescript/#disqus_thread" class="article-comment-link">留言</a>
       
@@ -667,7 +667,7 @@ j=d.createElement(s),dl=l!='dataLayer'?'&l='+l:'';j.async=true;j.src=
       
     </div>
     <footer class="article-footer">
-      <a data-url="https://blog.marsen.me/2024/09/17/2024/different_FUPAN_ways/" data-id="cm1w3qtub00fq2sooeoo93rhw" class="article-share-link">Share</a>
+      <a data-url="https://blog.marsen.me/2024/09/17/2024/different_FUPAN_ways/" data-id="cm1xvbagn00ft2slf4o2ocg6d" class="article-share-link">Share</a>
       
         <a href="https://blog.marsen.me/2024/09/17/2024/different_FUPAN_ways/#disqus_thread" class="article-comment-link">留言</a>
       
@@ -780,7 +780,7 @@ j=d.createElement(s),dl=l!='dataLayer'?'&l='+l:'';j.async=true;j.src=
       
     </div>
     <footer class="article-footer">
-      <a data-url="https://blog.marsen.me/2024/09/09/2024/azure_function_developer_with_queue/" data-id="cm1w3qtu600f42soo7equgup0" class="article-share-link">Share</a>
+      <a data-url="https://blog.marsen.me/2024/09/09/2024/azure_function_developer_with_queue/" data-id="cm1xvbagh00f12slfas3j84i2" class="article-share-link">Share</a>
       
         <a href="https://blog.marsen.me/2024/09/09/2024/azure_function_developer_with_queue/#disqus_thread" class="article-comment-link">留言</a>
       
@@ -904,7 +904,7 @@ j=d.createElement(s),dl=l!='dataLayer'?'&l='+l:'';j.async=true;j.src=
       
     </div>
     <footer class="article-footer">
-      <a data-url="https://blog.marsen.me/2024/08/13/2024/azure_function_python_deploy_with_devops_pipeline/" data-id="cm1w3qtu600f62soo762l3cg0" class="article-share-link">Share</a>
+      <a data-url="https://blog.marsen.me/2024/08/13/2024/azure_function_python_deploy_with_devops_pipeline/" data-id="cm1xvbagi00f62slf9was7bs4" class="article-share-link">Share</a>
       
         <a href="https://blog.marsen.me/2024/08/13/2024/azure_function_python_deploy_with_devops_pipeline/#disqus_thread" class="article-comment-link">留言</a>
       
@@ -981,7 +981,7 @@ j=d.createElement(s),dl=l!='dataLayer'?'&l='+l:'';j.async=true;j.src=
       
     </div>
     <footer class="article-footer">
-      <a data-url="https://blog.marsen.me/2024/08/12/2024/azure_function_toggle_virtual_machine/" data-id="cm1w3qtu700f92soo6abu0djw" class="article-share-link">Share</a>
+      <a data-url="https://blog.marsen.me/2024/08/12/2024/azure_function_toggle_virtual_machine/" data-id="cm1xvbagj00f92slf72so72wi" class="article-share-link">Share</a>
       
         <a href="https://blog.marsen.me/2024/08/12/2024/azure_function_toggle_virtual_machine/#disqus_thread" class="article-comment-link">留言</a>
       
