@@ -103,6 +103,360 @@ j=d.createElement(s),dl=l!='dataLayer'?'&l='+l:'';j.async=true;j.src=
       <div class="outer">
         <section id="main">
   
+    <article id="post-2022/react_practice_firebase_login" class="article article-type-post" itemscope itemprop="blogPost">
+  <div class="article-meta">
+    <a href="/2022/01/27/2022/react_practice_firebase_login/" class="article-date">
+  <time datetime="2022-01-27T09:57:59.000Z" itemprop="datePublished">2022-01-27</time>
+</a>
+    
+  </div>
+  <div class="article-inner">
+    
+    
+      <header class="article-header">
+        
+  
+    <h1 itemprop="name">
+      <a class="article-title" href="/2022/01/27/2022/react_practice_firebase_login/"> [實作筆記] React Practice (一) Firebase 與 React Login</a>
+    </h1>
+  
+
+      </header>
+    
+    <div class="article-entry" itemprop="articleBody">
+      
+        <h2 id="前情提要"><a href="#前情提要" class="headerlink" title="前情提要"></a>前情提要</h2><p>本文不會介紹 <a target="_blank" rel="noopener" href="https://firebase.google.com/">Firebase</a> 與 <a target="_blank" rel="noopener" href="https://reactjs.org/">React</a>.<br>依照這篇文章完成後，你會</p>
+<ul>
+<li>透過 <a target="_blank" rel="noopener" href="https://create-react-app.dev/">CRA</a> 建立一個專案</li>
+<li>透過 <a target="_blank" rel="noopener" href="https://mui.com/">MUI</a> 建立符合 <a target="_blank" rel="noopener" href="https://material.io/design">Material Design</a> 的登入畫面</li>
+<li>建立 Firsbase 專案並且透過 Firsbase 完成登入登出的功能</li>
+<li>建立登入後才能瀏覽的頁面，並且實作登入／登出功能，登出後將無法瀏覽</li>
+</ul>
+<h2 id="Firebase-設定"><a href="#Firebase-設定" class="headerlink" title="Firebase 設定"></a>Firebase 設定</h2><h3 id="建立-Firebase-專案"><a href="#建立-Firebase-專案" class="headerlink" title="建立 Firebase 專案"></a>建立 Firebase 專案</h3><p>這裡的操作非常簡單，可以直接參考下面的影片。</p>
+<div class="video-container"><iframe src="https://www.youtube.com/embed/6juww5Lmvgo" frameborder="0" loading="lazy" allowfullscreen></iframe></div>
+
+<p>詳細的步驟如下</p>
+<ol>
+<li>進入 <a target="_blank" rel="noopener" href="https://console.firebase.google.com/">firebase console</a></li>
+<li>選擇建立專案(Add Project)，並且為你的專案取一個名字</li>
+<li>進入剛剛建立的專案後，選擇建立應用程式(Add App)，<br>在這裡我們選擇 Web 類型的應用程式<br>建立完成後我們會得到一個範例檔如下, 部份機敏資料先上遮罩</li>
+</ol>
+<figure class="highlight typescript"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment">// Import the functions you need from the SDKs you need</span></span><br><span class="line"><span class="keyword">import</span> &#123; initializeApp &#125; <span class="keyword">from</span> <span class="string">&quot;firebase/app&quot;</span>;</span><br><span class="line"><span class="keyword">import</span> &#123; getAnalytics &#125; <span class="keyword">from</span> <span class="string">&quot;firebase/analytics&quot;</span>;</span><br><span class="line"><span class="comment">// <span class="doctag">TODO:</span> Add SDKs for Firebase products that you want to use</span></span><br><span class="line"><span class="comment">// https://firebase.google.com/docs/web/setup#available-libraries</span></span><br><span class="line"></span><br><span class="line"><span class="comment">// Your web app&#x27;s Firebase configuration</span></span><br><span class="line"><span class="comment">// For Firebase JS SDK v7.20.0 and later, measurementId is optional</span></span><br><span class="line"><span class="keyword">const</span> firebaseConfig = &#123;</span><br><span class="line">  <span class="attr">apiKey</span>: <span class="string">&quot;A****************&quot;</span>,</span><br><span class="line">  <span class="attr">authDomain</span>: <span class="string">&quot;******.firebaseapp.com&quot;</span>,</span><br><span class="line">  <span class="attr">projectId</span>: <span class="string">&quot;******&quot;</span>,</span><br><span class="line">  <span class="attr">storageBucket</span>: <span class="string">&quot;******.appspot.com&quot;</span>,</span><br><span class="line">  <span class="attr">messagingSenderId</span>: <span class="string">&quot;******&quot;</span>,</span><br><span class="line">  <span class="attr">appId</span>: <span class="string">&quot;1:******:web:******&quot;</span>,</span><br><span class="line">  <span class="attr">measurementId</span>: <span class="string">&quot;G-*********&quot;</span>,</span><br><span class="line">&#125;;</span><br><span class="line"></span><br><span class="line"><span class="comment">// Initialize Firebase</span></span><br><span class="line"><span class="keyword">const</span> app = <span class="title function_">initializeApp</span>(firebaseConfig);</span><br><span class="line"><span class="keyword">const</span> analytics = <span class="title function_">getAnalytics</span>(app);</span><br></pre></td></tr></table></figure>
+
+<h4 id="抽出環境變數"><a href="#抽出環境變數" class="headerlink" title="抽出環境變數"></a>抽出環境變數</h4><p>在 React 當中的機敏資料,建議的作法是使用環境變數,<br>我們可以建立一個<code>.env.local</code>提供給開發測試用,<br>而 Production 環境請直接設定在環境變數中, 相關資料不會進版控.<br>以下幾點注意事項</p>
+<ul>
+<li>必需使用 <code>REACT_APP_*</code> 開頭才可讓 REACT APP 使用 ex:<code>REACT_APP_APIKEY</code></li>
+<li>一般的建議是全大寫</li>
+<li>環境變數的更新不適用 Hot Reload，請重啟環境</li>
+</ul>
+<h3 id="啟用-Firebase-認証-Authentication"><a href="#啟用-Firebase-認証-Authentication" class="headerlink" title="啟用 Firebase 認証(Authentication)"></a>啟用 Firebase 認証(Authentication)</h3><ol>
+<li>首先要建立 Sign-in method &gt; 原生供應商 &gt; 電子郵件&#x2F;密碼</li>
+<li>建立第一個使用者 Users &gt; Add User</li>
+</ol>
+<h2 id="React"><a href="#React" class="headerlink" title="React"></a>React</h2><h3 id="Create-React-Application"><a href="#Create-React-Application" class="headerlink" title="Create React Application"></a>Create React Application</h3><p>我們透過 TypeScript 建立 React 專案</p>
+<figure class="highlight shell"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">npx create-react-app my-app --template typescript</span><br></pre></td></tr></table></figure>
+
+<p>我們可以試著啟動專案看一下，</p>
+<figure class="highlight shell"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">cd my-app</span><br></pre></td></tr></table></figure>
+
+<figure class="highlight shell"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">npm i</span><br></pre></td></tr></table></figure>
+
+<figure class="highlight shell"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">npm start</span><br></pre></td></tr></table></figure>
+
+<h3 id="安裝相關的套件"><a href="#安裝相關的套件" class="headerlink" title="安裝相關的套件"></a>安裝相關的套件</h3><h4 id="emotion-相關"><a href="#emotion-相關" class="headerlink" title="emotion 相關"></a>emotion 相關</h4><figure class="highlight shell"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">npm i @emotion/react @emotion/styled</span><br></pre></td></tr></table></figure>
+
+<h4 id="material-相關"><a href="#material-相關" class="headerlink" title="material 相關"></a>material 相關</h4><figure class="highlight shell"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">npm i @mui/material @mui/icons-material</span><br></pre></td></tr></table></figure>
+
+<h4 id="firebase-相關"><a href="#firebase-相關" class="headerlink" title="firebase 相關"></a>firebase 相關</h4><figure class="highlight shell"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">npm i firebase react-firebase-hooks</span><br></pre></td></tr></table></figure>
+
+<h4 id="react-router-dom-相關"><a href="#react-router-dom-相關" class="headerlink" title="react-router-dom 相關"></a>react-router-dom 相關</h4><figure class="highlight shell"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">npm i react-router-dom@6</span><br></pre></td></tr></table></figure>
+
+<h3 id="建立登入頁面"><a href="#建立登入頁面" class="headerlink" title="建立登入頁面"></a>建立登入頁面</h3><h4 id="登入頁面與路由"><a href="#登入頁面與路由" class="headerlink" title="登入頁面與路由"></a>登入頁面與路由</h4><p>在 src 中建立 <code>pages</code> 資料夾，<br>之後我們再建立 <code>Login.tsx</code> 檔案如下</p>
+<figure class="highlight jsx"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">import</span> <span class="title class_">React</span> <span class="keyword">from</span> <span class="string">&quot;react&quot;</span>;</span><br><span class="line"></span><br><span class="line"><span class="keyword">export</span> <span class="keyword">const</span> <span class="title function_">Login</span> = (<span class="params"></span>) =&gt; &#123;</span><br><span class="line">  <span class="keyword">return</span> <span class="language-xml"><span class="tag">&lt;&gt;</span>Login Page<span class="tag">&lt;/&gt;</span></span>;</span><br><span class="line">&#125;;</span><br></pre></td></tr></table></figure>
+
+<p>接下來我們要透過 react-router-dom 來建立路由<br>開啟 <code>index.tsx</code> 如下</p>
+<figure class="highlight jsx"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">import</span> <span class="title class_">React</span> <span class="keyword">from</span> <span class="string">&#x27;react&#x27;</span>;</span><br><span class="line"><span class="keyword">import</span> <span class="title class_">ReactDOM</span> <span class="keyword">from</span> <span class="string">&#x27;react-dom&#x27;</span>;</span><br><span class="line"><span class="keyword">import</span> <span class="string">&#x27;./index.css&#x27;</span>;</span><br><span class="line"><span class="keyword">import</span> <span class="title class_">App</span> <span class="keyword">from</span> <span class="string">&#x27;./App&#x27;</span>;</span><br><span class="line"><span class="keyword">import</span> reportWebVitals <span class="keyword">from</span> <span class="string">&#x27;./reportWebVitals&#x27;</span>;</span><br><span class="line"></span><br><span class="line"><span class="title class_">ReactDOM</span>.<span class="title function_">render</span>(</span><br><span class="line">  <span class="language-xml"><span class="tag">&lt;<span class="name">React.StrictMode</span>&gt;</span></span></span><br><span class="line"><span class="language-xml">    <span class="tag">&lt;<span class="name">App</span> /&gt;</span></span></span><br><span class="line"><span class="language-xml">  <span class="tag">&lt;/<span class="name">React.StrictMode</span>&gt;</span></span>,</span><br><span class="line">  <span class="variable language_">document</span>.<span class="title function_">getElementById</span>(<span class="string">&#x27;root&#x27;</span>)</span><br><span class="line">);</span><br><span class="line"></span><br><span class="line"><span class="comment">// If you want to start measuring performance in your app, pass a function</span></span><br><span class="line"><span class="comment">// to log results (for example: reportWebVitals(console.log))</span></span><br><span class="line"><span class="comment">// or send to an analytics endpoint. Learn more: https://bit.ly/CRA-vitals</span></span><br><span class="line"><span class="title function_">reportWebVitals</span>();</span><br><span class="line"></span><br></pre></td></tr></table></figure>
+
+<p>修改如下</p>
+<figure class="highlight jsx"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">import</span> <span class="title class_">React</span> <span class="keyword">from</span> <span class="string">&quot;react&quot;</span>;</span><br><span class="line"><span class="keyword">import</span> <span class="title class_">ReactDOM</span> <span class="keyword">from</span> <span class="string">&quot;react-dom&quot;</span>;</span><br><span class="line"><span class="keyword">import</span> <span class="string">&quot;./index.css&quot;</span>;</span><br><span class="line"><span class="keyword">import</span> <span class="title class_">App</span> <span class="keyword">from</span> <span class="string">&quot;./App&quot;</span>;</span><br><span class="line"><span class="keyword">import</span> reportWebVitals <span class="keyword">from</span> <span class="string">&quot;./reportWebVitals&quot;</span>;</span><br><span class="line"><span class="keyword">import</span> &#123; <span class="title class_">BrowserRouter</span>, <span class="title class_">Route</span>, <span class="title class_">Routes</span> &#125; <span class="keyword">from</span> <span class="string">&quot;react-router-dom&quot;</span>;</span><br><span class="line"><span class="keyword">import</span> &#123; <span class="title class_">Login</span> &#125; <span class="keyword">from</span> <span class="string">&quot;./pages/Login&quot;</span>;</span><br><span class="line"></span><br><span class="line"><span class="title class_">ReactDOM</span>.<span class="title function_">render</span>(</span><br><span class="line">  <span class="language-xml"><span class="tag">&lt;<span class="name">React.StrictMode</span>&gt;</span></span></span><br><span class="line"><span class="language-xml">    <span class="tag">&lt;<span class="name">BrowserRouter</span>&gt;</span></span></span><br><span class="line"><span class="language-xml">      <span class="tag">&lt;<span class="name">Routes</span>&gt;</span></span></span><br><span class="line"><span class="language-xml">        <span class="tag">&lt;<span class="name">Route</span> <span class="attr">path</span>=<span class="string">&quot;&quot;</span> <span class="attr">element</span>=<span class="string">&#123;</span>&lt;<span class="attr">App</span> /&gt;</span>&#125; /&gt;</span></span><br><span class="line"><span class="language-xml">        <span class="tag">&lt;<span class="name">Route</span> <span class="attr">path</span>=<span class="string">&quot;login&quot;</span> <span class="attr">element</span>=<span class="string">&#123;</span>&lt;<span class="attr">Login</span> /&gt;</span>&#125; /&gt;</span></span><br><span class="line"><span class="language-xml">      <span class="tag">&lt;/<span class="name">Routes</span>&gt;</span></span></span><br><span class="line"><span class="language-xml">    <span class="tag">&lt;/<span class="name">BrowserRouter</span>&gt;</span></span></span><br><span class="line"><span class="language-xml">  <span class="tag">&lt;/<span class="name">React.StrictMode</span>&gt;</span></span>,</span><br><span class="line">  <span class="variable language_">document</span>.<span class="title function_">getElementById</span>(<span class="string">&quot;root&quot;</span>)</span><br><span class="line">);</span><br><span class="line"></span><br><span class="line"><span class="comment">// If you want to start measuring performance in your app, pass a function</span></span><br><span class="line"><span class="comment">// to log results (for example: reportWebVitals(console.log))</span></span><br><span class="line"><span class="comment">// or send to an analytics endpoint. Learn more: https://bit.ly/CRA-vitals</span></span><br><span class="line"><span class="title function_">reportWebVitals</span>();</span><br></pre></td></tr></table></figure>
+
+<p>重新啟動專案，在瀏覽器輸入不同的網址將會看到不同的畫面，如此我們完成了頁面的路由。</p>
+<h4 id="快速建立符合-MUI-的登入頁面"><a href="#快速建立符合-MUI-的登入頁面" class="headerlink" title="快速建立符合 MUI 的登入頁面"></a>快速建立符合 MUI 的登入頁面</h4><p>我們可以透過 MUI 提供的 <a target="_blank" rel="noopener" href="https://mui.com/getting-started/templates/">Template</a> 來建立 <a target="_blank" rel="noopener" href="https://mui.com/getting-started/templates/sign-in-side/">Login</a> 頁面<br>實作細節如下:</p>
+<ul>
+<li>參考 <a target="_blank" rel="noopener" href="https://github.com/mui-org/material-ui/tree/master/docs/src/pages/getting-started/templates/sign-in-side">Source Code</a> 建立 <code>src/components/SigninSide</code> 組件</li>
+<li>修改 <code>src/pages/Login.tsx</code> 如下:</li>
+</ul>
+<figure class="highlight jsx"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">import</span> <span class="title class_">SignInSide</span> <span class="keyword">from</span> <span class="string">&quot;../components/SignInSide&quot;</span>;</span><br><span class="line"></span><br><span class="line"><span class="keyword">export</span> <span class="keyword">const</span> <span class="title function_">Login</span> = (<span class="params"></span>) =&gt; &#123;</span><br><span class="line">  <span class="keyword">return</span> <span class="language-xml"><span class="tag">&lt;<span class="name">SignInSide</span> /&gt;</span></span>;</span><br><span class="line">&#125;;</span><br></pre></td></tr></table></figure>
+
+<p>重新瀏覽登入畫面，就可以看到一個美觀的登入頁 .</p>
+<h4 id="實作登入功能"><a href="#實作登入功能" class="headerlink" title="實作登入功能"></a>實作登入功能</h4><p>首先請花點時間看一下 <a target="_blank" rel="noopener" href="https://firebase.google.com/docs/auth/web/password-auth#sign_in_a_user_with_an_email_address_and_password">Firebase 帳號密碼登入的文件</a>。<br>接下來我們將依照文件的解釋修改我們的 SigninSide 組件。<br>打開 SigninSide 組件，找到<code>handleSubmit</code> 函數如下：</p>
+<figure class="highlight jsx"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">const</span> <span class="title function_">handleSubmit</span> = (<span class="params">event: React.FormEvent&lt;HTMLFormElement&gt;</span>) =&gt; &#123;</span><br><span class="line">  event.<span class="title function_">preventDefault</span>();</span><br><span class="line">  <span class="keyword">const</span> data = <span class="keyword">new</span> <span class="title class_">FormData</span>(event.<span class="property">currentTarget</span>);</span><br><span class="line">  <span class="comment">// eslint-disable-next-line no-console</span></span><br><span class="line">  <span class="variable language_">console</span>.<span class="title function_">log</span>(&#123;</span><br><span class="line">    <span class="attr">email</span>: data.<span class="title function_">get</span>(<span class="string">&quot;email&quot;</span>),</span><br><span class="line">    <span class="attr">password</span>: data.<span class="title function_">get</span>(<span class="string">&quot;password&quot;</span>),</span><br><span class="line">  &#125;);</span><br><span class="line">&#125;;</span><br></pre></td></tr></table></figure>
+
+<p>修改如下</p>
+<figure class="highlight jsx"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">import</span> &#123; getAuth, signInWithEmailAndPassword &#125; <span class="keyword">from</span> <span class="string">&quot;firebase/auth&quot;</span>;</span><br><span class="line"><span class="keyword">import</span> &#123; app &#125; <span class="keyword">from</span> <span class="string">&quot;../firebase-config&quot;</span>;</span><br><span class="line">....</span><br><span class="line"><span class="keyword">const</span> <span class="title function_">handleSubmit</span> = (<span class="params">event: React.FormEvent&lt;HTMLFormElement&gt;</span>) =&gt; &#123;</span><br><span class="line">  event.<span class="title function_">preventDefault</span>();</span><br><span class="line">  <span class="keyword">const</span> data = <span class="keyword">new</span> <span class="title class_">FormData</span>(event.<span class="property">currentTarget</span>);</span><br><span class="line">  <span class="keyword">const</span> auth = <span class="title function_">getAuth</span>(app);</span><br><span class="line">  <span class="title function_">signInWithEmailAndPassword</span>(</span><br><span class="line">    auth,</span><br><span class="line">    data.<span class="title function_">get</span>(<span class="string">&quot;email&quot;</span>)!.<span class="title function_">toString</span>(),</span><br><span class="line">    data.<span class="title function_">get</span>(<span class="string">&quot;password&quot;</span>)!.<span class="title function_">toString</span>()</span><br><span class="line">  )</span><br><span class="line">    .<span class="title function_">then</span>(<span class="function">(<span class="params">userCredential</span>) =&gt;</span> &#123;</span><br><span class="line">      <span class="comment">// Signed in</span></span><br><span class="line">      <span class="keyword">const</span> user = userCredential.<span class="property">user</span>;</span><br><span class="line">      <span class="variable language_">console</span>.<span class="title function_">log</span>(<span class="string">&quot;user&quot;</span>, userCredential.<span class="property">user</span>);</span><br><span class="line">      <span class="comment">// ...</span></span><br><span class="line">    &#125;)</span><br><span class="line">    .<span class="title function_">catch</span>(<span class="function">(<span class="params">error</span>) =&gt;</span> &#123;</span><br><span class="line">      <span class="keyword">const</span> errorCode = error.<span class="property">code</span>;</span><br><span class="line">      <span class="keyword">const</span> errorMessage = error.<span class="property">message</span>;</span><br><span class="line">      <span class="variable language_">console</span>.<span class="title function_">log</span>(<span class="string">&quot;error&quot;</span>, error);</span><br><span class="line">    &#125;);</span><br><span class="line">&#125;;</span><br></pre></td></tr></table></figure>
+
+<blockquote>
+<p>題外話，<strong>data.get(“email”)!.toString()</strong><br>當中的 <code>!.</code> 運算子可以<a target="_blank" rel="noopener" href="https://www.typescriptlang.org/docs/handbook/release-notes/typescript-2-0.html#non-null-assertion-operator">參考 TypeScript Non-null assertion operator 的說明</a></p>
+</blockquote>
+<p>用之前在 firebase 建立的帳密登入，登入成功的話可以在 Console 看到類似以下的資訊</p>
+<figure class="highlight console"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br></pre></td><td class="code"><pre><span class="line">UserImpl &#123;providerId: &#x27;firebase&#x27;, emailVerified: false, isAnonymous:</span><br><span class="line">false, tenantId: null, providerData: Array(1), …&#125;</span><br></pre></td></tr></table></figure>
+
+<h4 id="實作登入後進頁面的跳轉"><a href="#實作登入後進頁面的跳轉" class="headerlink" title="實作登入後進頁面的跳轉"></a>實作登入後進頁面的跳轉</h4><p>這裡要使用 <code>react-dom-router</code> 提供的 hook <code>useNavigate</code>,<br>注意 React Hook 的使用限制</p>
+<ul>
+<li><a target="_blank" rel="noopener" href="https://reactjs.org/docs/hooks-rules.html#only-call-hooks-at-the-top-level">只在最上層呼叫 Hook—不要在迴圈、條件式或是巢狀的 function 內呼叫 Hook。</a></li>
+<li><a target="_blank" rel="noopener" href="https://reactjs.org/docs/hooks-rules.html#only-call-hooks-from-react-functions">只在 React Function 中呼叫 Hook—別在一般的 JavaScript function 中呼叫 Hook。</a></li>
+</ul>
+<p>CRA 建立專案時同時會幫我們安裝檢查用的 Lint 所以不用太擔心。<br>同時我們把 <code>getAuth(app)</code> 也提取到 <code>SignInSide</code> Component 之外</p>
+<figure class="highlight jsx"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment">////getAuth 可以不用寫在 handleSubmit 中</span></span><br><span class="line"><span class="keyword">const</span> auth = <span class="title function_">getAuth</span>(app);</span><br><span class="line"></span><br><span class="line"><span class="keyword">export</span> <span class="keyword">default</span> <span class="keyword">function</span> <span class="title function_">SignInSide</span>(<span class="params"></span>) &#123;</span><br><span class="line">  <span class="comment">////遵循 React Hook 的規則在最上層呼叫 Hook</span></span><br><span class="line">  <span class="keyword">const</span> navigate = <span class="title function_">useNavigate</span>();<span class="comment">//取得 navigate</span></span><br><span class="line">  <span class="keyword">const</span> <span class="title function_">handleSubmit</span> = (<span class="params">event: React.FormEvent&lt;HTMLFormElement&gt;</span>) =&gt; &#123;</span><br><span class="line">    event.<span class="title function_">preventDefault</span>();</span><br><span class="line">    <span class="keyword">const</span> data = <span class="keyword">new</span> <span class="title class_">FormData</span>(event.<span class="property">currentTarget</span>);</span><br><span class="line">    <span class="title function_">signInWithEmailAndPassword</span>(</span><br><span class="line">      auth,</span><br><span class="line">      data.<span class="title function_">get</span>(<span class="string">&quot;email&quot;</span>)!.<span class="title function_">toString</span>(),</span><br><span class="line">      data.<span class="title function_">get</span>(<span class="string">&quot;password&quot;</span>)!.<span class="title function_">toString</span>()</span><br><span class="line">    )</span><br><span class="line">      .<span class="title function_">then</span>(<span class="function">(<span class="params">userCredential</span>) =&gt;</span> &#123;</span><br><span class="line">        <span class="comment">// Signed in</span></span><br><span class="line">        <span class="comment">// console.log(&quot;user&quot;, userCredential.user);</span></span><br><span class="line">        <span class="title function_">navigate</span>(<span class="string">&quot;/&quot;</span>);<span class="comment">// navigate 到首頁</span></span><br></pre></td></tr></table></figure>
+
+<h3 id="實作登出的功能"><a href="#實作登出的功能" class="headerlink" title="實作登出的功能"></a>實作登出的功能</h3><p>調整 <code>App.tsx</code> 如下，移除不相關的程式，建立一個 Button 並準備好 onClick 事件</p>
+<figure class="highlight jsx"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">import</span> &#123; <span class="title class_">Button</span> &#125; <span class="keyword">from</span> <span class="string">&quot;@mui/material&quot;</span>;</span><br><span class="line"><span class="keyword">import</span> <span class="string">&quot;./App.css&quot;</span>;</span><br><span class="line"><span class="keyword">function</span> <span class="title function_">App</span>(<span class="params"></span>) &#123;</span><br><span class="line">  <span class="keyword">return</span> (</span><br><span class="line">    <span class="language-xml"><span class="tag">&lt;<span class="name">div</span> <span class="attr">className</span>=<span class="string">&quot;App&quot;</span>&gt;</span></span></span><br><span class="line"><span class="language-xml">      <span class="tag">&lt;<span class="name">Button</span> <span class="attr">variant</span>=<span class="string">&quot;outlined&quot;</span> <span class="attr">onClick</span>=<span class="string">&#123;()</span> =&gt;</span> &#123;&#125;&#125;&gt;</span></span><br><span class="line"><span class="language-xml">        LOGOUT</span></span><br><span class="line"><span class="language-xml">      <span class="tag">&lt;/<span class="name">Button</span>&gt;</span></span></span><br><span class="line"><span class="language-xml">    <span class="tag">&lt;/<span class="name">div</span>&gt;</span></span></span><br><span class="line">  );</span><br><span class="line">&#125;</span><br><span class="line"></span><br><span class="line"><span class="keyword">export</span> <span class="keyword">default</span> <span class="title class_">App</span>;</span><br></pre></td></tr></table></figure>
+
+<h4 id="路由設定，只有登入者才能看的頁面"><a href="#路由設定，只有登入者才能看的頁面" class="headerlink" title="路由設定，只有登入者才能看的頁面"></a>路由設定，只有登入者才能看的頁面</h4><p>透過 getAuth().currentUser 取得目前的登入者資料, 如果沒有登入者轉導到 Login 頁面,</p>
+<figure class="highlight jsx"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">import</span> &#123; getAuth &#125; <span class="keyword">from</span> <span class="string">&quot;firebase/auth&quot;</span>;</span><br><span class="line">....</span><br><span class="line">&lt;<span class="title class_">React</span>.<span class="property">StrictMode</span>&gt;</span><br><span class="line">  <span class="language-xml"><span class="tag">&lt;<span class="name">BrowserRouter</span>&gt;</span></span></span><br><span class="line"><span class="language-xml">    <span class="tag">&lt;<span class="name">Routes</span>&gt;</span></span></span><br><span class="line"><span class="language-xml">      <span class="tag">&lt;<span class="name">Route</span></span></span></span><br><span class="line"><span class="tag"><span class="language-xml">      <span class="attr">path</span>=<span class="string">&quot;&quot;</span></span></span></span><br><span class="line"><span class="tag"><span class="language-xml">      <span class="attr">element</span>=<span class="string">&#123;getAuth().currentUser</span> ? &lt;<span class="attr">App</span> /&gt;</span> : <span class="tag">&lt;<span class="name">Navigate</span> <span class="attr">to</span>=<span class="string">&quot;/login&quot;</span> /&gt;</span> &#125;</span></span><br><span class="line"><span class="language-xml">      /&gt;</span></span><br><span class="line"><span class="language-xml">      <span class="tag">&lt;<span class="name">Route</span> <span class="attr">path</span>=<span class="string">&quot;login&quot;</span> <span class="attr">element</span>=<span class="string">&#123;</span>&lt;<span class="attr">Login</span> /&gt;</span>&#125; /&gt;</span></span><br><span class="line"><span class="language-xml">    <span class="tag">&lt;/<span class="name">Routes</span>&gt;</span></span></span><br><span class="line"><span class="language-xml">  <span class="tag">&lt;/<span class="name">BrowserRouter</span>&gt;</span></span></span><br><span class="line">&lt;/<span class="title class_">React</span>.<span class="property">StrictMode</span>&gt;</span><br></pre></td></tr></table></figure>
+
+<p>不過這樣的作法會有問題，<br>getAuth().currentUser 是非同步取得的資訊，<br>所以你很有可能都會拿到 null 值，<br>在官方的建議作法是透過 <a target="_blank" rel="noopener" href="https://firebase.google.com/docs/auth/web/manage-users#get_a_users_profile">onAuthStateChanged</a> 註冊 Observer, <code>index.tsx</code> 會類似下面這樣</p>
+<figure class="highlight jsx"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">const</span> auth = <span class="title function_">getAuth</span>();</span><br><span class="line"></span><br><span class="line"><span class="title function_">onAuthStateChanged</span>(auth, <span class="function">(<span class="params">user</span>) =&gt;</span> &#123;</span><br><span class="line">  <span class="title class_">ReactDOM</span>.<span class="title function_">render</span>(</span><br><span class="line">    <span class="language-xml"><span class="tag">&lt;<span class="name">React.StrictMode</span>&gt;</span></span></span><br><span class="line"><span class="language-xml">      <span class="tag">&lt;<span class="name">BrowserRouter</span>&gt;</span></span></span><br><span class="line"><span class="language-xml">        <span class="tag">&lt;<span class="name">Routes</span>&gt;</span></span></span><br><span class="line"><span class="language-xml">          <span class="tag">&lt;<span class="name">Route</span> <span class="attr">path</span>=<span class="string">&quot;&quot;</span> <span class="attr">element</span>=<span class="string">&#123;user</span> ? &lt;<span class="attr">App</span> /&gt;</span> : <span class="tag">&lt;<span class="name">Navigate</span> <span class="attr">to</span>=<span class="string">&quot;login&quot;</span> /&gt;</span>&#125; /&gt;</span></span><br><span class="line"><span class="language-xml">          <span class="tag">&lt;<span class="name">Route</span> <span class="attr">path</span>=<span class="string">&quot;login&quot;</span> <span class="attr">element</span>=<span class="string">&#123;</span>&lt;<span class="attr">Login</span> /&gt;</span>&#125; /&gt;</span></span><br><span class="line"><span class="language-xml">        <span class="tag">&lt;/<span class="name">Routes</span>&gt;</span></span></span><br><span class="line"><span class="language-xml">      <span class="tag">&lt;/<span class="name">BrowserRouter</span>&gt;</span></span></span><br><span class="line"><span class="language-xml">    <span class="tag">&lt;/<span class="name">React.StrictMode</span>&gt;</span></span>,</span><br><span class="line">    <span class="variable language_">document</span>.<span class="title function_">getElementById</span>(<span class="string">&quot;root&quot;</span>)</span><br><span class="line">  );</span><br><span class="line"></span><br><span class="line">  <span class="comment">// If you want to start measuring performance in your app, pass a function</span></span><br><span class="line">  <span class="comment">// to log results (for example: reportWebVitals(console.log))</span></span><br><span class="line">  <span class="comment">// or send to an analytics endpoint. Learn more: https://bit.ly/CRA-vitals</span></span><br><span class="line">  <span class="title function_">reportWebVitals</span>();</span><br><span class="line">&#125;);</span><br></pre></td></tr></table></figure>
+
+<h2 id="Todo"><a href="#Todo" class="headerlink" title="Todo"></a>Todo</h2><ul>
+<li>Firebase Email link(passwordless sign-in)</li>
+<li>Firebase Host Project</li>
+<li>PageNotFound</li>
+<li>管理 Routes</li>
+<li>more…</li>
+</ul>
+<p>(つづく)</p>
+
+      
+    </div>
+    <footer class="article-footer">
+      <a data-url="https://blog.marsen.me/2022/01/27/2022/react_practice_firebase_login/" data-id="cm9wp1jrx00bn2ss54vwo83rd" class="article-share-link">Share</a>
+      
+        <a href="https://blog.marsen.me/2022/01/27/2022/react_practice_firebase_login/#disqus_thread" class="article-comment-link">留言</a>
+      
+      
+  <ul class="article-tag-list" itemprop="keywords"><li class="article-tag-list-item"><a class="article-tag-list-link" href="/tags/Firebase/" rel="tag">Firebase</a></li><li class="article-tag-list-item"><a class="article-tag-list-link" href="/tags/React/" rel="tag">React</a></li><li class="article-tag-list-item"><a class="article-tag-list-link" href="/tags/%E5%AF%A6%E4%BD%9C%E7%AD%86%E8%A8%98/" rel="tag">實作筆記</a></li></ul>
+
+    </footer>
+  </div>
+  
+</article>
+
+
+  
+    <article id="post-2022/javascript_function" class="article article-type-post" itemscope itemprop="blogPost">
+  <div class="article-meta">
+    <a href="/2022/01/13/2022/javascript_function/" class="article-date">
+  <time datetime="2022-01-13T03:59:54.000Z" itemprop="datePublished">2022-01-13</time>
+</a>
+    
+  </div>
+  <div class="article-inner">
+    
+    
+      <header class="article-header">
+        
+  
+    <h1 itemprop="name">
+      <a class="article-title" href="/2022/01/13/2022/javascript_function/"> [學習筆記] JavaScript function 幾種不同的寫法</a>
+    </h1>
+  
+
+      </header>
+    
+    <div class="article-entry" itemprop="articleBody">
+      
+        <h2 id="回傳純值的函數"><a href="#回傳純值的函數" class="headerlink" title="回傳純值的函數"></a>回傳純值的函數</h2><figure class="highlight javascript"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment">//return value</span></span><br><span class="line"><span class="keyword">function</span> <span class="title function_">foo1</span>(<span class="params">a, b</span>) &#123;</span><br><span class="line">  <span class="keyword">return</span> a + b;</span><br><span class="line">&#125;</span><br><span class="line"><span class="comment">// arrow function</span></span><br><span class="line"><span class="keyword">let</span> <span class="title function_">foo2</span> = (<span class="params">a, b</span>) =&gt; &#123;</span><br><span class="line">  <span class="keyword">return</span> a + b;</span><br><span class="line">&#125;;</span><br><span class="line"><span class="comment">// skip &#123; &#125; and return</span></span><br><span class="line"><span class="keyword">let</span> <span class="title function_">foo3</span> = (<span class="params">a, b</span>) =&gt; a + b;</span><br><span class="line"></span><br><span class="line"><span class="variable language_">console</span>.<span class="title function_">log</span>(<span class="string">&quot;foo1(1,2) is&quot;</span>, <span class="title function_">foo1</span>(<span class="number">1</span>, <span class="number">2</span>));</span><br><span class="line"><span class="variable language_">console</span>.<span class="title function_">log</span>(<span class="string">&quot;foo2(1,2) is&quot;</span>, <span class="title function_">foo2</span>(<span class="number">1</span>, <span class="number">2</span>));</span><br><span class="line"><span class="variable language_">console</span>.<span class="title function_">log</span>(<span class="string">&quot;foo3(1,2) is&quot;</span>, <span class="title function_">foo3</span>(<span class="number">1</span>, <span class="number">2</span>));</span><br></pre></td></tr></table></figure>
+
+<h2 id="回傳物件的函數"><a href="#回傳物件的函數" class="headerlink" title="回傳物件的函數"></a>回傳物件的函數</h2><figure class="highlight javascript"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment">//return object</span></span><br><span class="line"></span><br><span class="line"><span class="keyword">function</span> <span class="title function_">foo4</span>(<span class="params">a, b</span>) &#123;</span><br><span class="line">  <span class="keyword">return</span> &#123; <span class="attr">sum</span>: a + b &#125;;</span><br><span class="line">&#125;</span><br><span class="line"><span class="comment">// arrow function</span></span><br><span class="line"><span class="keyword">let</span> <span class="title function_">foo5</span> = (<span class="params">a, b</span>) =&gt; &#123;</span><br><span class="line">  <span class="keyword">return</span> &#123; <span class="attr">sum</span>: a + b &#125;;</span><br><span class="line">&#125;;</span><br><span class="line"><span class="comment">// add () so you can skip &#123; &#125; and return</span></span><br><span class="line"><span class="keyword">let</span> <span class="title function_">foo6</span> = (<span class="params">a, b</span>) =&gt; (&#123; <span class="attr">sum</span>: a + b &#125;);</span><br><span class="line"></span><br><span class="line"><span class="variable language_">console</span>.<span class="title function_">log</span>(<span class="string">&quot;foo4(1,2) is&quot;</span>, <span class="title function_">foo4</span>(<span class="number">1</span>, <span class="number">2</span>));</span><br><span class="line"><span class="variable language_">console</span>.<span class="title function_">log</span>(<span class="string">&quot;foo5(1,2) is&quot;</span>, <span class="title function_">foo5</span>(<span class="number">1</span>, <span class="number">2</span>));</span><br><span class="line"><span class="variable language_">console</span>.<span class="title function_">log</span>(<span class="string">&quot;foo6(1,2) is&quot;</span>, <span class="title function_">foo6</span>(<span class="number">1</span>, <span class="number">2</span>));</span><br></pre></td></tr></table></figure>
+
+<h2 id="科里-Curry-化函數"><a href="#科里-Curry-化函數" class="headerlink" title="科里(Curry)化函數"></a>科里(Curry)化函數</h2><figure class="highlight javascript"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment">//return function, execute foo7(1,2)()</span></span><br><span class="line"><span class="keyword">let</span> <span class="title function_">foo7</span> = (<span class="params">a, b</span>) =&gt; <span class="function">() =&gt;</span> a + b;</span><br><span class="line"><span class="variable language_">console</span>.<span class="title function_">log</span>(<span class="string">&quot;foo7(1,2) is&quot;</span>, <span class="title function_">foo7</span>(<span class="number">1</span>, <span class="number">2</span>)());</span><br><span class="line"><span class="comment">//curry</span></span><br><span class="line"><span class="keyword">let</span> <span class="title function_">foo8</span> = (<span class="params">a</span>) =&gt; <span class="function">(<span class="params">b</span>) =&gt;</span> a + b;</span><br><span class="line"><span class="variable language_">console</span>.<span class="title function_">log</span>(<span class="string">&quot;foo8(1,2) is&quot;</span>, <span class="title function_">foo8</span>(<span class="number">1</span>)(<span class="number">2</span>));</span><br></pre></td></tr></table></figure>
+
+<p>(fin)</p>
+
+      
+    </div>
+    <footer class="article-footer">
+      <a data-url="https://blog.marsen.me/2022/01/13/2022/javascript_function/" data-id="cm9wp1jrt00b42ss5ea4fcm2q" class="article-share-link">Share</a>
+      
+        <a href="https://blog.marsen.me/2022/01/13/2022/javascript_function/#disqus_thread" class="article-comment-link">留言</a>
+      
+      
+    </footer>
+  </div>
+  
+</article>
+
+
+  
+    <article id="post-2022/comfortable_zone" class="article article-type-post" itemscope itemprop="blogPost">
+  <div class="article-meta">
+    <a href="/2022/01/13/2022/comfortable_zone/" class="article-date">
+  <time datetime="2022-01-13T03:54:16.000Z" itemprop="datePublished">2022-01-13</time>
+</a>
+    
+  </div>
+  <div class="article-inner">
+    
+    
+      <header class="article-header">
+        
+  
+    <h1 itemprop="name">
+      <a class="article-title" href="/2022/01/13/2022/comfortable_zone/"> [心得筆記] 學習圈有多厚?</a>
+    </h1>
+  
+
+      </header>
+    
+    <div class="article-entry" itemprop="articleBody">
+      
+        <h2 id="前情提要"><a href="#前情提要" class="headerlink" title="前情提要"></a>前情提要</h2><p>這是 2021 年 3 月的一些隨筆, 不知何故沒有整理上傳 Blog，<br>剛好最近翻到，作一次反芻並且記錄。</p>
+<h3 id="隨筆-1、學習圈有多厚"><a href="#隨筆-1、學習圈有多厚" class="headerlink" title="隨筆 1、學習圈有多厚?"></a>隨筆 1、學習圈有多厚?</h3><p>常常聽到舒適圈、學習圈、恐慌圈, 再搭配上下圖<br><img src="https://i.imgur.com/9VJu295.png" alt="舒適圈、學習圈、恐慌圈"></p>
+<p>這個圖，我覺得比例不對，<br>所謂的 Growth Zone 應該只有簿簿的一層，<br>大多數的時候我們只能延著這層膜多踏出一步是一步。</p>
+<p><img src="https://i.imgur.com/EcbucNZ.jpg" alt="舒適圈、學習膜、恐慌圈"></p>
+<p>偶有突破，才能擴大 Comfort Zone</p>
+<p>我覺得下圖比較適合，你要找到正確的方向突破<br>才能從 Comfort Zone 連結到 Success</p>
+<p><img src="https://i.imgur.com/gjt7aYZ.png" alt="作個有梗的人"></p>
+<p>那個縫縫才是你成長區(膜)</p>
+<p><img src="https://i.imgur.com/mVBsf55.png" alt="作個有梗的人"></p>
+<p>突破是困難的，一但突破了，紅色的部份就會自動補上，這就是它神奇的地方</p>
+<p><img src="https://i.imgur.com/OOA3rZt.png" alt="作個有梗的人"></p>
+<h3 id="隨筆-2、福原愛事件"><a href="#隨筆-2、福原愛事件" class="headerlink" title="隨筆 2、福原愛事件"></a>隨筆 2、福原愛事件</h3><ul>
+<li>甘我屁事? 除非我想當 KOL 用來蹭流量，或是一般大眾需要談資</li>
+<li>如果已離婚，她的自由</li>
+<li>如果未離婚，感情淡了，感情本來就存在灰色地帶</li>
+<li>如果未離婚，感情好，那就是假新聞</li>
+</ul>
+<h4 id="2022-王力宏事件"><a href="#2022-王力宏事件" class="headerlink" title="2022 王力宏事件"></a>2022 王力宏事件</h4><p>恰巧 2022 也有類似的事件</p>
+<ul>
+<li>甘我屁事 ?</li>
+<li>渣男是否違法 ? 法律是道德的底限 ?<ul>
+<li>群眾觀感是否約束力，或只是群眾暴力 ?</li>
+<li>文革式審判</li>
+</ul>
+</li>
+<li>有錢中國賺，出事回台灣(羅志祥)</li>
+<li>一個人的作品與其道德是否有關 ?<ul>
+<li>好的事就是是會改變的，而且不一定會變好</li>
+<li>昨是今非(時空背景不同)</li>
+</ul>
+</li>
+</ul>
+<h3 id="隨筆-3、錢、價格、價值"><a href="#隨筆-3、錢、價格、價值" class="headerlink" title="隨筆 3、錢、價格、價值"></a>隨筆 3、錢、價格、價值</h3><p>最重要的是價值，價格只是落後指標，<br>你應該持有資產(農田、房子、工廠、生意、股票)，<br>錢只是流通的工具，只有被消費掉的時候會產生價值。</p>
+<ul>
+<li>置裝:10000</li>
+<li>孝親:104000</li>
+<li>生活:120000</li>
+<li>娛樂:40000</li>
+<li>教育:60000<br>&#x3D;&gt; 年度儲蓄目標: 334,000+額外家庭開支(房貸、網路、電話、水電費、第四台、瓦斯)</li>
+<li>緊急預備金:180000</li>
+</ul>
+<h3 id="邊際效應具體感受"><a href="#邊際效應具體感受" class="headerlink" title="邊際效應具體感受"></a>邊際效應具體感受</h3><p>月費 600 元的運動中心，假設每次去 3 小時，<br>只去一次的話，那一次就價值 600 元，<br>當次數變多的時候，每次的時間成本不變，現金成本卻是下降的，<br>運動中心能帶給我的價值，具體量化的話有</p>
+<ol>
+<li>運動次數</li>
+<li>運動時數</li>
+<li>運動頻率*</li>
+</ol>
+<p>背後的抽象目的可能包含:</p>
+<ol>
+<li>健康</li>
+<li>社交</li>
+</ol>
+<p>這些「目的」與「價值」就是所謂的「效應」，<br>並不是越多越好，而是取得平衡*(參考系統思考)<br>比如說，運動過量反而會受傷變得不健康。</p>
+<p>下表顯示，當我第一次去運動中心時，<br>性價比是最高的，單次的價格是 600 元，<br>隨著次數的提昇，單次的價格是持續下降的，<br>理論上每天一次的話，單次價格會下降到 20 元&#x2F;次</p>
+<h4 id="«表一»"><a href="#«表一»" class="headerlink" title="«表一»"></a>«表一»</h4><table>
+<thead>
+<tr>
+<th>次數</th>
+<th>均價</th>
+<th>時數</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>1</td>
+<td>600</td>
+<td>3</td>
+</tr>
+<tr>
+<td>2</td>
+<td>300</td>
+<td>6</td>
+</tr>
+<tr>
+<td>3</td>
+<td>200</td>
+<td>9</td>
+</tr>
+<tr>
+<td>4</td>
+<td>150</td>
+<td>12</td>
+</tr>
+<tr>
+<td>5</td>
+<td>120</td>
+<td>15</td>
+</tr>
+<tr>
+<td>6</td>
+<td>100</td>
+<td>18</td>
+</tr>
+<tr>
+<td>…</td>
+<td>…</td>
+<td></td>
+</tr>
+<tr>
+<td>10</td>
+<td>60</td>
+<td>30</td>
+</tr>
+<tr>
+<td>20</td>
+<td>30</td>
+<td>60</td>
+</tr>
+<tr>
+<td>30</td>
+<td>20</td>
+<td>90</td>
+</tr>
+</tbody></table>
+<p>但價值就不是這樣衡量的，<br>一開始的價值遞增的，但是當超過了某個奇點，<br>價值就會開始遞減。</p>
+<p><img src="https://i.imgur.com/LQXthWU.jpg" alt="長萎"></p>
+<p>那麼錢呢?<br>其實錢只是一個交流價值用的媒介，<br>以物易物本身是價值的交換，<br>但是會耗消很大的時間，才能找到等價的物品，<br>比如一頭牛可以換多少的白米呢?<br>更不用說是情感需求等抽象層面的東西。</p>
+<p>所以當有了代幣、指示物(Token)、貨幣將抽象的價值具象化，<br>(背後要有強而有力的組織支持，如:國家，強而有力的信用才能維持貨幣價值)，<br>不同的國家有不同的貨幣，錢則是這些貨幣的代稱。</p>
+<p><img src="https://i.imgur.com/e822nMV.jpg" alt="Cat"></p>
+<p>所以真正有價值的東西並不是錢，錢只有在需要交易之時才有用，<br>真正有價值的是一首好聽的歌，(太好聽了，怎麼才能反覆聽呢?)<br>一顆蘋果、一段關係…<br>一直持續對社會有益的組織<br>ex:</p>
+<ul>
+<li>讓人生活有意義(專家、奴隸)，</li>
+<li>提供讓人更便利生活、</li>
+<li>提供食物、衣服、交通、娛樂、</li>
+<li>提供五大需求所需事務、</li>
+<li>建立關係</li>
+</ul>
+<h3 id="隨筆-4、左右"><a href="#隨筆-4、左右" class="headerlink" title="隨筆 4、左右"></a>隨筆 4、左右</h3><p>我很左，但是極致的左是不夠務實的，<br>我要務實，為了實現某些左邊的理想，<br>我要右，極致的右才能帶來極致的左，<br>這樣我還左嗎?</p>
+<h4 id="2202-反思"><a href="#2202-反思" class="headerlink" title="2202 反思"></a>2202 反思</h4><p>就像跳舞或走路一樣，單足難行千里，<br>我們總要左右才能前行。<br>重要的是平衡與推動力。</p>
+<h2 id="參考"><a href="#參考" class="headerlink" title="參考"></a>參考</h2><p><a target="_blank" rel="noopener" href="https://www.books.com.tw/products/0010653417">https://www.books.com.tw/products/0010653417</a><br><a target="_blank" rel="noopener" href="https://pttcareers.com/Soft_Job/1WQm1aXz">https://pttcareers.com/Soft_Job/1WQm1aXz</a></p>
+<p>(fin)</p>
+
+      
+    </div>
+    <footer class="article-footer">
+      <a data-url="https://blog.marsen.me/2022/01/13/2022/comfortable_zone/" data-id="cm9wp1jrl00a52ss5c0um84cl" class="article-share-link">Share</a>
+      
+        <a href="https://blog.marsen.me/2022/01/13/2022/comfortable_zone/#disqus_thread" class="article-comment-link">留言</a>
+      
+      
+    </footer>
+  </div>
+  
+</article>
+
+
+  
     <article id="post-2021/gcp_cloud_learn" class="article article-type-post" itemscope itemprop="blogPost">
   <div class="article-meta">
     <a href="/2021/12/22/2021/gcp_cloud_learn/" class="article-date">
@@ -180,7 +534,7 @@ j=d.createElement(s),dl=l!='dataLayer'?'&l='+l:'';j.async=true;j.src=
       
     </div>
     <footer class="article-footer">
-      <a data-url="https://blog.marsen.me/2021/12/22/2021/gcp_cloud_learn/" data-id="cm8tx3pkb008d2rqm0bfudows" class="article-share-link">Share</a>
+      <a data-url="https://blog.marsen.me/2021/12/22/2021/gcp_cloud_learn/" data-id="cm9wp1jr5008a2ss56d42ea0p" class="article-share-link">Share</a>
       
         <a href="https://blog.marsen.me/2021/12/22/2021/gcp_cloud_learn/#disqus_thread" class="article-comment-link">留言</a>
       
@@ -356,7 +710,7 @@ j=d.createElement(s),dl=l!='dataLayer'?'&l='+l:'';j.async=true;j.src=
       
     </div>
     <footer class="article-footer">
-      <a data-url="https://blog.marsen.me/2021/12/03/2021/gitlab_cicd_learn/" data-id="cm8tx3pkb008a2rqmhoyt5rcv" class="article-share-link">Share</a>
+      <a data-url="https://blog.marsen.me/2021/12/03/2021/gitlab_cicd_learn/" data-id="cm9wp1jr6008d2ss59toi9nxc" class="article-share-link">Share</a>
       
         <a href="https://blog.marsen.me/2021/12/03/2021/gitlab_cicd_learn/#disqus_thread" class="article-comment-link">留言</a>
       
@@ -409,7 +763,7 @@ j=d.createElement(s),dl=l!='dataLayer'?'&l='+l:'';j.async=true;j.src=
       
     </div>
     <footer class="article-footer">
-      <a data-url="https://blog.marsen.me/2021/11/05/2021/terminal_split_string/" data-id="cm8tx3pki009e2rqmcjax8fxf" class="article-share-link">Share</a>
+      <a data-url="https://blog.marsen.me/2021/11/05/2021/terminal_split_string/" data-id="cm9wp1jrd009e2ss581fv3uf9" class="article-share-link">Share</a>
       
         <a href="https://blog.marsen.me/2021/11/05/2021/terminal_split_string/#disqus_thread" class="article-comment-link">留言</a>
       
@@ -488,7 +842,7 @@ j=d.createElement(s),dl=l!='dataLayer'?'&l='+l:'';j.async=true;j.src=
       
     </div>
     <footer class="article-footer">
-      <a data-url="https://blog.marsen.me/2021/11/05/2021/mac_m1_with_mysql/" data-id="cm8tx3pke008s2rqm10zw4mrm" class="article-share-link">Share</a>
+      <a data-url="https://blog.marsen.me/2021/11/05/2021/mac_m1_with_mysql/" data-id="cm9wp1jr9008s2ss556lb1hna" class="article-share-link">Share</a>
       
         <a href="https://blog.marsen.me/2021/11/05/2021/mac_m1_with_mysql/#disqus_thread" class="article-comment-link">留言</a>
       
@@ -543,7 +897,7 @@ j=d.createElement(s),dl=l!='dataLayer'?'&l='+l:'';j.async=true;j.src=
       
     </div>
     <footer class="article-footer">
-      <a data-url="https://blog.marsen.me/2021/10/12/2021/react_route_3_rendering_method/" data-id="cm8tx3pkf008z2rqmciwoazh0" class="article-share-link">Share</a>
+      <a data-url="https://blog.marsen.me/2021/10/12/2021/react_route_3_rendering_method/" data-id="cm9wp1jra008z2ss52c4h6ze6" class="article-share-link">Share</a>
       
         <a href="https://blog.marsen.me/2021/10/12/2021/react_route_3_rendering_method/#disqus_thread" class="article-comment-link">留言</a>
       
@@ -604,7 +958,7 @@ j=d.createElement(s),dl=l!='dataLayer'?'&l='+l:'';j.async=true;j.src=
       
     </div>
     <footer class="article-footer">
-      <a data-url="https://blog.marsen.me/2021/10/04/2021/i18next_config_setting/" data-id="cm8tx3pkc008f2rqm4fj0axfr" class="article-share-link">Share</a>
+      <a data-url="https://blog.marsen.me/2021/10/04/2021/i18next_config_setting/" data-id="cm9wp1jr6008f2ss5afg154nr" class="article-share-link">Share</a>
       
         <a href="https://blog.marsen.me/2021/10/04/2021/i18next_config_setting/#disqus_thread" class="article-comment-link">留言</a>
       
@@ -663,362 +1017,11 @@ j=d.createElement(s),dl=l!='dataLayer'?'&l='+l:'';j.async=true;j.src=
       
     </div>
     <footer class="article-footer">
-      <a data-url="https://blog.marsen.me/2021/09/14/2021/lastpass_to_bitwarden/" data-id="cm8tx3pkd008k2rqmgoklbtxb" class="article-share-link">Share</a>
+      <a data-url="https://blog.marsen.me/2021/09/14/2021/lastpass_to_bitwarden/" data-id="cm9wp1jr7008k2ss54wiv4bxy" class="article-share-link">Share</a>
       
         <a href="https://blog.marsen.me/2021/09/14/2021/lastpass_to_bitwarden/#disqus_thread" class="article-comment-link">留言</a>
       
       
-    </footer>
-  </div>
-  
-</article>
-
-
-  
-    <article id="post-2021/azure_function_app_identity_key_vault" class="article article-type-post" itemscope itemprop="blogPost">
-  <div class="article-meta">
-    <a href="/2021/08/24/2021/azure_function_app_identity_key_vault/" class="article-date">
-  <time datetime="2021-08-24T00:51:43.000Z" itemprop="datePublished">2021-08-24</time>
-</a>
-    
-  </div>
-  <div class="article-inner">
-    
-    
-      <header class="article-header">
-        
-  
-    <h1 itemprop="name">
-      <a class="article-title" href="/2021/08/24/2021/azure_function_app_identity_key_vault/"> [實作筆記] Azure Functions 存取 Key Vault</a>
-    </h1>
-  
-
-      </header>
-    
-    <div class="article-entry" itemprop="articleBody">
-      
-        <h2 id="前情提要"><a href="#前情提要" class="headerlink" title="前情提要"></a>前情提要</h2><p>新的工作有機會接觸到微軟的 Azure Cloud 服務,<br>包含 AWS 、 GCP 的話，世界的三大雲服務都碰過一輪了,<br>不過也只是皮毛而已, 紀錄下來免得遺忘 .</p>
-<p>說明一下需求，在實作授權的</p>
-<p>在這裡我會使用到 Azure Cloud 的三個服務,</p>
-<ol>
-<li><a target="_blank" rel="noopener" href="https://docs.microsoft.com/en-us/azure/azure-functions/functions-overview">Azure Functions</a></li>
-<li><a target="_blank" rel="noopener" href="https://docs.microsoft.com/en-us/azure/active-directory/managed-identities-azure-resources/overview">Managed Identity</a></li>
-<li><a target="_blank" rel="noopener" href="https://docs.microsoft.com/en-us/azure/key-vault/general/overview">Key Vault</a></li>
-</ol>
-<h3 id="使用的服務簡介-TL-DR"><a href="#使用的服務簡介-TL-DR" class="headerlink" title="使用的服務簡介 TL;DR"></a>使用的服務簡介 TL;DR</h3><blockquote>
-<p>說明一下我理解的三個服務:</p>
-<p>Azure Functions 是微軟無伺服器(Serverless),<br>Serverless 的概念是讓開發人員專注開發, 減少對伺服器維運的成本,<br>並且提供極度彈性的可擴展性，並且可以使用更少的資源(更低的成本),<br>最大的限制是<a target="_blank" rel="noopener" href="https://docs.microsoft.com/en-us/azure/azure-functions/functions-host-json#functiontimeout">運算時間(timeout)</a>,<br>但就我個人而言的 Best Practice 在 300 秒內完成不了的運算, 應考量整體架構的瓶頸在哪裡,<br>而不是採取無限制的付費方案(Plan Type)。<br>稍微作個 ORK 評量，應該在 0.2 | 10 | 300 秒內完成計算。</p>
-<p>Managed Identity 是微軟用來作身份認証與授權的服務,<br>與其它雲服務最大的差別應該是它是基於 Azure Active Directory (Azure AD) 之上,<br>一般來說會建議使用遵循(Role-based Access Control),<br>下面的圖片很好的說明了其概念。</p>
-<p><img src="https://docs.microsoft.com/zh-tw/azure/active-directory/managed-identities-azure-resources/media/overview/when-use-managed-identities.png" alt="如何使用適用於 Azure 資源的受控識別？"></p>
-<p>Key Vault 是個相對簡單的概念, 在開發中我們會接觸到需多的密鑰、証書、連線字串等等資訊…<br>這些資訊有敏感性, 但對開發過程又不是最重要的東西,<br>這些資訊在單體架構(Monolithic)時常常面臨開發與資安的兩難,<br>而 Key Vault 可以解決這個問題(當然不同的 Cloud 也有類似的解決方案)</p>
-</blockquote>
-<h3 id="案例說明"><a href="#案例說明" class="headerlink" title="案例說明"></a>案例說明</h3><p>這次的案例，使用者會在瀏覽器提供給我們一組 Token ,<br>而我們會拿這組 Token 與第三方互動換回我們需要的 Key,<br>最後我們會把這組 Key 存進 Key Vault 給其它服務使用.<br><img src="/images/2021/function_app_key_vault_flow.png" alt="流程簡介"></p>
-<p>你可能會好奇, 在上圖中 Managed Identity 扮演的角色為何 ?<br>就是在 Function Apps 存取 Key Vault 這一段,<br>我們將提供一組 Identity 給 Function Apps 讓它有權限存取 Key Vault .</p>
-<h2 id="實作"><a href="#實作" class="headerlink" title="實作"></a>實作</h2><p>我將步驟大致分為以下幾步</p>
-<ol>
-<li>建立 Function App 與 function</li>
-<li>啟用 Function App 的 Managed Identity</li>
-<li>建立 Key Vault</li>
-<li>設定 Key Vault Access policies</li>
-<li>設定 Function App Configuration</li>
-<li>修改 Function</li>
-</ol>
-<p>讓我們開始吧.</p>
-<h3 id="建立-Function-Apps-與-function"><a href="#建立-Function-Apps-與-function" class="headerlink" title="建立 Function Apps 與 function"></a>建立 Function Apps 與 function</h3><p>開始前先作名詞解釋, 因為微軟的命名會讓剛接觸的人十分混淆</p>
-<ul>
-<li>Azure Functions : 微軟的 Serverless 產品名稱, 我們可以在這個服務下建立許多 Function Apps 的實體</li>
-<li>Functions Apps : 主要運作的實體, 也是我們要設定的地方，每個 App 裡面可以有多個 function</li>
-<li>Functions : 主要邏輯所在的地方, 以開發的角度來說, 我們應該只關心這塊</li>
-</ul>
-<p><a target="_blank" rel="noopener" href="https://docs.microsoft.com/en-us/azure/azure-functions/functions-create-function-app-portal#create-a-function-app">建立 Function Apps</a> 的步驟較為簡單，請依照微軟文件即可，<br>接下來選擇 Function Apps &gt; 選擇剛剛建立的 Functions App &gt; Create &gt; Http Trigger C#,<br>選擇這個範本我們將以 C# 語言實作，授權等級我選擇 Anonymous .</p>
-<p>建立好後，可以在 Code + Test 裡面查看預設的程式.<br>這裡建立的是 C# 指令碼, 開發上的細節請參考<a target="_blank" rel="noopener" href="https://docs.microsoft.com/zh-tw/azure/azure-functions/functions-reference-csharp#reusing-csx-code">官方文件</a></p>
-<figure class="highlight csharp"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">using</span> System.Net;</span><br><span class="line"></span><br><span class="line"><span class="function"><span class="keyword">public</span> <span class="keyword">static</span> <span class="keyword">async</span> Task&lt;HttpResponseMessage&gt; <span class="title">Run</span>(<span class="params">HttpRequestMessage req, TraceWriter log</span>)</span></span><br><span class="line">&#123;</span><br><span class="line">    log.Info(<span class="string">&quot;C# HTTP trigger function processed a request.&quot;</span>);</span><br><span class="line"></span><br><span class="line">    <span class="comment">// parse query parameter</span></span><br><span class="line">    <span class="built_in">string</span> name = req.GetQueryNameValuePairs()</span><br><span class="line">        .FirstOrDefault(q =&gt; <span class="built_in">string</span>.Compare(q.Key, <span class="string">&quot;name&quot;</span>, <span class="literal">true</span>) == <span class="number">0</span>)</span><br><span class="line">        .Value;</span><br><span class="line"></span><br><span class="line">    <span class="keyword">if</span> (name == <span class="literal">null</span>)</span><br><span class="line">    &#123;</span><br><span class="line">        <span class="comment">// Get request body</span></span><br><span class="line">        <span class="built_in">dynamic</span> data = <span class="keyword">await</span> req.Content.ReadAsAsync&lt;<span class="built_in">object</span>&gt;();</span><br><span class="line">        name = data?.name;</span><br><span class="line">    &#125;</span><br><span class="line"></span><br><span class="line">    <span class="keyword">return</span> name == <span class="literal">null</span></span><br><span class="line">        ? req.CreateResponse(HttpStatusCode.BadRequest, <span class="string">&quot;Please pass a name on the query string or in the request body&quot;</span>)</span><br><span class="line">        : req.CreateResponse(HttpStatusCode.OK, <span class="string">&quot;Hello &quot;</span> + name);</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
-
-<h3 id="啟用-Function-App-的-Managed-Identity"><a href="#啟用-Function-App-的-Managed-Identity" class="headerlink" title="啟用 Function App 的 Managed Identity"></a>啟用 Function App 的 Managed Identity</h3><p>移動到 Functions Apps 的 Settings &gt; Identity,<br>可以看 System assigned &gt; Status 將它切換為 <code>On</code>.<br>這一步的設定是為了讓服務之間可以受到 AAD 控管而不需要你自行處理.</p>
-<h3 id="建立-Key-Vault"><a href="#建立-Key-Vault" class="headerlink" title="建立 Key Vault"></a>建立 Key Vault</h3><p>在建立之前也是需要一些名詞解釋，</p>
-<ul>
-<li>Key Vault: 微軟的服務名稱</li>
-<li>key vault section: Key Vault 的實體區塊(可以想像成一個實體檔案，裡面可以存很多 Key, 並且我們可以對這個檔案進一步設定,也可以參考 <a target="_blank" rel="noopener" href="https://docs.microsoft.com/en-us/azure/key-vault/general/quick-create-portal">官方的文件快速建立</a>)</li>
-<li>Keys : 在 key vault section 的 settings 中有三種類型的資料，Keys、Secrets 與 Certificates,</li>
-</ul>
-<p>找到 Key Vault &gt; key vault section &gt; Settings &gt; Secrets , 建立一組 Secret</p>
-<p><img src="/images/2021/function_app_key_vault_create_key_vault.png" alt="建立 Key Vault"></p>
-<p>點選剛剛建立的 Secret 並且選擇 CURRENT VERSION 取得 Secret Identifier(複製下來, 待會會用到)</p>
-<h3 id="設定-Key-Vault-Access-policies"><a href="#設定-Key-Vault-Access-policies" class="headerlink" title="設定 Key Vault Access policies"></a>設定 Key Vault Access policies</h3><p>一樣在 Key Vault &gt; Settings &gt; Access policies &gt; Add access policy ,<br>在 Select principal 找到剛剛建立的 Function App,<br>在 Configure from template (optional) 我們直接套用 Secret Management,<br>這允許我們的 Function App 會取得管理 Key Vault Secret 的權限.</p>
-<h3 id="設定-Function-App-Configuration"><a href="#設定-Function-App-Configuration" class="headerlink" title="設定 Function App Configuration"></a>設定 Function App Configuration</h3><p>移動到 Function App &gt; Settings &gt; Configuration &gt; Application settings<br>我們要在這裡新加一個 Application Setting</p>
-<p>Name 自已取但是請記得，我們稍後就會用到，這裡我先命名為 <code>TestKV</code>,<br>Value 請參加下面的範例, 將前面步驟取得的 <code>Secret Identifier</code> 填到 SecretUri 之後.</p>
-<figure class="highlight text"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">@Microsoft.KeyVault(SecretUri=https://mykv.vault.azure.net/secrets/RefreshToken/xxxx)</span><br></pre></td></tr></table></figure>
-
-<p>這裡有小朋友問我, 那為什麼不把資料設定在 Function App Configuration 就好,<br>這樣子開發人員也碰不到資料, 要修改也是很有彈性的.<br>我的回答是, 這樣子其它的服務也需要這個資料怎麼辦呢？<br>Copy-Paste 會造成維護上很大的困難, 我們會希望維持一組就好.<br>放在 Key Vault 可以讓我們不同的服務共用.<br><img src="/images/2021/function_app_key_vault_overview.png" alt="Overview"></p>
-<blockquote>
-<p>反思 Best Practice 應該怎麼作???<br>設定檔散落在不同的層級, 還是應該集中管理, 再用 Config 橋接???</p>
-</blockquote>
-<h3 id="修改-Function-的代碼"><a href="#修改-Function-的代碼" class="headerlink" title="修改 Function 的代碼"></a>修改 Function 的代碼</h3><p>下列我們用 <code>TestKV</code> 這組設定與 C# 作為範例 :<br>透過環境變數取得 Key Vault 的資料</p>
-<figure class="highlight csharp"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment">// Get</span></span><br><span class="line"><span class="keyword">var</span> testKV =</span><br><span class="line">  Environment.GetEnvironmentVariable(<span class="string">&quot;TestKV&quot;</span>, EnvironmentVariableTarget.Process);</span><br></pre></td></tr></table></figure>
-
-<p>而如果你需要寫入請使用 <code>Azure SDK Client Library</code></p>
-<figure class="highlight csharp"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">using</span> Azure.Identity;</span><br><span class="line"><span class="keyword">using</span> Azure.Security.KeyVault.Secrets;</span><br><span class="line"><span class="comment"><span class="doctag">///</span> Skip ...</span></span><br><span class="line">    <span class="comment"><span class="doctag">///</span> Set</span></span><br><span class="line">    <span class="keyword">var</span> kvUri = <span class="string">$&quot;https://<span class="subst">&#123;KeyVaultName&#125;</span>.vault.azure.net&quot;</span>;</span><br><span class="line">    <span class="keyword">var</span> client = <span class="keyword">new</span> SecretClient(<span class="keyword">new</span> Uri(kvUri), <span class="keyword">new</span> DefaultAzureCredential());</span><br><span class="line">    client.SetSecret(<span class="string">$&quot;<span class="subst">&#123;SecretKey&#125;</span>&quot;</span>, <span class="string">$&quot;<span class="subst">&#123;SecretValue&#125;</span>&quot;</span>);</span><br></pre></td></tr></table></figure>
-
-<p>其它語言可以<a target="_blank" rel="noopener" href="https://docs.microsoft.com/zh-tw/azure/azure-functions/functions-how-to-use-azure-function-app-settings?tabs=portal#use-application-settings">參考</a></p>
-<h2 id="參考"><a href="#參考" class="headerlink" title="參考"></a>參考</h2><ul>
-<li><a target="_blank" rel="noopener" href="https://docs.microsoft.com/en-us/azure/azure-functions/functions-overview">Azure Functions</a></li>
-<li><a target="_blank" rel="noopener" href="https://daniel-krzyczkowski.github.io/Integrate-Key-Vault-Secrets-With-Azure-Functions/">Integrate Key Vault Secrets With Azure Functions</a></li>
-<li><a target="_blank" rel="noopener" href="https://denny.qollie.com/2016/05/22/serverless-simple-crud/">淺析 serverless 架構與實作</a></li>
-<li><a target="_blank" rel="noopener" href="https://adamtheautomator.com/azure-functions-tutorial/">Azure Function Tutorial</a></li>
-<li><a target="_blank" rel="noopener" href="https://build5nines.com/azure-functions-extend-execution-timeout-past-5-minutes/">Azure Functions: Extend Execution Timeout Past 5 Minutes</a></li>
-<li><a target="_blank" rel="noopener" href="https://docs.microsoft.com/en-us/dotnet/api/overview/azure/identity-readme#defaultazurecredential">DefaultAzureCredential</a></li>
-</ul>
-<p>(fin)</p>
-
-      
-    </div>
-    <footer class="article-footer">
-      <a data-url="https://blog.marsen.me/2021/08/24/2021/azure_function_app_identity_key_vault/" data-id="cm8tx3pk8007w2rqmdyfx1lnu" class="article-share-link">Share</a>
-      
-        <a href="https://blog.marsen.me/2021/08/24/2021/azure_function_app_identity_key_vault/#disqus_thread" class="article-comment-link">留言</a>
-      
-      
-  <ul class="article-tag-list" itemprop="keywords"><li class="article-tag-list-item"><a class="article-tag-list-link" href="/tags/%E5%AF%A6%E4%BD%9C%E7%AD%86%E8%A8%98/" rel="tag">實作筆記</a></li></ul>
-
-    </footer>
-  </div>
-  
-</article>
-
-
-  
-    <article id="post-2021/facebook_application_and_https_login" class="article article-type-post" itemscope itemprop="blogPost">
-  <div class="article-meta">
-    <a href="/2021/08/08/2021/facebook_application_and_https_login/" class="article-date">
-  <time datetime="2021-08-08T07:34:10.000Z" itemprop="datePublished">2021-08-08</time>
-</a>
-    
-  </div>
-  <div class="article-inner">
-    
-    
-      <header class="article-header">
-        
-  
-    <h1 itemprop="name">
-      <a class="article-title" href="/2021/08/08/2021/facebook_application_and_https_login/"> [實作筆記] 自我簽署憑証, localhost run with https </a>
-    </h1>
-  
-
-      </header>
-    
-    <div class="article-entry" itemprop="articleBody">
-      
-        <h2 id="前情提要"><a href="#前情提要" class="headerlink" title="前情提要"></a>前情提要</h2><p>最近有一批學生在學習 Express 開發網站,<br>他們需要透過 facebook 應用程式作登入。<br>遇到了以下的問題<br><img src="/../../images/2021/fb_login_fail.png" alt="Facebook 偵測到 所使用的網連線並不安全"></p>
-<p>最簡單的解決方式，重新選擇你的 Facebook Application Type 為無</p>
-<p>如下:<br>!<a href="../../images/2021/fb_application_type.png">Facebook Application Type 選擇無</a><br>這樣足以解決學生們在練習開發上的問題了。</p>
-<p>不過我有點好奇背後的真正原因是什麼 ?</p>
-<h2 id="Facebook-的政策"><a href="#Facebook-的政策" class="headerlink" title="Facebook 的政策"></a>Facebook 的政策</h2><p>Facebook 的<a target="_blank" rel="noopener" href="https://developers.facebook.com/docs/facebook-login/security/#surfacearea">文件</a>說明</p>
-<blockquote>
-<h3 id="使用-HTTPS"><a href="#使用-HTTPS" class="headerlink" title="使用 HTTPS"></a>使用 HTTPS</h3><p>使用具有加密功能的 HTTPS 作為網際網路通訊協定，而非 HTTP。HTTPS 會維護傳送資料的隱私，保護其不受竊聽攻擊。<br>此外，也能保護資料在傳送過程中不遭到置入廣告或惡意程式碼的竄改。</p>
-<p>在 2018 年 10 月 6 日，所有應用程式都必須使用 HTTPS。</p>
-</blockquote>
-<p>可能是一個原因，因為學生們的開發環境建置出來都是單純的 http ，同學也有作出相關的猜測。<br>那麼我們要怎麼快速驗証這個想法呢 ?</p>
-<h2 id="https-localhost"><a href="#https-localhost" class="headerlink" title="https-localhost"></a>https-localhost</h2><p>這是一個最快速的驗証方法，不過需要修改部份的代碼，而且遮蓋了需多細節。<br>以下以 MacOS 操作為主</p>
-<p>首先，需要安裝相依的 <a target="_blank" rel="noopener" href="https://developer.mozilla.org/en-US/docs/Mozilla/Projects/NSS/tools/NSS_Tools_certutil">NSS Tool</a></p>
-<blockquote>
-<p>brew install nss</p>
-</blockquote>
-<p>安裝 <code>https-localhost</code></p>
-<blockquote>
-<p>npm i https-localhost</p>
-</blockquote>
-<p>改寫在 Express 網站的 <code>app.js</code></p>
-<figure class="highlight javascript"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment">//const app = express()</span></span><br><span class="line"><span class="keyword">const</span> app = <span class="built_in">require</span>(<span class="string">&quot;https-localhost&quot;</span>)();</span><br></pre></td></tr></table></figure>
-
-<p>基本這樣就完成了。</p>
-<ul>
-<li>優點<ul>
-<li>改動步驟少</li>
-<li>無需理解細節</li>
-</ul>
-</li>
-<li>缺點<ul>
-<li>要改動原始代碼</li>
-</ul>
-</li>
-</ul>
-<h2 id="自我簽署憑証"><a href="#自我簽署憑証" class="headerlink" title="自我簽署憑証"></a>自我簽署憑証</h2><p>接下來我們會深入一點細節，並了解背後的機制。</p>
-<h3 id="憑証機制簡介"><a href="#憑証機制簡介" class="headerlink" title="憑証機制簡介"></a>憑証機制簡介</h3><p>我不打算從 TCP、Http 講解到 Https，網路上已有相當多的資訊，<br>或是未來有機會再補充。<br>總而言之，當你使用 Https 時，有一個很重要的觀念是，<br>你的 Server 應該提供一組<code>公鑰</code>給 User 作為資料的加解密。<br>那延伸的問題就是<strong>怎麼確認這組公鑰是可以信任的呢?</strong></p>
-<p>簡單說就是透過第三方的公正單位進行認証，所謂憑証認証機構(CA)。<br>我們相信這些機構，而機構也會幫我們進行審核。<br>而一般來說你的應用程式，比如說瀏覽器會先安裝好可信任的根憑証。</p>
-<p>一個經典的說明是這樣的:</p>
-<blockquote>
-<p>鮑伯可以隨便把憑證向外發布。<br>鮑伯與愛麗絲事先可能互不認識，但鮑伯與愛麗絲都信任伊凡，<br>愛麗絲使用認證機構伊凡的公鑰驗證數位簽章，如果驗證成功，便可以信任鮑勃的公鑰是真正屬於鮑伯的。[1]<br>愛麗絲可以使用憑證上的鮑勃的公鑰加密明文，得到密文並傳送給鮑伯。<br>鮑伯可以可以用自己的私鑰把密文解密，得到明文。</p>
-</blockquote>
-<p>以開發者而言，你可以自我簽署憑証，<br>這裡你要同時扮演鮑伯，愛麗絲與伊凡，<br>所以常有人會在其中迷失方向，角色錯亂。</p>
-<h3 id="伊凡-local-CA"><a href="#伊凡-local-CA" class="headerlink" title="伊凡(local CA)"></a>伊凡(local CA)</h3><p>伊凡是一個 CA，我們只要安裝 <code>mkcert</code>，<br>就可以建自一個本地端的 CA</p>
-<blockquote>
-<p>brew install mkcert</p>
-</blockquote>
-<p>我們來對 <code>localhost</code> 發行憑証</p>
-<blockquote>
-<p>mkcert localhost</p>
-</blockquote>
-<p>會產生下列兩個檔案，<br>分別為憑証 <code>localhost.pem</code><br>與私錀 <code>localhost-key.pem</code></p>
-<h3 id="鮑伯-Server"><a href="#鮑伯-Server" class="headerlink" title="鮑伯(Server)"></a>鮑伯(Server)</h3><p>這個時候我們角色切換至鮑伯(Server)<br>鮑伯在這個過程中最重要的發行公錀，<br>私錀是用來加密傳輸的資料的。</p>
-<p>這裡需要修改一下 Server 的程式碼</p>
-<figure class="highlight javascript"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">const</span> fs = <span class="built_in">require</span>(<span class="string">&quot;fs&quot;</span>);</span><br><span class="line"><span class="keyword">const</span> https = <span class="built_in">require</span>(<span class="string">&quot;https&quot;</span>);</span><br><span class="line"></span><br><span class="line"><span class="comment">/// 中略…</span></span><br><span class="line"></span><br><span class="line">https</span><br><span class="line">  .<span class="title function_">createServer</span>(</span><br><span class="line">    &#123;</span><br><span class="line">      <span class="attr">key</span>: fs.<span class="title function_">readFileSync</span>(<span class="string">&quot;localhost-key.pem&quot;</span>),</span><br><span class="line">      <span class="attr">cert</span>: fs.<span class="title function_">readFileSync</span>(<span class="string">&quot;localhost.pem&quot;</span>),</span><br><span class="line">    &#125;,</span><br><span class="line">    app</span><br><span class="line">  )</span><br><span class="line">  .<span class="title function_">listen</span>(<span class="number">3000</span>, <span class="keyword">function</span> (<span class="params"></span>) &#123;</span><br><span class="line">    <span class="variable language_">console</span>.<span class="title function_">log</span>(</span><br><span class="line">      <span class="string">&quot;Example app listening on port 3000! Go to https://localhost:3000/&quot;</span></span><br><span class="line">    );</span><br><span class="line">  &#125;);</span><br></pre></td></tr></table></figure>
-
-<p>這樣我們就可以允許愛麗絲透過 Https 與我們溝通囉。</p>
-<h3 id="愛麗絲-Client"><a href="#愛麗絲-Client" class="headerlink" title="愛麗絲(Client)"></a>愛麗絲(Client)</h3><p>基本你只要開啟瀏覽器，輸入 <code>https://localhost:3000/</code> 你就可以正常瀏覽了。<br>但我們要了解背後發生的過程，</p>
-<p>安裝 <code>mkcert</code> 完畢後，其實會在你的機器(與瀏覽器)上安裝根憑証，<br>這樣愛麗絲才會信任伊凡<br>可以透過以下語法查詢安裝路徑(不同 OS 會有差異)</p>
-<blockquote>
-<p>mkcert -CAROOT</p>
-</blockquote>
-<p>這個作法改動的程式也不會比較少，<br>但至少不再有黑魔法(當然你也可以去追蹤 <code>https-localhost</code> 的代碼)</p>
-<h3 id="Recap"><a href="#Recap" class="headerlink" title="Recap"></a>Recap</h3><p>快速回顧一下 <code>mkcert</code> 作了哪些事</p>
-<ol>
-<li>建立一個 local CA</li>
-<li>替你的瀏覽器安裝 CA</li>
-<li>對 localhost 發行憑証</li>
-</ol>
-<p>而你的程式需要</p>
-<ul>
-<li>改使用 https 啟動網站</li>
-</ul>
-<h2 id="別忘了解決學生問題"><a href="#別忘了解決學生問題" class="headerlink" title="別忘了解決學生問題"></a>別忘了解決學生問題</h2><p>回到 facebook 應用程式登入的問題，<br>別忘了去設定 callback 網址，並且確定是走 https<br><strong>用戶端 OAuth 設定 &gt; 有效的 OAuth 重新導向 URI</strong><br>不然會得到以下錯誤</p>
-<p><img src="/../../images/2021/fb_login_fail_wrong_domain.png" alt="忘了設定 callback URL"></p>
-<h2 id="小計"><a href="#小計" class="headerlink" title="小計"></a>小計</h2><p>文末的聯結有需多是透過 OpenSSL 的作法供參考，<br>但是會多一步驟需要安裝手動憑証(愛麗絲該作的事)。</p>
-<p>另外仍然需要修改程式這點我不是很滿意，<br>應該可以掛上其它的 Proxy Server，由 Proxy Server 處理 https 就好，<br>內網單純走 http。<br>最近也有看到<a target="_blank" rel="noopener" href="https://www.youtube.com/watch?v=gC4wmZf7dAI">零信任網路</a>，<br>不過那應該是另一個議題了</p>
-<blockquote>
-<p>Zero Trust 零信任架構近年來日受重視，在 Zero Trust 框架底下，<br>即便使用者在內網環境，也不會給予沒有期效或過高之存取權限。</p>
-</blockquote>
-<h2 id="參考"><a href="#參考" class="headerlink" title="參考"></a>參考</h2><ul>
-<li><a target="_blank" rel="noopener" href="https://www.npmjs.com/package/https-localhost?activeTab=readme">https-localhost</a></li>
-<li><a target="_blank" rel="noopener" href="https://xenby.com/b/205-%E6%8E%A8%E8%96%A6-%E5%BF%AB%E9%80%9F%E7%94%A2%E7%94%9F%E6%9C%AC%E5%9C%B0%E7%AB%AF%E9%96%8B%E7%99%BC%E7%94%A8ssl%E6%86%91%E8%AD%89%E5%B7%A5%E5%85%B7-mkcert">[推薦] 快速產生本地端開發用 SSL 憑證工具-mkcert</a></li>
-<li><a target="_blank" rel="noopener" href="https://medium.com/@shriramsharma/mkcert-you-changed-my-life-b157466880bf">mkcert, you changed my life!!</a></li>
-<li><a target="_blank" rel="noopener" href="https://tw.alphacamp.co/blog/http-https-difference">一文搞懂 HTTP 和 HTTPS 是什麼？兩者有什麼差別</a></li>
-<li><a target="_blank" rel="noopener" href="https://onlinemad.medium.com/%E6%A5%B5%E9%80%9F%E6%89%93%E9%80%A0-https-localhost-431d89a0c2e4">極速打造 https://localhost</a></li>
-<li><a target="_blank" rel="noopener" href="https://medium.com/@nitinpatel_20236/how-to-create-an-https-server-on-localhost-using-express-366435d61f28">How To Create an HTTPS Server on Localhost using Express</a></li>
-<li><a target="_blank" rel="noopener" href="https://timonweb.com/javascript/running-expressjs-server-over-https/">Running express.js server over HTTPS</a></li>
-<li><a target="_blank" rel="noopener" href="https://letsencrypt.org/zh-tw/docs/certificates-for-localhost/">使用 localhost 建立憑證</a></li>
-<li><a target="_blank" rel="noopener" href="https://blog.miniasp.com/post/2019/02/25/Creating-Self-signed-Certificate-using-OpenSSL">如何使用 OpenSSL 建立開發測試用途的自簽憑證 (Self-Signed Certificate)
-</a></li>
-</ul>
-<p>(fin)</p>
-
-      
-    </div>
-    <footer class="article-footer">
-      <a data-url="https://blog.marsen.me/2021/08/08/2021/facebook_application_and_https_login/" data-id="cm8tx3pka00852rqmfo63hgvw" class="article-share-link">Share</a>
-      
-        <a href="https://blog.marsen.me/2021/08/08/2021/facebook_application_and_https_login/#disqus_thread" class="article-comment-link">留言</a>
-      
-      
-  <ul class="article-tag-list" itemprop="keywords"><li class="article-tag-list-item"><a class="article-tag-list-link" href="/tags/%E5%AF%A6%E4%BD%9C%E7%AD%86%E8%A8%98/" rel="tag">實作筆記</a></li></ul>
-
-    </footer>
-  </div>
-  
-</article>
-
-
-  
-    <article id="post-2021/kata_guess_number" class="article article-type-post" itemscope itemprop="blogPost">
-  <div class="article-meta">
-    <a href="/2021/07/13/2021/kata_guess_number/" class="article-date">
-  <time datetime="2021-07-13T13:10:02.000Z" itemprop="datePublished">2021-07-13</time>
-</a>
-    
-  </div>
-  <div class="article-inner">
-    
-    
-      <header class="article-header">
-        
-  
-    <h1 itemprop="name">
-      <a class="article-title" href="/2021/07/13/2021/kata_guess_number/"> [活動筆記] 利用單元測試來開發『猜數字』小遊戲</a>
-    </h1>
-  
-
-      </header>
-    
-    <div class="article-entry" itemprop="articleBody">
-      
-        <h2 id="前情提要"><a href="#前情提要" class="headerlink" title="前情提要"></a>前情提要</h2><p>一直有在收集一些 Kata 用來練習 TDD ,<br>剛好台中的敏捷社群有這樣的活動, 第一時間就報名參加,<br>也很幸運的搶到票, 下面是我的記錄與一些心得反饋。<br>不過我沒有 Php 的經驗, 或許會有一些偏誤。</p>
-<blockquote>
-<p>希望有機會可以整理出一系列的 Kata ,<br>讓人可以在學習 Coding 過程中將 Testing 變成一種首選（反射行為、自然反應 etc …)<br>可以參考我之前的 Blog <a href="https://blog.marsen.me/2020/02/26/2020/todo_driven_develop_to_test_driven_develop_1/">從 TDD 到 TDD, Todo 到 Test 趨動開發</a></p>
-</blockquote>
-<h2 id="活動流程"><a href="#活動流程" class="headerlink" title="活動流程"></a>活動流程</h2><ul>
-<li>主持人簡單介紹, 並邀請大家輪流發言, 說明參加的目的<blockquote>
-<p>這個引導技巧蠻好的, 有 Check-In 與 Warm-up 的效果<br>雖然是還是有人不發言或是後續引發的討論有點少（直接用肯定句結束對話）<br>但是相信多試幾次是可以改善的</p>
-</blockquote>
-</li>
-<li>主講者介紹題目</li>
-<li>主講者實作題目<ul>
-<li>拆分「猜數字」與「隨機數」</li>
-<li>使用 Injection 的技巧</li>
-<li>解題</li>
-</ul>
-</li>
-<li>分組解「隨機數」</li>
-<li>主講者講解隨機數</li>
-<li>問問題</li>
-</ul>
-<h2 id="心得"><a href="#心得" class="headerlink" title="心得"></a>心得</h2><p>看到各地開始有不同的講者來說明 Unit Test 或 TDD 感覺是很棒的,<br>希望能夠有更多的社群與講者來介紹. 這個工程師的<strong>基本技能</strong>。</p>
-<p>在講解的過程中, 可能是我誤會了, 但是我感覺到講者不確定是不是能講更多,<br>畢竟測試、單元測試(Unit Test)、測試趨動開發(TDD)的重心都有一些不同,<br>也許在報名前作一次篩選, 或是同時準備<code>基本</code>與<code>進階</code>的教材,<br>在 <code>Check-In</code> 的階段, 或隨著課程進行由淺入深的介紹,<br>就以猜數字來說 <code>Injection</code> 也許可以放入進階的部份再介紹,<br>反而有位與會者在 <code>Check-In</code> 提出的問題我覺得蠻好的。</p>
-<p>如何對猜數字這個題目, 進行需求分析, 可惜沒有進一步的研討。<br>第二部份的猜數字, 包含了隨機的部份, 分組討論我沒有參與到其它組別,<br>不太確定討論的效果為何？ 但是在我的組別是有人完全不說話的,<br>總之線上活動與會者的參予是非常重要的,<br>另外在實作猜數字的測試案例時, 講者使用了我們這一組的代碼,<br>講者似乎有不同的看法, 它將 3 個案例合併成了 1 個,<br>但是在移除案例時, 並沒有實測可以保護原有案例的部份.<br>這裡可以處理的更細緻一些.</p>
-<p>最後如果能有完整流程的 commits 與錄影的話更好,<br>當然主辦與講者可能有不同的考量就不予置評了.</p>
-<h2 id="用-C-重新跑一次-Kata"><a href="#用-C-重新跑一次-Kata" class="headerlink" title="用 C# 重新跑一次 Kata"></a>用 C# 重新跑一次 Kata</h2><p>我打算用 C# 重新進行一次這個 Kata 並稍作記錄</p>
-<h3 id="規則說明"><a href="#規則說明" class="headerlink" title="規則說明"></a>規則說明</h3><p>猜數字是一個經典的遊戲, 分為出題者與答題者,<br>出題者必需隨機設定一組四碼不重複的數字, 答題者嘗試去猜出正確的數字,<br>如果答題者猜對數字且位置正確, 出題者必需給一個 A,<br>如果答題者猜對數字但位置不正確, 出題者必需給一個 B,<br>如果 4A0B 就代表答對, 遊戲結束.</p>
-<h3 id="設計"><a href="#設計" class="headerlink" title="設計"></a>設計</h3><p>出題的部份, 我們可以開發給出題者輸入, 或是隨機產生題目,<br>隨機出題的部份我們可以拉出來當另一個功能, 所以我們先專注在猜數字的邏輯上<br>先是 A 的邏輯, 表示位置與數字相同, 所以我會需要定位與數字比較<br>B 的邏輯, 表示位置與數字相同, 這裡我會發現不存在數字比較的邏輯,<br>而是字串或字符的比對.<br>大概就這樣, 很簡單來設計我們的 Case 吧</p>
-<h4 id="猜數字案例"><a href="#猜數字案例" class="headerlink" title="猜數字案例"></a>猜數字案例</h4><p>前設條件:答案為<code>1234</code></p>
-<ol>
-<li>5678 應該得到 <code>0A0B</code> : 目的是產生方法的介面與參數</li>
-<li>1678 應該得到 <code>1A0B</code> : 最簡單的方式可以檢查第 1 個數字是否符合</li>
-<li>1278 應該得到 <code>2A0B</code> : 最簡單的方式可以檢查第 2 個數字是否符合, 產生重複</li>
-<li>重構 2、3 案例, 消重複使用 <code>ACounter</code> 作為記錄</li>
-<li>1238 應該得到 <code>3A0B</code> : 目的是確定上面的重構有效</li>
-<li>1283 應該得到 <code>2A1B</code> : 最簡單的方式檢查是否符合包含 3</li>
-<li>1243 應該得到 <code>2A2B</code> : 最簡單的方式檢查是否符合包含 4, 產生重複</li>
-<li>重構 6、7 案例, 消重複使用 <code>BCounter</code> 作為記錄</li>
-<li>2143 應該得到 <code>0A4B</code> : 確認上面的重構有效</li>
-</ol>
-<h3 id="出題者的設計"><a href="#出題者的設計" class="headerlink" title="出題者的設計"></a>出題者的設計</h3><p>這裡我覺得不適合只使用單元測試, 應該搭配整合測試可以有更好的效果</p>
-<h4 id="設計隨機出題"><a href="#設計隨機出題" class="headerlink" title="設計隨機出題"></a>設計隨機出題</h4><ol>
-<li>每次都是隨機的</li>
-<li>是 4 個數字</li>
-<li>4 個數字不重複</li>
-</ol>
-<h4 id="隨機答案案例"><a href="#隨機答案案例" class="headerlink" title="隨機答案案例"></a>隨機答案案例</h4><ol>
-<li>呼叫應得到數字 : 定義介面, 無傳入值, 回傳字串, 但是每個字元都是數字</li>
-<li>呼叫應得到長度為 4 的字串 : 限制回傳長度</li>
-<li>重構:使用正規表示式合併兩個 Case</li>
-<li>4 個數字不能重複</li>
-</ol>
-<h3 id="後記"><a href="#後記" class="headerlink" title="後記"></a>後記</h3><ol>
-<li>將 SetAnswer 由 public 轉為 private,內化為由程式隨機出題(也就是沒有出題者,實務上這層級的改動應參考需求)</li>
-<li>第二層抽象, 將 SetAnswer 實作包裝一層介面, 抽象為取出不重複數字,<br>但是將字串職責留在 SetAnswer 之中</li>
-<li>實作介面, 測試轉移到這個實作之中, 猜數字的測試改用相依性注入作 Mock</li>
-<li>C# 語言特性並沒有對集合的洗牌擴充方法, 抽出這一部份單獨實作, 並使用整合測試進行測試</li>
-<li>改寫隨機的洗牌方法以符合 <a target="_blank" rel="noopener" href="https://en.wikipedia.org/wiki/Fisher%E2%80%93Yates_shuffle">Fisher–Yates 的演算法</a><ul>
-<li><a target="_blank" rel="noopener" href="https://codepen.io/haoyang/pen/jrvrQq">動畫顯示</a></li>
-</ul>
-</li>
-</ol>
-<iframe id="cp_embed_JjNEzdd" src="//codepen.io/thisismygithub/embed/JjNEzdd?height=500&theme-id=33713&slug-hash=JjNEzdd&default-tab=result&embed-version=2" scrolling="no" frameborder="no" height="500" allowTransparency="true" allowfullscreen="true" class="cp_embed_iframe" style="width: 100%; overflow: hidden;"></iframe>
-
-<h2 id="參考"><a href="#參考" class="headerlink" title="參考"></a>參考</h2><ul>
-<li><a target="_blank" rel="noopener" href="https://github.com/recca0120/guess-number-20210710">Number Guess</a></li>
-</ul>
-<p>(fin)</p>
-
-      
-    </div>
-    <footer class="article-footer">
-      <a data-url="https://blog.marsen.me/2021/07/13/2021/kata_guess_number/" data-id="cm8tx3pkc008i2rqmdxxtaeux" class="article-share-link">Share</a>
-      
-        <a href="https://blog.marsen.me/2021/07/13/2021/kata_guess_number/#disqus_thread" class="article-comment-link">留言</a>
-      
-      
-  <ul class="article-tag-list" itemprop="keywords"><li class="article-tag-list-item"><a class="article-tag-list-link" href="/tags/%E6%B4%BB%E5%8B%95%E7%AD%86%E8%A8%98/" rel="tag">活動筆記</a></li></ul>
-
     </footer>
   </div>
   
@@ -1042,7 +1045,11 @@ j=d.createElement(s),dl=l!='dataLayer'?'&l='+l:'';j.async=true;j.src=
       <ul>
         
           <li>
-            <a href="/2025/03/29/2025/firstrade_activate_debit_card/"> [生活筆記] First Trade 開卡記錄</a>
+            <a href="/2025/04/25/2025/firstrade_activate_debit_card/"> [生活筆記] First Trade 開卡記錄</a>
+          </li>
+        
+          <li>
+            <a href="/2025/04/22/2025/should_we_need_rd/"> [生活筆記] 我們不再需要碼農??</a>
           </li>
         
           <li>
@@ -1050,15 +1057,11 @@ j=d.createElement(s),dl=l!='dataLayer'?'&l='+l:'';j.async=true;j.src=
           </li>
         
           <li>
+            <a href="/2025/02/24/2025/gcp-iam-and-instance-schedule/"> [實作筆記] 踩雷 GCP Instance Schedules 排程開關機</a>
+          </li>
+        
+          <li>
             <a href="/2025/02/20/2025/ai-deepseek/"> [實作筆記] 試玩 DeepSeek 與避免思想審查</a>
-          </li>
-        
-          <li>
-            <a href="/2025/02/17/2025/ai-breezyvoice/"> [實作筆記] 試用 Breezy Voice</a>
-          </li>
-        
-          <li>
-            <a href="/2025/02/14/2025/ai-ollama/"> [實作筆記] 在 MacBook 上安裝與使用 Ollama</a>
           </li>
         
       </ul>
@@ -1070,7 +1073,7 @@ j=d.createElement(s),dl=l!='dataLayer'?'&l='+l:'';j.async=true;j.src=
   <div class="widget-wrap">
     <h3 class="widget-title">彙整</h3>
     <div class="widget">
-      <ul class="archive-list"><li class="archive-list-item"><a class="archive-list-link" href="/archives/2025/03/">三月 2025</a><span class="archive-list-count">2</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2025/02/">二月 2025</a><span class="archive-list-count">3</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2025/01/">一月 2025</a><span class="archive-list-count">2</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2024/12/">十二月 2024</a><span class="archive-list-count">3</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2024/11/">十一月 2024</a><span class="archive-list-count">3</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2024/10/">十月 2024</a><span class="archive-list-count">4</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2024/09/">九月 2024</a><span class="archive-list-count">5</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2024/08/">八月 2024</a><span class="archive-list-count">4</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2024/07/">七月 2024</a><span class="archive-list-count">3</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2024/06/">六月 2024</a><span class="archive-list-count">2</span></li><span id='list_archives2' style='display:none'><li class="archive-list-item"><a class="archive-list-link" href="/archives/2024/05/">五月 2024</a><span class="archive-list-count">1</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2024/04/">四月 2024</a><span class="archive-list-count">2</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2024/03/">三月 2024</a><span class="archive-list-count">3</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2024/02/">二月 2024</a><span class="archive-list-count">2</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2024/01/">一月 2024</a><span class="archive-list-count">4</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2023/12/">十二月 2023</a><span class="archive-list-count">2</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2023/11/">十一月 2023</a><span class="archive-list-count">3</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2023/10/">十月 2023</a><span class="archive-list-count">2</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2023/09/">九月 2023</a><span class="archive-list-count">3</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2023/08/">八月 2023</a><span class="archive-list-count">2</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2023/07/">七月 2023</a><span class="archive-list-count">6</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2023/06/">六月 2023</a><span class="archive-list-count">6</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2023/05/">五月 2023</a><span class="archive-list-count">1</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2023/04/">四月 2023</a><span class="archive-list-count">9</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2023/03/">三月 2023</a><span class="archive-list-count">4</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2023/02/">二月 2023</a><span class="archive-list-count">2</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2023/01/">一月 2023</a><span class="archive-list-count">2</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2022/12/">十二月 2022</a><span class="archive-list-count">1</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2022/10/">十月 2022</a><span class="archive-list-count">2</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2022/09/">九月 2022</a><span class="archive-list-count">6</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2022/08/">八月 2022</a><span class="archive-list-count">3</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2022/07/">七月 2022</a><span class="archive-list-count">2</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2022/06/">六月 2022</a><span class="archive-list-count">3</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2022/05/">五月 2022</a><span class="archive-list-count">7</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2022/04/">四月 2022</a><span class="archive-list-count">3</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2022/03/">三月 2022</a><span class="archive-list-count">3</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2022/02/">二月 2022</a><span class="archive-list-count">2</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2022/01/">一月 2022</a><span class="archive-list-count">3</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2021/12/">十二月 2021</a><span class="archive-list-count">2</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2021/11/">十一月 2021</a><span class="archive-list-count">2</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2021/10/">十月 2021</a><span class="archive-list-count">2</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2021/09/">九月 2021</a><span class="archive-list-count">1</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2021/08/">八月 2021</a><span class="archive-list-count">2</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2021/07/">七月 2021</a><span class="archive-list-count">4</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2021/06/">六月 2021</a><span class="archive-list-count">1</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2021/05/">五月 2021</a><span class="archive-list-count">2</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2021/04/">四月 2021</a><span class="archive-list-count">3</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2021/03/">三月 2021</a><span class="archive-list-count">3</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2021/02/">二月 2021</a><span class="archive-list-count">1</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2021/01/">一月 2021</a><span class="archive-list-count">7</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2020/12/">十二月 2020</a><span class="archive-list-count">1</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2020/11/">十一月 2020</a><span class="archive-list-count">2</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2020/10/">十月 2020</a><span class="archive-list-count">5</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2020/09/">九月 2020</a><span class="archive-list-count">5</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2020/08/">八月 2020</a><span class="archive-list-count">2</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2020/07/">七月 2020</a><span class="archive-list-count">3</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2020/06/">六月 2020</a><span class="archive-list-count">3</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2020/05/">五月 2020</a><span class="archive-list-count">3</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2020/04/">四月 2020</a><span class="archive-list-count">4</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2020/03/">三月 2020</a><span class="archive-list-count">1</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2020/02/">二月 2020</a><span class="archive-list-count">1</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2020/01/">一月 2020</a><span class="archive-list-count">5</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2019/12/">十二月 2019</a><span class="archive-list-count">1</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2019/11/">十一月 2019</a><span class="archive-list-count">2</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2019/10/">十月 2019</a><span class="archive-list-count">1</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2019/09/">九月 2019</a><span class="archive-list-count">2</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2019/08/">八月 2019</a><span class="archive-list-count">5</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2019/07/">七月 2019</a><span class="archive-list-count">1</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2019/06/">六月 2019</a><span class="archive-list-count">1</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2019/05/">五月 2019</a><span class="archive-list-count">2</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2019/04/">四月 2019</a><span class="archive-list-count">3</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2019/03/">三月 2019</a><span class="archive-list-count">1</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2019/02/">二月 2019</a><span class="archive-list-count">2</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2019/01/">一月 2019</a><span class="archive-list-count">4</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2018/12/">十二月 2018</a><span class="archive-list-count">5</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2018/11/">十一月 2018</a><span class="archive-list-count">7</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2018/10/">十月 2018</a><span class="archive-list-count">6</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2018/09/">九月 2018</a><span class="archive-list-count">3</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2018/08/">八月 2018</a><span class="archive-list-count">2</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2018/07/">七月 2018</a><span class="archive-list-count">6</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2018/06/">六月 2018</a><span class="archive-list-count">2</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2018/05/">五月 2018</a><span class="archive-list-count">1</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2018/04/">四月 2018</a><span class="archive-list-count">5</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2018/03/">三月 2018</a><span class="archive-list-count">5</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2018/02/">二月 2018</a><span class="archive-list-count">1</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2018/01/">一月 2018</a><span class="archive-list-count">5</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2017/12/">十二月 2017</a><span class="archive-list-count">3</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2017/10/">十月 2017</a><span class="archive-list-count">3</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2017/09/">九月 2017</a><span class="archive-list-count">2</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2017/08/">八月 2017</a><span class="archive-list-count">1</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2017/07/">七月 2017</a><span class="archive-list-count">2</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2017/05/">五月 2017</a><span class="archive-list-count">1</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2017/04/">四月 2017</a><span class="archive-list-count">2</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2017/03/">三月 2017</a><span class="archive-list-count">1</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2017/02/">二月 2017</a><span class="archive-list-count">1</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2017/01/">一月 2017</a><span class="archive-list-count">6</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2016/12/">十二月 2016</a><span class="archive-list-count">1</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2016/11/">十一月 2016</a><span class="archive-list-count">2</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2016/10/">十月 2016</a><span class="archive-list-count">4</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2016/09/">九月 2016</a><span class="archive-list-count">1</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2016/08/">八月 2016</a><span class="archive-list-count">6</span></li></span><span id=''></span><span onclick="var d=document.getElementById('list_archives2'); d.style.display===''?d.style='display:none':d.style=''">toggle...</span></ul>
+      <ul class="archive-list"><li class="archive-list-item"><a class="archive-list-link" href="/archives/2025/04/">四月 2025</a><span class="archive-list-count">2</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2025/03/">三月 2025</a><span class="archive-list-count">1</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2025/02/">二月 2025</a><span class="archive-list-count">4</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2025/01/">一月 2025</a><span class="archive-list-count">3</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2024/12/">十二月 2024</a><span class="archive-list-count">3</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2024/11/">十一月 2024</a><span class="archive-list-count">3</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2024/10/">十月 2024</a><span class="archive-list-count">4</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2024/09/">九月 2024</a><span class="archive-list-count">5</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2024/08/">八月 2024</a><span class="archive-list-count">4</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2024/07/">七月 2024</a><span class="archive-list-count">3</span></li><span id='list_archives2' style='display:none'><li class="archive-list-item"><a class="archive-list-link" href="/archives/2024/06/">六月 2024</a><span class="archive-list-count">2</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2024/05/">五月 2024</a><span class="archive-list-count">1</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2024/04/">四月 2024</a><span class="archive-list-count">2</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2024/03/">三月 2024</a><span class="archive-list-count">3</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2024/02/">二月 2024</a><span class="archive-list-count">2</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2024/01/">一月 2024</a><span class="archive-list-count">4</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2023/12/">十二月 2023</a><span class="archive-list-count">2</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2023/11/">十一月 2023</a><span class="archive-list-count">3</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2023/10/">十月 2023</a><span class="archive-list-count">2</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2023/09/">九月 2023</a><span class="archive-list-count">3</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2023/08/">八月 2023</a><span class="archive-list-count">2</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2023/07/">七月 2023</a><span class="archive-list-count">6</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2023/06/">六月 2023</a><span class="archive-list-count">6</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2023/05/">五月 2023</a><span class="archive-list-count">1</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2023/04/">四月 2023</a><span class="archive-list-count">9</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2023/03/">三月 2023</a><span class="archive-list-count">4</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2023/02/">二月 2023</a><span class="archive-list-count">2</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2023/01/">一月 2023</a><span class="archive-list-count">2</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2022/12/">十二月 2022</a><span class="archive-list-count">1</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2022/10/">十月 2022</a><span class="archive-list-count">2</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2022/09/">九月 2022</a><span class="archive-list-count">6</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2022/08/">八月 2022</a><span class="archive-list-count">3</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2022/07/">七月 2022</a><span class="archive-list-count">2</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2022/06/">六月 2022</a><span class="archive-list-count">3</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2022/05/">五月 2022</a><span class="archive-list-count">7</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2022/04/">四月 2022</a><span class="archive-list-count">3</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2022/03/">三月 2022</a><span class="archive-list-count">3</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2022/02/">二月 2022</a><span class="archive-list-count">2</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2022/01/">一月 2022</a><span class="archive-list-count">3</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2021/12/">十二月 2021</a><span class="archive-list-count">2</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2021/11/">十一月 2021</a><span class="archive-list-count">2</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2021/10/">十月 2021</a><span class="archive-list-count">2</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2021/09/">九月 2021</a><span class="archive-list-count">1</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2021/08/">八月 2021</a><span class="archive-list-count">2</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2021/07/">七月 2021</a><span class="archive-list-count">4</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2021/06/">六月 2021</a><span class="archive-list-count">1</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2021/05/">五月 2021</a><span class="archive-list-count">2</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2021/04/">四月 2021</a><span class="archive-list-count">3</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2021/03/">三月 2021</a><span class="archive-list-count">3</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2021/02/">二月 2021</a><span class="archive-list-count">1</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2021/01/">一月 2021</a><span class="archive-list-count">7</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2020/12/">十二月 2020</a><span class="archive-list-count">1</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2020/11/">十一月 2020</a><span class="archive-list-count">2</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2020/10/">十月 2020</a><span class="archive-list-count">5</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2020/09/">九月 2020</a><span class="archive-list-count">5</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2020/08/">八月 2020</a><span class="archive-list-count">2</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2020/07/">七月 2020</a><span class="archive-list-count">3</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2020/06/">六月 2020</a><span class="archive-list-count">3</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2020/05/">五月 2020</a><span class="archive-list-count">3</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2020/04/">四月 2020</a><span class="archive-list-count">4</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2020/03/">三月 2020</a><span class="archive-list-count">1</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2020/02/">二月 2020</a><span class="archive-list-count">1</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2020/01/">一月 2020</a><span class="archive-list-count">5</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2019/12/">十二月 2019</a><span class="archive-list-count">1</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2019/11/">十一月 2019</a><span class="archive-list-count">2</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2019/10/">十月 2019</a><span class="archive-list-count">1</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2019/09/">九月 2019</a><span class="archive-list-count">2</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2019/08/">八月 2019</a><span class="archive-list-count">5</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2019/07/">七月 2019</a><span class="archive-list-count">1</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2019/06/">六月 2019</a><span class="archive-list-count">1</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2019/05/">五月 2019</a><span class="archive-list-count">2</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2019/04/">四月 2019</a><span class="archive-list-count">3</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2019/03/">三月 2019</a><span class="archive-list-count">1</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2019/02/">二月 2019</a><span class="archive-list-count">2</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2019/01/">一月 2019</a><span class="archive-list-count">4</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2018/12/">十二月 2018</a><span class="archive-list-count">5</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2018/11/">十一月 2018</a><span class="archive-list-count">7</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2018/10/">十月 2018</a><span class="archive-list-count">6</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2018/09/">九月 2018</a><span class="archive-list-count">3</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2018/08/">八月 2018</a><span class="archive-list-count">2</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2018/07/">七月 2018</a><span class="archive-list-count">6</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2018/06/">六月 2018</a><span class="archive-list-count">2</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2018/05/">五月 2018</a><span class="archive-list-count">1</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2018/04/">四月 2018</a><span class="archive-list-count">5</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2018/03/">三月 2018</a><span class="archive-list-count">5</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2018/02/">二月 2018</a><span class="archive-list-count">1</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2018/01/">一月 2018</a><span class="archive-list-count">5</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2017/12/">十二月 2017</a><span class="archive-list-count">3</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2017/10/">十月 2017</a><span class="archive-list-count">3</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2017/09/">九月 2017</a><span class="archive-list-count">2</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2017/08/">八月 2017</a><span class="archive-list-count">1</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2017/07/">七月 2017</a><span class="archive-list-count">2</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2017/05/">五月 2017</a><span class="archive-list-count">1</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2017/04/">四月 2017</a><span class="archive-list-count">2</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2017/03/">三月 2017</a><span class="archive-list-count">1</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2017/02/">二月 2017</a><span class="archive-list-count">1</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2017/01/">一月 2017</a><span class="archive-list-count">6</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2016/12/">十二月 2016</a><span class="archive-list-count">1</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2016/11/">十一月 2016</a><span class="archive-list-count">2</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2016/10/">十月 2016</a><span class="archive-list-count">4</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2016/09/">九月 2016</a><span class="archive-list-count">1</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2016/08/">八月 2016</a><span class="archive-list-count">6</span></li></span><span id=''></span><span onclick="var d=document.getElementById('list_archives2'); d.style.display===''?d.style='display:none':d.style=''">toggle...</span></ul>
     </div>
   </div>
 
@@ -1087,7 +1090,7 @@ This work is licensed under a
   <div class="widget-wrap">
     <h3 class="widget-title">標籤雲</h3>
     <div class="widget tagcloud">
-      <a href="/tags/Net-Framework/" style="font-size: 14.67px;">.Net Framework</a> <a href="/tags/API/" style="font-size: 11.33px;">API</a> <a href="/tags/AWS/" style="font-size: 13.33px;">AWS</a> <a href="/tags/Agile/" style="font-size: 17.33px;">Agile</a> <a href="/tags/CI-CD/" style="font-size: 19.33px;">CI/CD</a> <a href="/tags/Cache/" style="font-size: 10px;">Cache</a> <a href="/tags/Coding-Standard/" style="font-size: 10px;">Coding Standard</a> <a href="/tags/Container/" style="font-size: 12px;">Container</a> <a href="/tags/Database/" style="font-size: 12.67px;">Database</a> <a href="/tags/Design-Pattern/" style="font-size: 10.67px;">Design Pattern</a> <a href="/tags/Docker/" style="font-size: 12px;">Docker</a> <a href="/tags/Entity-Framework/" style="font-size: 10.67px;">Entity Framework</a> <a href="/tags/Firebase/" style="font-size: 10px;">Firebase</a> <a href="/tags/Git/" style="font-size: 10.67px;">Git</a> <a href="/tags/Golang/" style="font-size: 11.33px;">Golang</a> <a href="/tags/Google/" style="font-size: 11.33px;">Google</a> <a href="/tags/GulpJs/" style="font-size: 10.67px;">GulpJs</a> <a href="/tags/HTTP/" style="font-size: 10px;">HTTP</a> <a href="/tags/Hexo/" style="font-size: 15.33px;">Hexo</a> <a href="/tags/IIS/" style="font-size: 10px;">IIS</a> <a href="/tags/IO/" style="font-size: 10px;">IO</a> <a href="/tags/Integrated-Testing/" style="font-size: 10px;">Integrated Testing</a> <a href="/tags/Jenkins/" style="font-size: 12px;">Jenkins</a> <a href="/tags/Kubernetes/" style="font-size: 10px;">Kubernetes</a> <a href="/tags/Linux/" style="font-size: 10.67px;">Linux</a> <a href="/tags/Mongodb/" style="font-size: 10px;">Mongodb</a> <a href="/tags/MsSQL/" style="font-size: 11.33px;">MsSQL</a> <a href="/tags/MsTest/" style="font-size: 10px;">MsTest</a> <a href="/tags/Mutation-Testing/" style="font-size: 10px;">Mutation Testing</a> <a href="/tags/Nodejs/" style="font-size: 15.33px;">Nodejs</a> <a href="/tags/OAuth/" style="font-size: 10px;">OAuth</a> <a href="/tags/OOP/" style="font-size: 11.33px;">OOP</a> <a href="/tags/Openshift/" style="font-size: 10.67px;">Openshift</a> <a href="/tags/PowerShell/" style="font-size: 11.33px;">PowerShell</a> <a href="/tags/React/" style="font-size: 12px;">React</a> <a href="/tags/Redis/" style="font-size: 10.67px;">Redis</a> <a href="/tags/SQL/" style="font-size: 12px;">SQL</a> <a href="/tags/Scrum/" style="font-size: 16.67px;">Scrum</a> <a href="/tags/Shell/" style="font-size: 10.67px;">Shell</a> <a href="/tags/Specflow/" style="font-size: 10px;">Specflow</a> <a href="/tags/StyleCop/" style="font-size: 10px;">StyleCop</a> <a href="/tags/TDD/" style="font-size: 16px;">TDD</a> <a href="/tags/Testing/" style="font-size: 14px;">Testing</a> <a href="/tags/Thread/" style="font-size: 10.67px;">Thread</a> <a href="/tags/Trello/" style="font-size: 10px;">Trello</a> <a href="/tags/TypeScript/" style="font-size: 13.33px;">TypeScript</a> <a href="/tags/Unit-Testing/" style="font-size: 18.67px;">Unit Testing</a> <a href="/tags/Unix/" style="font-size: 10.67px;">Unix</a> <a href="/tags/Vim/" style="font-size: 10px;">Vim</a> <a href="/tags/Visual-Studio/" style="font-size: 10px;">Visual Studio</a> <a href="/tags/html/" style="font-size: 10px;">html</a> <a href="/tags/post/" style="font-size: 10px;">post</a> <a href="/tags/%E5%AD%B8%E7%BF%92%E7%AD%86%E8%A8%98/" style="font-size: 14px;">學習筆記</a> <a href="/tags/%E5%AF%A6%E4%BD%9C%E7%AD%86%E8%A8%98/" style="font-size: 20px;">實作筆記</a> <a href="/tags/%E6%99%82%E9%96%93%E7%AE%A1%E7%90%86/" style="font-size: 10.67px;">時間管理</a> <a href="/tags/%E6%B4%BB%E5%8B%95%E7%AD%86%E8%A8%98/" style="font-size: 12.67px;">活動筆記</a> <a href="/tags/%E7%94%9F%E6%B4%BB%E7%AD%86%E8%A8%98/" style="font-size: 16px;">生活筆記</a> <a href="/tags/%E8%A8%98%E9%8C%84/" style="font-size: 11.33px;">記錄</a> <a href="/tags/%E8%B8%A9%E9%9B%B7%E7%AD%86%E8%A8%98/" style="font-size: 14.67px;">踩雷筆記</a> <a href="/tags/%E9%87%8D%E6%A7%8B/" style="font-size: 12px;">重構</a> <a href="/tags/%E9%96%B1%E8%AE%80%E7%AD%86%E8%A8%98/" style="font-size: 18px;">閱讀筆記</a>
+      <a href="/tags/Net-Framework/" style="font-size: 14.38px;">.Net Framework</a> <a href="/tags/API/" style="font-size: 11.25px;">API</a> <a href="/tags/AWS/" style="font-size: 13.13px;">AWS</a> <a href="/tags/Agile/" style="font-size: 17.5px;">Agile</a> <a href="/tags/CI-CD/" style="font-size: 19.38px;">CI/CD</a> <a href="/tags/Cache/" style="font-size: 10px;">Cache</a> <a href="/tags/Coding-Standard/" style="font-size: 10px;">Coding Standard</a> <a href="/tags/Container/" style="font-size: 11.88px;">Container</a> <a href="/tags/Database/" style="font-size: 12.5px;">Database</a> <a href="/tags/Design-Pattern/" style="font-size: 10.63px;">Design Pattern</a> <a href="/tags/Docker/" style="font-size: 11.88px;">Docker</a> <a href="/tags/Entity-Framework/" style="font-size: 10.63px;">Entity Framework</a> <a href="/tags/Firebase/" style="font-size: 10px;">Firebase</a> <a href="/tags/Git/" style="font-size: 10.63px;">Git</a> <a href="/tags/Golang/" style="font-size: 11.25px;">Golang</a> <a href="/tags/Google/" style="font-size: 11.25px;">Google</a> <a href="/tags/GulpJs/" style="font-size: 10.63px;">GulpJs</a> <a href="/tags/HTTP/" style="font-size: 10px;">HTTP</a> <a href="/tags/Hexo/" style="font-size: 15px;">Hexo</a> <a href="/tags/IIS/" style="font-size: 10px;">IIS</a> <a href="/tags/IO/" style="font-size: 10px;">IO</a> <a href="/tags/Integrated-Testing/" style="font-size: 10px;">Integrated Testing</a> <a href="/tags/Jenkins/" style="font-size: 11.88px;">Jenkins</a> <a href="/tags/Kubernetes/" style="font-size: 10px;">Kubernetes</a> <a href="/tags/Linux/" style="font-size: 10.63px;">Linux</a> <a href="/tags/Mongodb/" style="font-size: 10px;">Mongodb</a> <a href="/tags/MsSQL/" style="font-size: 11.25px;">MsSQL</a> <a href="/tags/MsTest/" style="font-size: 10px;">MsTest</a> <a href="/tags/Mutation-Testing/" style="font-size: 10px;">Mutation Testing</a> <a href="/tags/Nodejs/" style="font-size: 15px;">Nodejs</a> <a href="/tags/OAuth/" style="font-size: 10px;">OAuth</a> <a href="/tags/OOP/" style="font-size: 11.25px;">OOP</a> <a href="/tags/Openshift/" style="font-size: 10.63px;">Openshift</a> <a href="/tags/PowerShell/" style="font-size: 11.25px;">PowerShell</a> <a href="/tags/React/" style="font-size: 11.88px;">React</a> <a href="/tags/Redis/" style="font-size: 10.63px;">Redis</a> <a href="/tags/SQL/" style="font-size: 11.88px;">SQL</a> <a href="/tags/Scrum/" style="font-size: 16.88px;">Scrum</a> <a href="/tags/Shell/" style="font-size: 10.63px;">Shell</a> <a href="/tags/Specflow/" style="font-size: 10px;">Specflow</a> <a href="/tags/StyleCop/" style="font-size: 10px;">StyleCop</a> <a href="/tags/TDD/" style="font-size: 15.63px;">TDD</a> <a href="/tags/Testing/" style="font-size: 13.75px;">Testing</a> <a href="/tags/Thread/" style="font-size: 10.63px;">Thread</a> <a href="/tags/Trello/" style="font-size: 10px;">Trello</a> <a href="/tags/TypeScript/" style="font-size: 13.13px;">TypeScript</a> <a href="/tags/Unit-Testing/" style="font-size: 18.75px;">Unit Testing</a> <a href="/tags/Unix/" style="font-size: 10.63px;">Unix</a> <a href="/tags/Vim/" style="font-size: 10px;">Vim</a> <a href="/tags/Visual-Studio/" style="font-size: 10px;">Visual Studio</a> <a href="/tags/html/" style="font-size: 10px;">html</a> <a href="/tags/post/" style="font-size: 10px;">post</a> <a href="/tags/%E5%AD%B8%E7%BF%92%E7%AD%86%E8%A8%98/" style="font-size: 15px;">學習筆記</a> <a href="/tags/%E5%AF%A6%E4%BD%9C%E7%AD%86%E8%A8%98/" style="font-size: 20px;">實作筆記</a> <a href="/tags/%E6%99%82%E9%96%93%E7%AE%A1%E7%90%86/" style="font-size: 10.63px;">時間管理</a> <a href="/tags/%E6%B4%BB%E5%8B%95%E7%AD%86%E8%A8%98/" style="font-size: 12.5px;">活動筆記</a> <a href="/tags/%E7%94%9F%E6%B4%BB%E7%AD%86%E8%A8%98/" style="font-size: 16.25px;">生活筆記</a> <a href="/tags/%E8%A8%98%E9%8C%84/" style="font-size: 11.25px;">記錄</a> <a href="/tags/%E8%B8%A9%E9%9B%B7%E7%AD%86%E8%A8%98/" style="font-size: 14.38px;">踩雷筆記</a> <a href="/tags/%E9%87%8D%E6%A7%8B/" style="font-size: 11.88px;">重構</a> <a href="/tags/%E9%96%B1%E8%AE%80%E7%AD%86%E8%A8%98/" style="font-size: 18.13px;">閱讀筆記</a>
     </div>
   </div>
 
@@ -1096,7 +1099,7 @@ This work is licensed under a
   <div class="widget-wrap">
     <h3 class="widget-title">標籤</h3>
     <div class="widget">
-      <ul class="tag-list" itemprop="keywords"><li class="tag-list-item"><a class="tag-list-link" href="/tags/Net-Framework/" rel="tag">.Net Framework</a><span class="tag-list-count">9</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/API/" rel="tag">API</a><span class="tag-list-count">3</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/AWS/" rel="tag">AWS</a><span class="tag-list-count">7</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/Agile/" rel="tag">Agile</a><span class="tag-list-count">14</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/CI-CD/" rel="tag">CI&#x2F;CD</a><span class="tag-list-count">24</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/Cache/" rel="tag">Cache</a><span class="tag-list-count">1</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/Coding-Standard/" rel="tag">Coding Standard</a><span class="tag-list-count">1</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/Container/" rel="tag">Container</a><span class="tag-list-count">4</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/Database/" rel="tag">Database</a><span class="tag-list-count">6</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/Design-Pattern/" rel="tag">Design Pattern</a><span class="tag-list-count">2</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/Docker/" rel="tag">Docker</a><span class="tag-list-count">4</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/Entity-Framework/" rel="tag">Entity Framework</a><span class="tag-list-count">2</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/Firebase/" rel="tag">Firebase</a><span class="tag-list-count">1</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/Git/" rel="tag">Git</a><span class="tag-list-count">2</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/Golang/" rel="tag">Golang</a><span class="tag-list-count">3</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/Google/" rel="tag">Google</a><span class="tag-list-count">3</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/GulpJs/" rel="tag">GulpJs</a><span class="tag-list-count">2</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/HTTP/" rel="tag">HTTP</a><span class="tag-list-count">1</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/Hexo/" rel="tag">Hexo</a><span class="tag-list-count">10</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/IIS/" rel="tag">IIS</a><span class="tag-list-count">1</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/IO/" rel="tag">IO</a><span class="tag-list-count">1</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/Integrated-Testing/" rel="tag">Integrated Testing</a><span class="tag-list-count">1</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/Jenkins/" rel="tag">Jenkins</a><span class="tag-list-count">4</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/Kubernetes/" rel="tag">Kubernetes</a><span class="tag-list-count">1</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/Linux/" rel="tag">Linux</a><span class="tag-list-count">2</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/Mongodb/" rel="tag">Mongodb</a><span class="tag-list-count">1</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/MsSQL/" rel="tag">MsSQL</a><span class="tag-list-count">3</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/MsTest/" rel="tag">MsTest</a><span class="tag-list-count">1</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/Mutation-Testing/" rel="tag">Mutation Testing</a><span class="tag-list-count">1</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/Nodejs/" rel="tag">Nodejs</a><span class="tag-list-count">10</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/OAuth/" rel="tag">OAuth</a><span class="tag-list-count">1</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/OOP/" rel="tag">OOP</a><span class="tag-list-count">3</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/Openshift/" rel="tag">Openshift</a><span class="tag-list-count">2</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/PowerShell/" rel="tag">PowerShell</a><span class="tag-list-count">3</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/React/" rel="tag">React</a><span class="tag-list-count">4</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/Redis/" rel="tag">Redis</a><span class="tag-list-count">2</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/SQL/" rel="tag">SQL</a><span class="tag-list-count">4</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/Scrum/" rel="tag">Scrum</a><span class="tag-list-count">13</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/Shell/" rel="tag">Shell</a><span class="tag-list-count">2</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/Specflow/" rel="tag">Specflow</a><span class="tag-list-count">1</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/StyleCop/" rel="tag">StyleCop</a><span class="tag-list-count">1</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/TDD/" rel="tag">TDD</a><span class="tag-list-count">11</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/Testing/" rel="tag">Testing</a><span class="tag-list-count">8</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/Thread/" rel="tag">Thread</a><span class="tag-list-count">2</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/Trello/" rel="tag">Trello</a><span class="tag-list-count">1</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/TypeScript/" rel="tag">TypeScript</a><span class="tag-list-count">7</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/Unit-Testing/" rel="tag">Unit Testing</a><span class="tag-list-count">19</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/Unix/" rel="tag">Unix</a><span class="tag-list-count">2</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/Vim/" rel="tag">Vim</a><span class="tag-list-count">1</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/Visual-Studio/" rel="tag">Visual Studio</a><span class="tag-list-count">1</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/html/" rel="tag">html</a><span class="tag-list-count">1</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/post/" rel="tag">post</a><span class="tag-list-count">1</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/%E5%AD%B8%E7%BF%92%E7%AD%86%E8%A8%98/" rel="tag">學習筆記</a><span class="tag-list-count">8</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/%E5%AF%A6%E4%BD%9C%E7%AD%86%E8%A8%98/" rel="tag">實作筆記</a><span class="tag-list-count">121</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/%E6%99%82%E9%96%93%E7%AE%A1%E7%90%86/" rel="tag">時間管理</a><span class="tag-list-count">2</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/%E6%B4%BB%E5%8B%95%E7%AD%86%E8%A8%98/" rel="tag">活動筆記</a><span class="tag-list-count">6</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/%E7%94%9F%E6%B4%BB%E7%AD%86%E8%A8%98/" rel="tag">生活筆記</a><span class="tag-list-count">11</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/%E8%A8%98%E9%8C%84/" rel="tag">記錄</a><span class="tag-list-count">3</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/%E8%B8%A9%E9%9B%B7%E7%AD%86%E8%A8%98/" rel="tag">踩雷筆記</a><span class="tag-list-count">9</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/%E9%87%8D%E6%A7%8B/" rel="tag">重構</a><span class="tag-list-count">4</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/%E9%96%B1%E8%AE%80%E7%AD%86%E8%A8%98/" rel="tag">閱讀筆記</a><span class="tag-list-count">15</span></li></ul>
+      <ul class="tag-list" itemprop="keywords"><li class="tag-list-item"><a class="tag-list-link" href="/tags/Net-Framework/" rel="tag">.Net Framework</a><span class="tag-list-count">9</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/API/" rel="tag">API</a><span class="tag-list-count">3</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/AWS/" rel="tag">AWS</a><span class="tag-list-count">7</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/Agile/" rel="tag">Agile</a><span class="tag-list-count">14</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/CI-CD/" rel="tag">CI&#x2F;CD</a><span class="tag-list-count">24</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/Cache/" rel="tag">Cache</a><span class="tag-list-count">1</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/Coding-Standard/" rel="tag">Coding Standard</a><span class="tag-list-count">1</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/Container/" rel="tag">Container</a><span class="tag-list-count">4</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/Database/" rel="tag">Database</a><span class="tag-list-count">6</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/Design-Pattern/" rel="tag">Design Pattern</a><span class="tag-list-count">2</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/Docker/" rel="tag">Docker</a><span class="tag-list-count">4</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/Entity-Framework/" rel="tag">Entity Framework</a><span class="tag-list-count">2</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/Firebase/" rel="tag">Firebase</a><span class="tag-list-count">1</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/Git/" rel="tag">Git</a><span class="tag-list-count">2</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/Golang/" rel="tag">Golang</a><span class="tag-list-count">3</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/Google/" rel="tag">Google</a><span class="tag-list-count">3</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/GulpJs/" rel="tag">GulpJs</a><span class="tag-list-count">2</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/HTTP/" rel="tag">HTTP</a><span class="tag-list-count">1</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/Hexo/" rel="tag">Hexo</a><span class="tag-list-count">10</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/IIS/" rel="tag">IIS</a><span class="tag-list-count">1</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/IO/" rel="tag">IO</a><span class="tag-list-count">1</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/Integrated-Testing/" rel="tag">Integrated Testing</a><span class="tag-list-count">1</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/Jenkins/" rel="tag">Jenkins</a><span class="tag-list-count">4</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/Kubernetes/" rel="tag">Kubernetes</a><span class="tag-list-count">1</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/Linux/" rel="tag">Linux</a><span class="tag-list-count">2</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/Mongodb/" rel="tag">Mongodb</a><span class="tag-list-count">1</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/MsSQL/" rel="tag">MsSQL</a><span class="tag-list-count">3</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/MsTest/" rel="tag">MsTest</a><span class="tag-list-count">1</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/Mutation-Testing/" rel="tag">Mutation Testing</a><span class="tag-list-count">1</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/Nodejs/" rel="tag">Nodejs</a><span class="tag-list-count">10</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/OAuth/" rel="tag">OAuth</a><span class="tag-list-count">1</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/OOP/" rel="tag">OOP</a><span class="tag-list-count">3</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/Openshift/" rel="tag">Openshift</a><span class="tag-list-count">2</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/PowerShell/" rel="tag">PowerShell</a><span class="tag-list-count">3</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/React/" rel="tag">React</a><span class="tag-list-count">4</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/Redis/" rel="tag">Redis</a><span class="tag-list-count">2</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/SQL/" rel="tag">SQL</a><span class="tag-list-count">4</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/Scrum/" rel="tag">Scrum</a><span class="tag-list-count">13</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/Shell/" rel="tag">Shell</a><span class="tag-list-count">2</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/Specflow/" rel="tag">Specflow</a><span class="tag-list-count">1</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/StyleCop/" rel="tag">StyleCop</a><span class="tag-list-count">1</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/TDD/" rel="tag">TDD</a><span class="tag-list-count">11</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/Testing/" rel="tag">Testing</a><span class="tag-list-count">8</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/Thread/" rel="tag">Thread</a><span class="tag-list-count">2</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/Trello/" rel="tag">Trello</a><span class="tag-list-count">1</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/TypeScript/" rel="tag">TypeScript</a><span class="tag-list-count">7</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/Unit-Testing/" rel="tag">Unit Testing</a><span class="tag-list-count">19</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/Unix/" rel="tag">Unix</a><span class="tag-list-count">2</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/Vim/" rel="tag">Vim</a><span class="tag-list-count">1</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/Visual-Studio/" rel="tag">Visual Studio</a><span class="tag-list-count">1</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/html/" rel="tag">html</a><span class="tag-list-count">1</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/post/" rel="tag">post</a><span class="tag-list-count">1</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/%E5%AD%B8%E7%BF%92%E7%AD%86%E8%A8%98/" rel="tag">學習筆記</a><span class="tag-list-count">10</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/%E5%AF%A6%E4%BD%9C%E7%AD%86%E8%A8%98/" rel="tag">實作筆記</a><span class="tag-list-count">121</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/%E6%99%82%E9%96%93%E7%AE%A1%E7%90%86/" rel="tag">時間管理</a><span class="tag-list-count">2</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/%E6%B4%BB%E5%8B%95%E7%AD%86%E8%A8%98/" rel="tag">活動筆記</a><span class="tag-list-count">6</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/%E7%94%9F%E6%B4%BB%E7%AD%86%E8%A8%98/" rel="tag">生活筆記</a><span class="tag-list-count">12</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/%E8%A8%98%E9%8C%84/" rel="tag">記錄</a><span class="tag-list-count">3</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/%E8%B8%A9%E9%9B%B7%E7%AD%86%E8%A8%98/" rel="tag">踩雷筆記</a><span class="tag-list-count">9</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/%E9%87%8D%E6%A7%8B/" rel="tag">重構</a><span class="tag-list-count">4</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/%E9%96%B1%E8%AE%80%E7%AD%86%E8%A8%98/" rel="tag">閱讀筆記</a><span class="tag-list-count">15</span></li></ul>
     </div>
   </div>
 
