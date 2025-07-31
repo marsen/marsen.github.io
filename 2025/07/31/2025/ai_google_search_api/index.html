@@ -1,0 +1,499 @@
+<!DOCTYPE html>
+<html>
+<head>
+  
+<!-- Google Tag Manager -->
+<script>(function(w,d,s,l,i){w[l]=w[l]||[];w[l].push({'gtm.start':
+new Date().getTime(),event:'gtm.js'});var f=d.getElementsByTagName(s)[0],
+j=d.createElement(s),dl=l!='dataLayer'?'&l='+l:'';j.async=true;j.src=
+'https://www.googletagmanager.com/gtm.js?id='+i+dl;f.parentNode.insertBefore(j,f);
+})(window,document,'script','dataLayer','GTM-NTDGNJZ');</script>
+<!-- End Google Tag Manager -->
+
+  
+<!-- Google Analytics -->
+<!-- Global site tag (gtag.js) - Google Analytics -->
+<script async src="https://www.googletagmanager.com/gtag/js?id=G-RF47NNRE5G"></script>
+<script>
+  window.dataLayer = window.dataLayer || [];
+  function gtag(){dataLayer.push(arguments);}
+  gtag('js', new Date());
+
+  gtag('config', 'G-RF47NNRE5G');
+</script>
+<!-- End Google Analytics -->
+
+  
+<!-- Google AdSense -->
+<script async src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-1885096025224905"
+     crossorigin="anonymous"></script>
+<!-- End Google AdSense -->
+
+
+
+  <meta charset="utf-8">
+  
+  <title> [實作筆記] AI Agent 實作 Web Search API：從設計到部署的完整記錄 | Marsen&#39;s Blog</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
+  <meta name="description" content="前情提要最近購買 Claude Code，在此同時也有試用 Github Copilot &#x2F; Gitlab Duo &#x2F; Gemini &#x2F; Amazon Q 剛好手上有需求，是簡單的 API 串接，但是我們的系統架構有一些只有團隊知道的 Know How。 我想試試用 AI Agent 來協助我處理這些開發，需求簡單明確，但是技術細節並不少， 如果是新進 RD(即使有開">
+<meta property="og:type" content="article">
+<meta property="og:title" content=" [實作筆記] AI Agent 實作 Web Search API：從設計到部署的完整記錄">
+<meta property="og:url" content="https://blog.marsen.me/2025/07/31/2025/ai_google_search_api/index.html">
+<meta property="og:site_name" content="Marsen&#39;s Blog">
+<meta property="og:description" content="前情提要最近購買 Claude Code，在此同時也有試用 Github Copilot &#x2F; Gitlab Duo &#x2F; Gemini &#x2F; Amazon Q 剛好手上有需求，是簡單的 API 串接，但是我們的系統架構有一些只有團隊知道的 Know How。 我想試試用 AI Agent 來協助我處理這些開發，需求簡單明確，但是技術細節並不少， 如果是新進 RD(即使有開">
+<meta property="og:locale" content="zh_TW">
+<meta property="article:published_time" content="2025-07-31T08:51:10.000Z">
+<meta property="article:modified_time" content="2025-07-31T11:12:52.485Z">
+<meta property="article:author" content="Marsen L.">
+<meta property="article:tag" content="實作筆記">
+<meta name="twitter:card" content="summary">
+  
+    <link rel="alternate" href="/atom.xml" title="Marsen&#39;s Blog" type="application/atom+xml">
+  
+  
+    <link rel="icon" href="/favicon.ico">
+  
+      
+    <link rel="preconnect" href="https://fonts.gstatic.com">
+    <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@300&display=swap" rel="stylesheet">
+  
+  
+<link rel="stylesheet" href="/css/style.css">
+
+  <meta property ="og:image" content="https://avatars1.githubusercontent.com/u/4269720?s=460&v=4" /> 
+<meta name="generator" content="Hexo 7.3.0"></head>
+
+<body>
+  <div id="container">
+    <div id="wrap">
+      <header id="header">
+  <div id="blog-banner"></div>
+  <div id="header-outer" class="outer">
+    <div id="header-title" class="inner">
+      <h1 id="logo-wrap">
+        <a href="/" id="logo">Marsen&#39;s Blog</a>
+      </h1>
+      
+        <h2 id="subtitle-wrap">
+          <a href="/" id="subtitle"></a>
+          <div>
+          <span style="width: 20px; height: 10px; background: linear-gradient(to bottom, #005BBB 50%, #FFD700 50%); text-align: center; color: white; font-size: 6px; font-weight: bold; line-height: 100px;">
+            #StandWithUkraine
+          </span>
+          </div>
+        </h2>
+      
+    </div>
+    <div id="header-inner" class="inner">
+      <nav id="main-nav">
+        <a id="main-nav-toggle" class="nav-icon"></a>
+        
+          <a class="main-nav-link" href="/">Home</a>
+        
+          <a class="main-nav-link" href="/archives">Archives</a>
+        
+      </nav>
+      <nav id="sub-nav">
+        
+          <a id="nav-rss-link" class="nav-icon" href="/atom.xml" title="RSS Feed"></a>
+        
+        <a id="nav-search-btn" class="nav-icon" title="搜尋"></a>
+      </nav>
+      <div id="search-form-wrap">
+        <form action="//google.com/search" method="get" accept-charset="UTF-8" class="search-form"><input type="search" name="q" class="search-form-input" placeholder="Search"><button type="submit" class="search-form-submit">&#xF002;</button><input type="hidden" name="sitesearch" value="https://blog.marsen.me"></form>
+      </div>
+    </div>
+  </div>
+</header>
+      <div class="outer">
+        <section id="main"><article id="post-2025/ai_google_search_api" class="article article-type-post" itemscope itemprop="blogPost">
+  <div class="article-meta">
+    <a href="/2025/07/31/2025/ai_google_search_api/" class="article-date">
+  <time datetime="2025-07-31T08:51:10.000Z" itemprop="datePublished">2025-07-31</time>
+</a>
+    
+  </div>
+  <div class="article-inner">
+    
+    
+      <header class="article-header">
+        
+  
+    <h1 class="article-title" itemprop="name">
+       [實作筆記] AI Agent 實作 Web Search API：從設計到部署的完整記錄
+    </h1>
+  
+
+      </header>
+    
+    <div class="article-entry" itemprop="articleBody">
+      
+        <h2 id="前情提要"><a href="#前情提要" class="headerlink" title="前情提要"></a>前情提要</h2><p>最近購買 Claude Code，在此同時也有試用 Github Copilot &#x2F; Gitlab Duo &#x2F; Gemini &#x2F; Amazon Q</p>
+<p>剛好手上有需求，是簡單的 API 串接，但是我們的系統架構有一些只有團隊知道的 Know How。</p>
+<p>我想試試用 AI Agent 來協助我處理這些開發，需求簡單明確，但是技術細節並不少，</p>
+<p>如果是新進 RD(即使有開發經驗)也不見得能掌握得很好，我來試試看 AI Agent 能作什麼程度。</p>
+<p>這篇文章記錄我在基於 Clean Architecture 的 Node.js API 系統中實作 Web Search 功能的完整過程，包含架構設計、權限管理、錯誤處理等細節。</p>
+<h2 id="系統架構背景"><a href="#系統架構背景" class="headerlink" title="系統架構背景"></a>系統架構背景</h2><p>專案採用 <strong>Clean Architecture</strong> 搭配 <strong>依賴注入 (Inversify)</strong>，技術棧包含：</p>
+<ul>
+<li>TypeScript + Express.js</li>
+<li>TypeORM (資料庫 ORM)</li>
+<li>Inversify (依賴注入容器)</li>
+<li>JWT (身份驗證)</li>
+<li>Zod (參數驗證)</li>
+</ul>
+<p>架構分為四個主要層級：</p>
+<figure class="highlight text"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br></pre></td><td class="code"><pre><span class="line">src/</span><br><span class="line">├── adapters/          # 外部介面層 - 控制器</span><br><span class="line">├── domain/           # 領域層 - 核心業務邏輯  </span><br><span class="line">├── infrastructure/   # 基礎設施層 - 外部依賴實作  </span><br><span class="line">└── useCases/        # 應用層 - 業務用例</span><br></pre></td></tr></table></figure>
+
+<h2 id="需求分析與設計決策"><a href="#需求分析與設計決策" class="headerlink" title="需求分析與設計決策"></a>需求分析與設計決策</h2><h3 id="API-規格定義"><a href="#API-規格定義" class="headerlink" title="API 規格定義"></a>API 規格定義</h3><ul>
+<li><strong>端點</strong>: <code>GET /api/v1/websearch?keyword=關鍵字</code></li>
+<li><strong>輸入</strong>: Query 參數 <code>&#123; keyword: string &#125;</code></li>
+<li><strong>輸出</strong>: <code>&#123; data: [&#123; title: string, url: string, description: string &#125;] &#125;</code></li>
+<li><strong>結果數</strong>: 10 筆</li>
+<li><strong>權限</strong>: 所有 API 都需要權限檢查(我們之前開發好的 RBAC 權限系統 )，一個功能對應一個權限，為此我需要新增 <code>web_search</code> 權限</li>
+</ul>
+<h3 id="關鍵設計決策"><a href="#關鍵設計決策" class="headerlink" title="關鍵設計決策"></a>關鍵設計決策</h3><p><strong>1. 控制器選擇</strong>  </p>
+<p>決定將功能放在 <code>BasicController</code> 而非 <code>ProjController</code>，因為這是通用功能而非特定業務邏輯。</p>
+<p>| 這裡我在需求上有明確告知 AI，實作上也沒有問題</p>
+<p><strong>2. 依賴關係</strong><br>嚴格遵循 Clean Architecture 的依賴規則：</p>
+<p>| 也有寫入 CLAUDE.md 的開發準則中，但 AI 會常常忘記這件事</p>
+<figure class="highlight text"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">Controller → UseCase → Service → External API</span><br></pre></td></tr></table></figure>
+
+<p><strong>3. 環境變數策略</strong>  </p>
+<p>將 Google API 設定為非必要欄位，未設定時警告但不中斷其他服務。</p>
+<p>| AI 提供很好的建議並快速完成開發</p>
+<p><strong>4. 錯誤處理設計</strong>  </p>
+<ul>
+<li>503: API 未設定</li>
+<li>502: API 呼叫失敗  </li>
+<li>400: 參數錯誤 (Zod 驗證)</li>
+</ul>
+<h2 id="實作步驟詳解"><a href="#實作步驟詳解" class="headerlink" title="實作步驟詳解"></a>實作步驟詳解</h2><h3 id="Phase-1-環境設定擴充"><a href="#Phase-1-環境設定擴充" class="headerlink" title="Phase 1: 環境設定擴充"></a>Phase 1: 環境設定擴充</h3><p>首先擴充環境變數設定，新增 Google Search API 相關設定：</p>
+<figure class="highlight bash"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment"># .env.example</span></span><br><span class="line"><span class="comment"># Google Search API Configuration</span></span><br><span class="line">GOOGLE_API_KEY=your_google_api_key</span><br><span class="line">GOOGLE_SEARCH_ENGINE_ID=your_search_engine_id  </span><br><span class="line">GOOGLE_SEARCH_API_URL=https://www.googleapis.com/customsearch/v1</span><br><span class="line">GOOGLE_SEARCH_RESULTS_COUNT=10</span><br></pre></td></tr></table></figure>
+
+<p><strong>修改 envConfigService.ts</strong><br>新增 <code>getOptional()</code> 方法支援可選配置：</p>
+<figure class="highlight typescript"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">public</span> <span class="title function_">getOptional</span>(<span class="attr">key</span>: <span class="built_in">string</span>): <span class="built_in">string</span> | <span class="literal">undefined</span> &#123;</span><br><span class="line">  <span class="keyword">return</span> process.<span class="property">env</span>[key]</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+<h3 id="Phase-2-權限系統整合"><a href="#Phase-2-權限系統整合" class="headerlink" title="Phase 2: 權限系統整合"></a>Phase 2: 權限系統整合</h3><p>建立資料庫遷移檔案，新增 <code>web_search</code> 權限：</p>
+<figure class="highlight sql"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">INSERT</span> <span class="keyword">INTO</span> permissions (name, description) <span class="keyword">VALUES</span> </span><br><span class="line">(<span class="string">&#x27;web_search&#x27;</span>, <span class="string">&#x27;Web Search API access permission&#x27;</span>);</span><br><span class="line"></span><br><span class="line"><span class="comment">-- 分配給 admin 和 member 角色</span></span><br><span class="line"><span class="keyword">INSERT</span> <span class="keyword">INTO</span> role_permissions (role_id, permission_id) </span><br><span class="line"><span class="keyword">SELECT</span> r.id, p.id <span class="keyword">FROM</span> roles r, permissions p </span><br><span class="line"><span class="keyword">WHERE</span> r.name <span class="keyword">IN</span> (<span class="string">&#x27;admin&#x27;</span>, <span class="string">&#x27;member&#x27;</span>) <span class="keyword">AND</span> p.name <span class="operator">=</span> <span class="string">&#x27;web_search&#x27;</span>;</span><br></pre></td></tr></table></figure>
+
+<h3 id="Phase-3-核心架構實作"><a href="#Phase-3-核心架構實作" class="headerlink" title="Phase 3: 核心架構實作"></a>Phase 3: 核心架構實作</h3><h4 id="1-定義領域介面"><a href="#1-定義領域介面" class="headerlink" title="1. 定義領域介面"></a>1. 定義領域介面</h4><p><strong>src&#x2F;domain&#x2F;interfaces&#x2F;webSearchService.ts</strong></p>
+<figure class="highlight typescript"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">export</span> <span class="keyword">interface</span> <span class="title class_">WebSearchService</span> &#123;</span><br><span class="line">  <span class="title function_">search</span>(<span class="attr">keyword</span>: <span class="built_in">string</span>): <span class="title class_">Promise</span>&lt;<span class="title class_">WebSearchResult</span>[]&gt;</span><br><span class="line">&#125;</span><br><span class="line"></span><br><span class="line"><span class="keyword">export</span> <span class="keyword">interface</span> <span class="title class_">WebSearchResult</span> &#123;</span><br><span class="line">  <span class="attr">title</span>: <span class="built_in">string</span></span><br><span class="line">  <span class="attr">url</span>: <span class="built_in">string</span>  </span><br><span class="line">  <span class="attr">description</span>: <span class="built_in">string</span></span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+<h4 id="2-Google-Search-Service-實作"><a href="#2-Google-Search-Service-實作" class="headerlink" title="2. Google Search Service 實作"></a>2. Google Search Service 實作</h4><p><strong>src&#x2F;infrastructure&#x2F;services&#x2F;googleSearchService.ts</strong></p>
+<figure class="highlight typescript"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br><span class="line">29</span><br><span class="line">30</span><br><span class="line">31</span><br><span class="line">32</span><br><span class="line">33</span><br><span class="line">34</span><br><span class="line">35</span><br><span class="line">36</span><br><span class="line">37</span><br><span class="line">38</span><br><span class="line">39</span><br><span class="line">40</span><br><span class="line">41</span><br><span class="line">42</span><br><span class="line">43</span><br></pre></td><td class="code"><pre><span class="line"><span class="meta">@injectable</span>()</span><br><span class="line"><span class="keyword">export</span> <span class="keyword">class</span> <span class="title class_">GoogleSearchService</span> <span class="keyword">implements</span> <span class="title class_">WebSearchService</span> &#123;</span><br><span class="line">  <span class="title function_">constructor</span>(<span class="params"></span></span><br><span class="line"><span class="params">    <span class="meta">@inject</span>(TYPES.HttpClient) <span class="keyword">private</span> <span class="keyword">readonly</span> httpClient: IHttpClient,</span></span><br><span class="line"><span class="params">    <span class="meta">@inject</span>(TYPES.EnvConfigService) <span class="keyword">private</span> <span class="keyword">readonly</span> envConfig: IEnvConfigService</span></span><br><span class="line"><span class="params">  </span>) &#123;&#125;</span><br><span class="line"></span><br><span class="line">  <span class="keyword">async</span> <span class="title function_">search</span>(<span class="attr">keyword</span>: <span class="built_in">string</span>): <span class="title class_">Promise</span>&lt;<span class="title class_">WebSearchResult</span>[]&gt; &#123;</span><br><span class="line">    <span class="keyword">const</span> apiKey = <span class="variable language_">this</span>.<span class="property">envConfig</span>.<span class="title function_">getOptional</span>(<span class="string">&#x27;GOOGLE_API_KEY&#x27;</span>)</span><br><span class="line">    <span class="keyword">const</span> searchEngineId = <span class="variable language_">this</span>.<span class="property">envConfig</span>.<span class="title function_">getOptional</span>(<span class="string">&#x27;GOOGLE_SEARCH_ENGINE_ID&#x27;</span>)</span><br><span class="line">    </span><br><span class="line">    <span class="keyword">if</span> (!apiKey || !searchEngineId) &#123;</span><br><span class="line">      <span class="keyword">throw</span> <span class="keyword">new</span> <span class="title class_">AppError</span>(<span class="string">&#x27;Google Search API 未設定&#x27;</span>, <span class="number">503</span>)</span><br><span class="line">    &#125;</span><br><span class="line"></span><br><span class="line">    <span class="keyword">const</span> params = &#123;</span><br><span class="line">      <span class="attr">key</span>: apiKey,</span><br><span class="line">      <span class="attr">cx</span>: searchEngineId, </span><br><span class="line">      <span class="attr">q</span>: keyword,</span><br><span class="line">      <span class="attr">num</span>: <span class="variable language_">this</span>.<span class="property">envConfig</span>.<span class="title function_">get</span>(<span class="string">&#x27;GOOGLE_SEARCH_RESULTS_COUNT&#x27;</span>, <span class="string">&#x27;10&#x27;</span>)</span><br><span class="line">    &#125;</span><br><span class="line"></span><br><span class="line">    <span class="keyword">try</span> &#123;</span><br><span class="line">      <span class="keyword">const</span> response = <span class="keyword">await</span> <span class="variable language_">this</span>.<span class="property">httpClient</span>.<span class="title function_">get</span>(</span><br><span class="line">        <span class="variable language_">this</span>.<span class="property">envConfig</span>.<span class="title function_">get</span>(<span class="string">&#x27;GOOGLE_SEARCH_API_URL&#x27;</span>), </span><br><span class="line">        &#123; params &#125;</span><br><span class="line">      )</span><br><span class="line">      <span class="keyword">return</span> <span class="variable language_">this</span>.<span class="title function_">transformGoogleResponse</span>(response.<span class="property">data</span>)</span><br><span class="line">    &#125; <span class="keyword">catch</span> (error) &#123;</span><br><span class="line">      <span class="keyword">throw</span> <span class="keyword">new</span> <span class="title class_">AppError</span>(<span class="string">&#x27;搜尋服務暫時無法使用&#x27;</span>, <span class="number">502</span>)</span><br><span class="line">    &#125;</span><br><span class="line">  &#125;</span><br><span class="line"></span><br><span class="line">  <span class="keyword">private</span> <span class="title function_">transformGoogleResponse</span>(<span class="attr">data</span>: <span class="built_in">any</span>): <span class="title class_">WebSearchResult</span>[] &#123;</span><br><span class="line">    <span class="keyword">if</span> (!data.<span class="property">items</span>) <span class="keyword">return</span> []</span><br><span class="line">    </span><br><span class="line">    <span class="keyword">return</span> data.<span class="property">items</span>.<span class="title function_">map</span>(<span class="function">(<span class="params">item: <span class="built_in">any</span></span>) =&gt;</span> (&#123;</span><br><span class="line">      <span class="attr">title</span>: item.<span class="property">title</span>,</span><br><span class="line">      <span class="attr">url</span>: item.<span class="property">link</span>,</span><br><span class="line">      <span class="attr">description</span>: item.<span class="property">snippet</span> || <span class="string">&#x27;&#x27;</span></span><br><span class="line">    &#125;))</span><br><span class="line">  &#125;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+<h4 id="3-UseCase-層實作"><a href="#3-UseCase-層實作" class="headerlink" title="3. UseCase 層實作"></a>3. UseCase 層實作</h4><p><strong>src&#x2F;useCases&#x2F;ExecuteWebSearch.ts</strong></p>
+<figure class="highlight typescript"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br></pre></td><td class="code"><pre><span class="line"><span class="meta">@injectable</span>()</span><br><span class="line"><span class="keyword">export</span> <span class="keyword">class</span> <span class="title class_">ExecuteWebSearch</span> <span class="keyword">implements</span> <span class="title class_">IUseCase</span>&lt;<span class="title class_">ExecuteWebSearchDTO</span>, <span class="title class_">WebSearchResponseDTO</span>&gt; &#123;</span><br><span class="line">  <span class="title function_">constructor</span>(<span class="params"></span></span><br><span class="line"><span class="params">    <span class="meta">@inject</span>(TYPES.WebSearchService) <span class="keyword">private</span> <span class="keyword">readonly</span> webSearchService: WebSearchService</span></span><br><span class="line"><span class="params">  </span>) &#123;&#125;</span><br><span class="line"></span><br><span class="line">  <span class="keyword">async</span> <span class="title function_">execute</span>(<span class="attr">input</span>: <span class="title class_">ExecuteWebSearchDTO</span>): <span class="title class_">Promise</span>&lt;<span class="title class_">WebSearchResponseDTO</span>&gt; &#123;</span><br><span class="line">    <span class="keyword">const</span> results = <span class="keyword">await</span> <span class="variable language_">this</span>.<span class="property">webSearchService</span>.<span class="title function_">search</span>(input.<span class="property">keyword</span>)</span><br><span class="line">    <span class="keyword">return</span> &#123; <span class="attr">data</span>: results &#125;</span><br><span class="line">  &#125;</span><br><span class="line">&#125;</span><br><span class="line"></span><br><span class="line"><span class="comment">// DTO 定義</span></span><br><span class="line"><span class="keyword">export</span> <span class="keyword">interface</span> <span class="title class_">ExecuteWebSearchDTO</span> &#123;</span><br><span class="line">  <span class="attr">keyword</span>: <span class="built_in">string</span></span><br><span class="line">&#125;</span><br><span class="line"></span><br><span class="line"><span class="keyword">export</span> <span class="keyword">interface</span> <span class="title class_">WebSearchResponseDTO</span> &#123;</span><br><span class="line">  <span class="attr">data</span>: <span class="title class_">WebSearchResult</span>[]</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+<h4 id="4-Controller-層實作"><a href="#4-Controller-層實作" class="headerlink" title="4. Controller 層實作"></a>4. Controller 層實作</h4><p><strong>src&#x2F;adapters&#x2F;controllers&#x2F;basicController.ts</strong></p>
+<figure class="highlight typescript"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">import</span> &#123; z &#125; <span class="keyword">from</span> <span class="string">&#x27;zod&#x27;</span></span><br><span class="line"></span><br><span class="line"><span class="comment">// Zod 驗證 schema</span></span><br><span class="line"><span class="keyword">const</span> webSearchQuerySchema = z.<span class="title function_">object</span>(&#123;</span><br><span class="line">  <span class="attr">keyword</span>: z.<span class="title function_">string</span>().<span class="title function_">min</span>(<span class="number">1</span>, <span class="string">&#x27;keyword 參數為必填且不能為空字串&#x27;</span>)</span><br><span class="line">&#125;)</span><br><span class="line"></span><br><span class="line"><span class="keyword">async</span> <span class="title function_">webSearch</span>(<span class="attr">req</span>: <span class="title class_">Request</span>, <span class="attr">res</span>: <span class="title class_">Response</span>): <span class="title class_">Promise</span>&lt;<span class="built_in">void</span>&gt; &#123;</span><br><span class="line">  <span class="comment">// 使用 Zod 進行參數驗證</span></span><br><span class="line">  <span class="keyword">const</span> &#123; keyword &#125; = webSearchQuerySchema.<span class="title function_">parse</span>(req.<span class="property">query</span>)</span><br><span class="line">  </span><br><span class="line">  <span class="keyword">const</span> <span class="attr">input</span>: <span class="title class_">ExecuteWebSearchDTO</span> = &#123; keyword &#125;</span><br><span class="line">  <span class="keyword">const</span> result = <span class="keyword">await</span> <span class="variable language_">this</span>.<span class="property">executeWebSearch</span>.<span class="title function_">execute</span>(input)</span><br><span class="line">  </span><br><span class="line">  res.<span class="title function_">status</span>(<span class="number">200</span>).<span class="title function_">json</span>(result)</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+<h4 id="5-路由設定"><a href="#5-路由設定" class="headerlink" title="5. 路由設定"></a>5. 路由設定</h4><p><strong>src&#x2F;infrastructure&#x2F;routes&#x2F;basicRouter.ts</strong></p>
+<figure class="highlight typescript"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment">// 註冊路由，先執行權限檢查，再執行業務邏輯</span></span><br><span class="line">r.<span class="title function_">get</span>(<span class="string">`<span class="subst">$&#123;basePath&#125;</span>/websearch`</span>, </span><br><span class="line">  auth.<span class="title function_">user</span>(<span class="string">&#x27;web_search&#x27;</span>),  <span class="comment">// 權限中介軟體</span></span><br><span class="line">  <span class="title function_">asyncWrapper</span>(basicController.<span class="property">webSearch</span>.<span class="title function_">bind</span>(basicController))</span><br><span class="line">)</span><br></pre></td></tr></table></figure>
+
+<h3 id="Phase-4-依賴注入設定"><a href="#Phase-4-依賴注入設定" class="headerlink" title="Phase 4: 依賴注入設定"></a>Phase 4: 依賴注入設定</h3><figure class="highlight typescript"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment">// inversify.config.ts</span></span><br><span class="line"><span class="comment">// 註冊 UseCase</span></span><br><span class="line">container.<span class="property">bind</span>&lt;<span class="title class_">IUseCase</span>&lt;<span class="title class_">ExecuteWebSearchDTO</span>, <span class="title class_">WebSearchResponseDTO</span>&gt;&gt;(</span><br><span class="line">  <span class="variable constant_">TYPES</span>.<span class="property">ExecuteWebSearch</span></span><br><span class="line">).<span class="title function_">to</span>(<span class="title class_">ExecuteWebSearch</span>)</span><br><span class="line"></span><br><span class="line"><span class="comment">// 註冊 Service</span></span><br><span class="line">container.<span class="property">bind</span>&lt;<span class="title class_">WebSearchService</span>&gt;(</span><br><span class="line">  <span class="variable constant_">TYPES</span>.<span class="property">WebSearchService</span></span><br><span class="line">).<span class="title function_">to</span>(<span class="title class_">GoogleSearchService</span>)</span><br><span class="line"></span><br><span class="line"><span class="comment">// 更新 TYPES 常數</span></span><br><span class="line"><span class="keyword">export</span> <span class="keyword">const</span> <span class="variable constant_">TYPES</span> = &#123;</span><br><span class="line">  <span class="comment">// ... existing types</span></span><br><span class="line">  <span class="title class_">ExecuteWebSearch</span>: <span class="title class_">Symbol</span>.<span class="title function_">for</span>(<span class="string">&#x27;ExecuteWebSearch&#x27;</span>),</span><br><span class="line">  <span class="title class_">WebSearchService</span>: <span class="title class_">Symbol</span>.<span class="title function_">for</span>(<span class="string">&#x27;WebSearchService&#x27;</span>),</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+<h2 id="測試與驗證"><a href="#測試與驗證" class="headerlink" title="測試與驗證"></a>測試與驗證</h2><h3 id="準備測試環境-–-取得測試-Token"><a href="#準備測試環境-–-取得測試-Token" class="headerlink" title="準備測試環境 – 取得測試 Token"></a>準備測試環境 – 取得測試 Token</h3><figure class="highlight bash"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br></pre></td><td class="code"><pre><span class="line">curl -X <span class="string">&#x27;POST&#x27;</span> <span class="string">&#x27;http://localhost:4578/api/v1/auth/login&#x27;</span> \</span><br><span class="line">  -H <span class="string">&#x27;accept: application/json&#x27;</span> \</span><br><span class="line">  -H <span class="string">&#x27;Content-Type: application/json&#x27;</span> \</span><br><span class="line">  -d <span class="string">&#x27;&#123;&quot;account&quot;: &quot;test_act&quot;, &quot;password&quot;: &quot;test_pwd&quot;&#125;&#x27;</span></span><br></pre></td></tr></table></figure>
+
+<h3 id="測試案例設計"><a href="#測試案例設計" class="headerlink" title="測試案例設計"></a>測試案例設計</h3><p>| AI　會自動幫我跑 End To End 測試（本來是 RD 用curl 或 postman 進行的工作）<br>| 案例的設計上也很細心，很多 RD 是只測試 Happy Case 的</p>
+<h4 id="正常功能測試-happy-case"><a href="#正常功能測試-happy-case" class="headerlink" title="正常功能測試(happy case)"></a>正常功能測試(happy case)</h4><figure class="highlight bash"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br></pre></td><td class="code"><pre><span class="line">curl -X GET <span class="string">&quot;http://localhost:4578/api/v1/websearch?keyword=nodejs&quot;</span> \</span><br><span class="line">  -H <span class="string">&quot;Authorization: Bearer &lt;token&gt;&quot;</span></span><br><span class="line"><span class="comment"># 預期: Google 搜尋結果 JSON</span></span><br></pre></td></tr></table></figure>
+
+<h4 id="權限檢查失敗測試"><a href="#權限檢查失敗測試" class="headerlink" title="權限檢查失敗測試"></a>權限檢查失敗測試</h4><figure class="highlight bash"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br></pre></td><td class="code"><pre><span class="line">curl -X GET <span class="string">&quot;http://localhost:4578/api/v1/websearch?keyword=test&quot;</span></span><br><span class="line"><span class="comment"># 預期: &#123;&quot;error&quot;:&quot;Authentication invalid&quot;&#125;</span></span><br></pre></td></tr></table></figure>
+
+<h4 id="參數驗證測試"><a href="#參數驗證測試" class="headerlink" title="參數驗證測試"></a>參數驗證測試</h4><figure class="highlight bash"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment"># 缺少參數</span></span><br><span class="line">curl -X GET <span class="string">&quot;http://localhost:4578/api/v1/websearch&quot;</span> \</span><br><span class="line">  -H <span class="string">&quot;Authorization: Bearer &lt;token&gt;&quot;</span></span><br><span class="line"><span class="comment"># 預期: Zod 驗證錯誤，400 status</span></span><br><span class="line"></span><br><span class="line"><span class="comment"># 空參數</span></span><br><span class="line">curl -X GET <span class="string">&quot;http://localhost:4578/api/v1/websearch?keyword=&quot;</span> \</span><br><span class="line">  -H <span class="string">&quot;Authorization: Bearer &lt;token&gt;&quot;</span></span><br><span class="line"><span class="comment"># 預期: &#123;&quot;error&quot;:[&#123;...,&quot;message&quot;:&quot;keyword 參數為必填且不能為空字串&quot;&#125;]&#125;</span></span><br></pre></td></tr></table></figure>
+
+<h2 id="錯誤處理機制"><a href="#錯誤處理機制" class="headerlink" title="錯誤處理機制"></a>錯誤處理機制</h2><h3 id="Zod-驗證整合"><a href="#Zod-驗證整合" class="headerlink" title="Zod 驗證整合"></a>Zod 驗證整合</h3><blockquote>
+<p>專案已內建 Zod 在 req&#x2F;res 檢查參數與錯誤處理有很好的表現，是團隊的開發工具之一<br>但要提醒 AI 不然他會手刻一個錯誤處理給你（刻得也不差就是了）</p>
+</blockquote>
+<figure class="highlight typescript"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment">// errorHandler.ts 已支援</span></span><br><span class="line">&#123;</span><br><span class="line">  <span class="attr">type</span>: <span class="title class_">ZodError</span>,</span><br><span class="line">  <span class="attr">status</span>: <span class="number">400</span>,</span><br><span class="line">  <span class="attr">log</span>: <span class="string">&#x27;Zod validation error&#x27;</span>,</span><br><span class="line">  <span class="attr">getMsg</span>: <span class="function">(<span class="params">err: ZodError</span>) =&gt;</span> err.<span class="property">errors</span>,</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+<h4 id="❌-錯誤方式：AI-手刻錯誤處理"><a href="#❌-錯誤方式：AI-手刻錯誤處理" class="headerlink" title="❌ 錯誤方式：AI 手刻錯誤處理"></a>❌ 錯誤方式：AI 手刻錯誤處理</h4><figure class="highlight typescript"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">if</span> (!keyword || <span class="keyword">typeof</span> keyword !== <span class="string">&#x27;string&#x27;</span>) &#123;</span><br><span class="line">  res.<span class="title function_">status</span>(<span class="number">400</span>).<span class="title function_">json</span>(&#123; <span class="attr">error</span>: <span class="string">&#x27;keyword 參數為必填且必須是字串&#x27;</span> &#125;)</span><br><span class="line">  <span class="keyword">return</span></span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+<h4 id="✅-正確方式：使用-Zod"><a href="#✅-正確方式：使用-Zod" class="headerlink" title="✅ 正確方式：使用 Zod"></a>✅ 正確方式：使用 Zod</h4><figure class="highlight typescript"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">const</span> &#123; keyword &#125; = webSearchQuerySchema.<span class="title function_">parse</span>(req.<span class="property">query</span>)</span><br></pre></td></tr></table></figure>
+
+<p>使用 Zod 的好處：</p>
+<ul>
+<li>統一的錯誤格式</li>
+<li>自動整合到全域錯誤處理器</li>
+<li>型別安全保證</li>
+</ul>
+<h3 id="中介軟體執行順序"><a href="#中介軟體執行順序" class="headerlink" title="中介軟體執行順序"></a>中介軟體執行順序</h3><blockquote>
+<p>重構算是這次需求的大目標，只要提示詞寫得夠好 AI 可以提供很完整的路由列表<br>而且重構的狀態也很正確，不過我的專案不大只有 30 隻左右的 API 參加價值可能不高</p>
+</blockquote>
+<figure class="highlight text"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">請求 → auth.user(&#x27;web_search&#x27;) → asyncWrapper → zod.parse() → 業務邏輯</span><br></pre></td></tr></table></figure>
+
+<p>這個順序確保：</p>
+<ol>
+<li>先檢查身份權限</li>
+<li>再進行參數驗證  </li>
+<li>最後執行業務邏輯</li>
+</ol>
+<h2 id="Google-Custom-Search-API-整合要點"><a href="#Google-Custom-Search-API-整合要點" class="headerlink" title="Google Custom Search API 整合要點"></a>Google Custom Search API 整合要點</h2><blockquote>
+<p>商業需求的主邏輯，我一行程式沒寫只與 AI 互動就完成了這個功能，包含點對點的測試<br>不過在零信任原則下，還是請其他 RD 再作一次 Code Review 與完整測試</p>
+</blockquote>
+<h3 id="必要參數說明"><a href="#必要參數說明" class="headerlink" title="必要參數說明"></a>必要參數說明</h3><ul>
+<li><code>key</code>: Google API Key</li>
+<li><code>cx</code>: Custom Search Engine ID  </li>
+<li><code>q</code>: 搜尋關鍵字</li>
+<li><code>num</code>: 結果數量</li>
+</ul>
+<h3 id="API-回應轉換"><a href="#API-回應轉換" class="headerlink" title="API 回應轉換"></a>API 回應轉換</h3><p>Google API 回應結構：</p>
+<figure class="highlight json"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br></pre></td><td class="code"><pre><span class="line"><span class="punctuation">&#123;</span></span><br><span class="line">  <span class="attr">&quot;items&quot;</span><span class="punctuation">:</span> <span class="punctuation">[</span></span><br><span class="line">    <span class="punctuation">&#123;</span></span><br><span class="line">      <span class="attr">&quot;title&quot;</span><span class="punctuation">:</span> <span class="string">&quot;搜尋結果標題&quot;</span><span class="punctuation">,</span></span><br><span class="line">      <span class="attr">&quot;link&quot;</span><span class="punctuation">:</span> <span class="string">&quot;https://example.com&quot;</span><span class="punctuation">,</span></span><br><span class="line">      <span class="attr">&quot;snippet&quot;</span><span class="punctuation">:</span> <span class="string">&quot;搜尋結果摘要&quot;</span></span><br><span class="line">    <span class="punctuation">&#125;</span></span><br><span class="line">  <span class="punctuation">]</span></span><br><span class="line"><span class="punctuation">&#125;</span></span><br></pre></td></tr></table></figure>
+
+<p>轉換為系統格式：</p>
+<figure class="highlight json"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br></pre></td><td class="code"><pre><span class="line"><span class="punctuation">&#123;</span></span><br><span class="line">  <span class="attr">&quot;data&quot;</span><span class="punctuation">:</span> <span class="punctuation">[</span></span><br><span class="line">    <span class="punctuation">&#123;</span></span><br><span class="line">      <span class="attr">&quot;title&quot;</span><span class="punctuation">:</span> <span class="string">&quot;搜尋結果標題&quot;</span><span class="punctuation">,</span></span><br><span class="line">      <span class="attr">&quot;url&quot;</span><span class="punctuation">:</span> <span class="string">&quot;https://example.com&quot;</span><span class="punctuation">,</span> </span><br><span class="line">      <span class="attr">&quot;description&quot;</span><span class="punctuation">:</span> <span class="string">&quot;搜尋結果摘要&quot;</span></span><br><span class="line">    <span class="punctuation">&#125;</span></span><br><span class="line">  <span class="punctuation">]</span></span><br><span class="line"><span class="punctuation">&#125;</span></span><br></pre></td></tr></table></figure>
+
+<h2 id="小結"><a href="#小結" class="headerlink" title="小結"></a>小結</h2><p>這次實作讓我深度體驗了 AI 與優良架構在實際專案中的運用。幾個關鍵收穫：</p>
+<h3 id="架構優勢"><a href="#架構優勢" class="headerlink" title="架構優勢"></a>架構優勢</h3><ul>
+<li>清晰的分層讓職責分明，測試容易</li>
+<li>依賴注入讓元件可抽換，符合開放封閉原則</li>
+<li>統一的錯誤處理機制，維護成本低</li>
+</ul>
+<p>上面是原本的優勢，加上 AI 判讀後，可以高效產生 Clean Code  </p>
+<p>不太確定不良代碼會有什麼結果，很幸運是我不在那種環境之中  </p>
+<p>現在三個圈圈是有交集的，好又快又便宜(產出／單位時間)，  </p>
+<p>依照 AI 帶來的生產力與現有的 RD 相比，其實是很便宜的選擇。</p>
+<p>良好的設計結合工具(AI)是提昇效率的手段,  </p>
+<p>3 個人可以當 ７ 個人用。至於為什麼是３個人，有機會再說了。</p>
+<p>(fin)</p>
+
+      
+    </div>
+    <footer class="article-footer">
+      <a data-url="https://blog.marsen.me/2025/07/31/2025/ai_google_search_api/" data-id="cmdraqg0300hs2srpe55ohgxm" class="article-share-link">Share</a>
+      
+        <a href="https://blog.marsen.me/2025/07/31/2025/ai_google_search_api/#disqus_thread" class="article-comment-link">留言</a>
+      
+      
+  <ul class="article-tag-list" itemprop="keywords"><li class="article-tag-list-item"><a class="article-tag-list-link" href="/tags/%E5%AF%A6%E4%BD%9C%E7%AD%86%E8%A8%98/" rel="tag">實作筆記</a></li></ul>
+
+    </footer>
+  </div>
+  
+    
+<nav id="article-nav">
+  
+  
+    <a href="/2025/07/29/2025/ai-eai-browser-install-flatpak-solution/" id="article-nav-older" class="article-nav-link-wrap">
+      <strong class="article-nav-caption">Older</strong>
+      <div class="article-nav-title"> [實作筆記] EAI 機器瀏覽器安裝問題與解決方案</div>
+    </a>
+  
+</nav>
+
+  
+</article>
+
+
+<section id="comments">
+  
+    <div id="gitalk-container" >
+  Please enable JavaScript to view the Gitalk. :D
+</div>
+<link rel="stylesheet" href="https://unpkg.com/gitalk/dist/gitalk.css">
+<script src="https://unpkg.com/gitalk/dist/gitalk.min.js"></script>  
+<script src="https://cdnjs.cloudflare.com/ajax/libs/blueimp-md5/2.18.0/js/md5.min.js"></script>
+<script>
+  (function(){
+    const gitalk = new Gitalk({
+      'clientID': '386c8c11178846ff9a31',
+      'clientSecret': '969a7543f3dc518b9e540d1e335df2fcb9c2df57',
+      'repo': 'marsen.github.io',
+      'owner': 'marsen',
+      'admin': ['marsen'],
+      'id': md5(location.pathname),      // Ensure uniqueness and length less than 50( use md5)
+      'distractionFreeMode': false  // Facebook-like distraction free mode
+    })
+
+    gitalk.render('gitalk-container')
+  })();
+</script>
+
+  
+  
+    <div id="likecoin">
+Please enable JavaScript to view the LikeCoin. :P
+</div>
+<script>
+
+  (function(){
+    var ifrm = document.createElement("iframe");
+    ifrm.setAttribute("src", "https://button.like.co/in/embed/marsenlin/button?referrer=https%3A%2F%2Fblog.marsen.me%2F2025%2F07%2F31%2F2025%2Fai_google_search_api%2F");      
+    ifrm.setAttribute("sandbox","allow-scripts allow-same-origin allow-popups allow-popups-to-escape-sandbox");
+    ifrm.frameborder = "0";
+    ifrm.scrolling = "no";
+    (document.getElementById("likecoin").replaceChild(ifrm, document.getElementById("likecoin").childNodes[0]));
+  })();
+
+</script>
+  
+  <div id="disqus_thread">
+    <noscript>Please enable JavaScript to view the <a target="_blank" rel="noopener" href="//disqus.com/?ref_noscript">comments powered by Disqus.</a></noscript>
+  </div>
+</section>
+</section>
+        
+          <aside id="sidebar">
+  
+    
+  <div class="widget-wrap">
+    <h3 class="widget-title">最新文章</h3>
+    <div class="widget">
+      <ul>
+        
+          <li>
+            <a href="/2025/07/31/2025/ai_google_search_api/"> [實作筆記] AI Agent 實作 Web Search API：從設計到部署的完整記錄</a>
+          </li>
+        
+          <li>
+            <a href="/2025/07/29/2025/ai-eai-browser-install-flatpak-solution/"> [實作筆記] EAI 機器瀏覽器安裝問題與解決方案</a>
+          </li>
+        
+          <li>
+            <a href="/2025/07/25/2025/express-res-locals-auth-best-practice/"> [學習筆記] Express.js middleware auth 的業界標準(res.locals)</a>
+          </li>
+        
+          <li>
+            <a href="/2025/07/22/2025/ithub-action-ssh-keyscan-not-found-fix/">[踩雷筆記] GitHub Action ssh-keyscan not found 問題修復</a>
+          </li>
+        
+          <li>
+            <a href="/2025/06/22/2025/ai-ollama-containerized/"> [實作筆記] Ollama 容器化調研筆記</a>
+          </li>
+        
+      </ul>
+    </div>
+  </div>
+
+  
+    
+  <div class="widget-wrap">
+    <h3 class="widget-title">彙整</h3>
+    <div class="widget">
+      <ul class="archive-list"><li class="archive-list-item"><a class="archive-list-link" href="/archives/2025/07/">七月 2025</a><span class="archive-list-count">4</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2025/06/">六月 2025</a><span class="archive-list-count">4</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2025/05/">五月 2025</a><span class="archive-list-count">5</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2025/04/">四月 2025</a><span class="archive-list-count">1</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2025/03/">三月 2025</a><span class="archive-list-count">2</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2025/02/">二月 2025</a><span class="archive-list-count">4</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2025/01/">一月 2025</a><span class="archive-list-count">3</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2024/12/">十二月 2024</a><span class="archive-list-count">3</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2024/11/">十一月 2024</a><span class="archive-list-count">3</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2024/10/">十月 2024</a><span class="archive-list-count">4</span></li><span id='list_archives2' style='display:none'><li class="archive-list-item"><a class="archive-list-link" href="/archives/2024/09/">九月 2024</a><span class="archive-list-count">5</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2024/08/">八月 2024</a><span class="archive-list-count">4</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2024/07/">七月 2024</a><span class="archive-list-count">3</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2024/06/">六月 2024</a><span class="archive-list-count">2</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2024/05/">五月 2024</a><span class="archive-list-count">1</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2024/04/">四月 2024</a><span class="archive-list-count">2</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2024/03/">三月 2024</a><span class="archive-list-count">3</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2024/02/">二月 2024</a><span class="archive-list-count">2</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2024/01/">一月 2024</a><span class="archive-list-count">4</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2023/12/">十二月 2023</a><span class="archive-list-count">2</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2023/11/">十一月 2023</a><span class="archive-list-count">3</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2023/10/">十月 2023</a><span class="archive-list-count">2</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2023/09/">九月 2023</a><span class="archive-list-count">3</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2023/08/">八月 2023</a><span class="archive-list-count">2</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2023/07/">七月 2023</a><span class="archive-list-count">6</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2023/06/">六月 2023</a><span class="archive-list-count">6</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2023/05/">五月 2023</a><span class="archive-list-count">1</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2023/04/">四月 2023</a><span class="archive-list-count">9</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2023/03/">三月 2023</a><span class="archive-list-count">4</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2023/02/">二月 2023</a><span class="archive-list-count">2</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2023/01/">一月 2023</a><span class="archive-list-count">2</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2022/12/">十二月 2022</a><span class="archive-list-count">1</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2022/10/">十月 2022</a><span class="archive-list-count">2</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2022/09/">九月 2022</a><span class="archive-list-count">6</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2022/08/">八月 2022</a><span class="archive-list-count">3</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2022/07/">七月 2022</a><span class="archive-list-count">2</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2022/06/">六月 2022</a><span class="archive-list-count">3</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2022/05/">五月 2022</a><span class="archive-list-count">7</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2022/04/">四月 2022</a><span class="archive-list-count">3</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2022/03/">三月 2022</a><span class="archive-list-count">3</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2022/02/">二月 2022</a><span class="archive-list-count">2</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2022/01/">一月 2022</a><span class="archive-list-count">3</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2021/12/">十二月 2021</a><span class="archive-list-count">2</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2021/11/">十一月 2021</a><span class="archive-list-count">2</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2021/10/">十月 2021</a><span class="archive-list-count">2</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2021/09/">九月 2021</a><span class="archive-list-count">1</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2021/08/">八月 2021</a><span class="archive-list-count">2</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2021/07/">七月 2021</a><span class="archive-list-count">4</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2021/06/">六月 2021</a><span class="archive-list-count">1</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2021/05/">五月 2021</a><span class="archive-list-count">2</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2021/04/">四月 2021</a><span class="archive-list-count">3</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2021/03/">三月 2021</a><span class="archive-list-count">3</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2021/02/">二月 2021</a><span class="archive-list-count">1</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2021/01/">一月 2021</a><span class="archive-list-count">7</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2020/12/">十二月 2020</a><span class="archive-list-count">1</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2020/11/">十一月 2020</a><span class="archive-list-count">2</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2020/10/">十月 2020</a><span class="archive-list-count">5</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2020/09/">九月 2020</a><span class="archive-list-count">5</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2020/08/">八月 2020</a><span class="archive-list-count">2</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2020/07/">七月 2020</a><span class="archive-list-count">3</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2020/06/">六月 2020</a><span class="archive-list-count">3</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2020/05/">五月 2020</a><span class="archive-list-count">3</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2020/04/">四月 2020</a><span class="archive-list-count">4</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2020/03/">三月 2020</a><span class="archive-list-count">1</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2020/02/">二月 2020</a><span class="archive-list-count">1</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2020/01/">一月 2020</a><span class="archive-list-count">5</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2019/12/">十二月 2019</a><span class="archive-list-count">1</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2019/11/">十一月 2019</a><span class="archive-list-count">2</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2019/10/">十月 2019</a><span class="archive-list-count">1</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2019/09/">九月 2019</a><span class="archive-list-count">2</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2019/08/">八月 2019</a><span class="archive-list-count">5</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2019/07/">七月 2019</a><span class="archive-list-count">1</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2019/06/">六月 2019</a><span class="archive-list-count">1</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2019/05/">五月 2019</a><span class="archive-list-count">2</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2019/04/">四月 2019</a><span class="archive-list-count">3</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2019/03/">三月 2019</a><span class="archive-list-count">1</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2019/02/">二月 2019</a><span class="archive-list-count">2</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2019/01/">一月 2019</a><span class="archive-list-count">4</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2018/12/">十二月 2018</a><span class="archive-list-count">5</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2018/11/">十一月 2018</a><span class="archive-list-count">7</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2018/10/">十月 2018</a><span class="archive-list-count">6</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2018/09/">九月 2018</a><span class="archive-list-count">3</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2018/08/">八月 2018</a><span class="archive-list-count">2</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2018/07/">七月 2018</a><span class="archive-list-count">6</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2018/06/">六月 2018</a><span class="archive-list-count">2</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2018/05/">五月 2018</a><span class="archive-list-count">1</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2018/04/">四月 2018</a><span class="archive-list-count">5</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2018/03/">三月 2018</a><span class="archive-list-count">5</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2018/02/">二月 2018</a><span class="archive-list-count">1</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2018/01/">一月 2018</a><span class="archive-list-count">5</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2017/12/">十二月 2017</a><span class="archive-list-count">3</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2017/10/">十月 2017</a><span class="archive-list-count">3</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2017/09/">九月 2017</a><span class="archive-list-count">2</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2017/08/">八月 2017</a><span class="archive-list-count">1</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2017/07/">七月 2017</a><span class="archive-list-count">2</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2017/05/">五月 2017</a><span class="archive-list-count">1</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2017/04/">四月 2017</a><span class="archive-list-count">2</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2017/03/">三月 2017</a><span class="archive-list-count">1</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2017/02/">二月 2017</a><span class="archive-list-count">1</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2017/01/">一月 2017</a><span class="archive-list-count">6</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2016/12/">十二月 2016</a><span class="archive-list-count">1</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2016/11/">十一月 2016</a><span class="archive-list-count">2</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2016/10/">十月 2016</a><span class="archive-list-count">4</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2016/09/">九月 2016</a><span class="archive-list-count">1</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2016/08/">八月 2016</a><span class="archive-list-count">6</span></li></span><span id=''></span><span onclick="var d=document.getElementById('list_archives2'); d.style.display===''?d.style='display:none':d.style=''">toggle...</span></ul>
+    </div>
+  </div>
+
+
+  
+    <a rel="license noopener" target="_blank" href="http://creativecommons.org/licenses/by-nc-nd/3.0/tw/">
+  <img alt="Creative Commons License" style="border-width:0" src="https://i.creativecommons.org/l/by-nc-nd/3.0/tw/88x31.png" />
+</a>
+  <br />
+This work is licensed under a 
+<a rel="license noopener" target="_blank" href="http://creativecommons.org/licenses/by-nc-nd/3.0/tw/">Creative Commons Attribution-NonCommercial-NoDerivs 3.0 Taiwan License</a>
+  
+    
+  <div class="widget-wrap">
+    <h3 class="widget-title">標籤雲</h3>
+    <div class="widget tagcloud">
+      <a href="/tags/Net-Framework/" style="font-size: 14.38px;">.Net Framework</a> <a href="/tags/API/" style="font-size: 11.25px;">API</a> <a href="/tags/AWS/" style="font-size: 13.13px;">AWS</a> <a href="/tags/Agile/" style="font-size: 17.5px;">Agile</a> <a href="/tags/CI-CD/" style="font-size: 19.38px;">CI/CD</a> <a href="/tags/Cache/" style="font-size: 10px;">Cache</a> <a href="/tags/Coding-Standard/" style="font-size: 10px;">Coding Standard</a> <a href="/tags/Container/" style="font-size: 11.88px;">Container</a> <a href="/tags/Database/" style="font-size: 12.5px;">Database</a> <a href="/tags/Design-Pattern/" style="font-size: 10.63px;">Design Pattern</a> <a href="/tags/Docker/" style="font-size: 11.88px;">Docker</a> <a href="/tags/Entity-Framework/" style="font-size: 10.63px;">Entity Framework</a> <a href="/tags/Firebase/" style="font-size: 10px;">Firebase</a> <a href="/tags/Git/" style="font-size: 10.63px;">Git</a> <a href="/tags/Golang/" style="font-size: 11.25px;">Golang</a> <a href="/tags/Google/" style="font-size: 11.25px;">Google</a> <a href="/tags/GulpJs/" style="font-size: 10.63px;">GulpJs</a> <a href="/tags/HTTP/" style="font-size: 10px;">HTTP</a> <a href="/tags/Hexo/" style="font-size: 15px;">Hexo</a> <a href="/tags/IIS/" style="font-size: 10px;">IIS</a> <a href="/tags/IO/" style="font-size: 10px;">IO</a> <a href="/tags/Integrated-Testing/" style="font-size: 10px;">Integrated Testing</a> <a href="/tags/Jenkins/" style="font-size: 11.88px;">Jenkins</a> <a href="/tags/Kubernetes/" style="font-size: 10px;">Kubernetes</a> <a href="/tags/Linux/" style="font-size: 10.63px;">Linux</a> <a href="/tags/Mongodb/" style="font-size: 10px;">Mongodb</a> <a href="/tags/MsSQL/" style="font-size: 11.25px;">MsSQL</a> <a href="/tags/MsTest/" style="font-size: 10px;">MsTest</a> <a href="/tags/Mutation-Testing/" style="font-size: 10px;">Mutation Testing</a> <a href="/tags/Nodejs/" style="font-size: 15px;">Nodejs</a> <a href="/tags/OAuth/" style="font-size: 10px;">OAuth</a> <a href="/tags/OOP/" style="font-size: 11.25px;">OOP</a> <a href="/tags/Openshift/" style="font-size: 10.63px;">Openshift</a> <a href="/tags/PowerShell/" style="font-size: 11.25px;">PowerShell</a> <a href="/tags/React/" style="font-size: 11.88px;">React</a> <a href="/tags/Redis/" style="font-size: 10.63px;">Redis</a> <a href="/tags/SQL/" style="font-size: 11.88px;">SQL</a> <a href="/tags/Scrum/" style="font-size: 16.88px;">Scrum</a> <a href="/tags/Shell/" style="font-size: 10.63px;">Shell</a> <a href="/tags/Specflow/" style="font-size: 10px;">Specflow</a> <a href="/tags/StyleCop/" style="font-size: 10px;">StyleCop</a> <a href="/tags/TDD/" style="font-size: 15.63px;">TDD</a> <a href="/tags/Testing/" style="font-size: 13.75px;">Testing</a> <a href="/tags/Thread/" style="font-size: 10.63px;">Thread</a> <a href="/tags/Trello/" style="font-size: 10px;">Trello</a> <a href="/tags/TypeScript/" style="font-size: 13.13px;">TypeScript</a> <a href="/tags/Unit-Testing/" style="font-size: 18.75px;">Unit Testing</a> <a href="/tags/Unix/" style="font-size: 10.63px;">Unix</a> <a href="/tags/Vim/" style="font-size: 10px;">Vim</a> <a href="/tags/Visual-Studio/" style="font-size: 10px;">Visual Studio</a> <a href="/tags/html/" style="font-size: 10px;">html</a> <a href="/tags/post/" style="font-size: 10px;">post</a> <a href="/tags/%E5%AD%B8%E7%BF%92%E7%AD%86%E8%A8%98/" style="font-size: 16.25px;">學習筆記</a> <a href="/tags/%E5%AF%A6%E4%BD%9C%E7%AD%86%E8%A8%98/" style="font-size: 20px;">實作筆記</a> <a href="/tags/%E6%99%82%E9%96%93%E7%AE%A1%E7%90%86/" style="font-size: 10.63px;">時間管理</a> <a href="/tags/%E6%B4%BB%E5%8B%95%E7%AD%86%E8%A8%98/" style="font-size: 12.5px;">活動筆記</a> <a href="/tags/%E7%94%9F%E6%B4%BB%E7%AD%86%E8%A8%98/" style="font-size: 16.88px;">生活筆記</a> <a href="/tags/%E8%A8%98%E9%8C%84/" style="font-size: 11.25px;">記錄</a> <a href="/tags/%E8%B8%A9%E9%9B%B7%E7%AD%86%E8%A8%98/" style="font-size: 15.63px;">踩雷筆記</a> <a href="/tags/%E9%87%8D%E6%A7%8B/" style="font-size: 11.88px;">重構</a> <a href="/tags/%E9%96%B1%E8%AE%80%E7%AD%86%E8%A8%98/" style="font-size: 18.13px;">閱讀筆記</a>
+    </div>
+  </div>
+
+  
+    
+  <div class="widget-wrap">
+    <h3 class="widget-title">標籤</h3>
+    <div class="widget">
+      <ul class="tag-list" itemprop="keywords"><li class="tag-list-item"><a class="tag-list-link" href="/tags/Net-Framework/" rel="tag">.Net Framework</a><span class="tag-list-count">9</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/API/" rel="tag">API</a><span class="tag-list-count">3</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/AWS/" rel="tag">AWS</a><span class="tag-list-count">7</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/Agile/" rel="tag">Agile</a><span class="tag-list-count">14</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/CI-CD/" rel="tag">CI&#x2F;CD</a><span class="tag-list-count">24</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/Cache/" rel="tag">Cache</a><span class="tag-list-count">1</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/Coding-Standard/" rel="tag">Coding Standard</a><span class="tag-list-count">1</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/Container/" rel="tag">Container</a><span class="tag-list-count">4</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/Database/" rel="tag">Database</a><span class="tag-list-count">6</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/Design-Pattern/" rel="tag">Design Pattern</a><span class="tag-list-count">2</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/Docker/" rel="tag">Docker</a><span class="tag-list-count">4</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/Entity-Framework/" rel="tag">Entity Framework</a><span class="tag-list-count">2</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/Firebase/" rel="tag">Firebase</a><span class="tag-list-count">1</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/Git/" rel="tag">Git</a><span class="tag-list-count">2</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/Golang/" rel="tag">Golang</a><span class="tag-list-count">3</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/Google/" rel="tag">Google</a><span class="tag-list-count">3</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/GulpJs/" rel="tag">GulpJs</a><span class="tag-list-count">2</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/HTTP/" rel="tag">HTTP</a><span class="tag-list-count">1</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/Hexo/" rel="tag">Hexo</a><span class="tag-list-count">10</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/IIS/" rel="tag">IIS</a><span class="tag-list-count">1</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/IO/" rel="tag">IO</a><span class="tag-list-count">1</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/Integrated-Testing/" rel="tag">Integrated Testing</a><span class="tag-list-count">1</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/Jenkins/" rel="tag">Jenkins</a><span class="tag-list-count">4</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/Kubernetes/" rel="tag">Kubernetes</a><span class="tag-list-count">1</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/Linux/" rel="tag">Linux</a><span class="tag-list-count">2</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/Mongodb/" rel="tag">Mongodb</a><span class="tag-list-count">1</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/MsSQL/" rel="tag">MsSQL</a><span class="tag-list-count">3</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/MsTest/" rel="tag">MsTest</a><span class="tag-list-count">1</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/Mutation-Testing/" rel="tag">Mutation Testing</a><span class="tag-list-count">1</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/Nodejs/" rel="tag">Nodejs</a><span class="tag-list-count">10</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/OAuth/" rel="tag">OAuth</a><span class="tag-list-count">1</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/OOP/" rel="tag">OOP</a><span class="tag-list-count">3</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/Openshift/" rel="tag">Openshift</a><span class="tag-list-count">2</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/PowerShell/" rel="tag">PowerShell</a><span class="tag-list-count">3</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/React/" rel="tag">React</a><span class="tag-list-count">4</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/Redis/" rel="tag">Redis</a><span class="tag-list-count">2</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/SQL/" rel="tag">SQL</a><span class="tag-list-count">4</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/Scrum/" rel="tag">Scrum</a><span class="tag-list-count">13</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/Shell/" rel="tag">Shell</a><span class="tag-list-count">2</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/Specflow/" rel="tag">Specflow</a><span class="tag-list-count">1</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/StyleCop/" rel="tag">StyleCop</a><span class="tag-list-count">1</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/TDD/" rel="tag">TDD</a><span class="tag-list-count">11</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/Testing/" rel="tag">Testing</a><span class="tag-list-count">8</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/Thread/" rel="tag">Thread</a><span class="tag-list-count">2</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/Trello/" rel="tag">Trello</a><span class="tag-list-count">1</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/TypeScript/" rel="tag">TypeScript</a><span class="tag-list-count">7</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/Unit-Testing/" rel="tag">Unit Testing</a><span class="tag-list-count">19</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/Unix/" rel="tag">Unix</a><span class="tag-list-count">2</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/Vim/" rel="tag">Vim</a><span class="tag-list-count">1</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/Visual-Studio/" rel="tag">Visual Studio</a><span class="tag-list-count">1</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/html/" rel="tag">html</a><span class="tag-list-count">1</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/post/" rel="tag">post</a><span class="tag-list-count">1</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/%E5%AD%B8%E7%BF%92%E7%AD%86%E8%A8%98/" rel="tag">學習筆記</a><span class="tag-list-count">12</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/%E5%AF%A6%E4%BD%9C%E7%AD%86%E8%A8%98/" rel="tag">實作筆記</a><span class="tag-list-count">126</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/%E6%99%82%E9%96%93%E7%AE%A1%E7%90%86/" rel="tag">時間管理</a><span class="tag-list-count">2</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/%E6%B4%BB%E5%8B%95%E7%AD%86%E8%A8%98/" rel="tag">活動筆記</a><span class="tag-list-count">6</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/%E7%94%9F%E6%B4%BB%E7%AD%86%E8%A8%98/" rel="tag">生活筆記</a><span class="tag-list-count">13</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/%E8%A8%98%E9%8C%84/" rel="tag">記錄</a><span class="tag-list-count">3</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/%E8%B8%A9%E9%9B%B7%E7%AD%86%E8%A8%98/" rel="tag">踩雷筆記</a><span class="tag-list-count">11</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/%E9%87%8D%E6%A7%8B/" rel="tag">重構</a><span class="tag-list-count">4</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/%E9%96%B1%E8%AE%80%E7%AD%86%E8%A8%98/" rel="tag">閱讀筆記</a><span class="tag-list-count">15</span></li></ul>
+    </div>
+  </div>
+
+
+  
+    
+
+  
+    <div class="widget-wrap">
+    <h3 class="widget-title">多語系</h3>
+    <div class="widget">
+        <div id="ytWidget"></div>
+    </div>
+</div>
+<script src="https://translate.yandex.net/website-widget/v1/widget.js?widgetId=ytWidget&pageLang=zh&widgetTheme=dark&autoMode=false" type="text/javascript"></script>
+  
+    <div class="widget-wrap">
+    <h3 class="widget-title">BADGES</h3>
+    <div class="widget">
+        <a target="_blank" rel="noopener" href="https://bcert.me/bc/html/show-badge.html?b=uufxvngl">
+            <img src="/images/2018/csm/seal-csm.png" alt="Certified ScrumMaster®">
+        </a>
+    </div>
+</div>
+  
+</aside>
+        
+      </div>
+      <footer id="footer">
+  
+  <div class="outer">
+    <div id="footer-info" class="inner">
+      &copy; 2025 Marsen L.<br>
+      Powered by <a href="http://hexo.io/" target="_blank">Hexo</a>
+    </div>
+  </div>
+</footer>
+    </div>
+    <nav id="mobile-nav">
+  
+    <a href="/" class="mobile-nav-link">Home</a>
+  
+    <a href="/archives" class="mobile-nav-link">Archives</a>
+  
+</nav>
+    <script src="//ajax.googleapis.com/ajax/libs/jquery/2.0.3/jquery.min.js"></script>
+
+  
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/fancybox/3.5.7/jquery.fancybox.min.css">
+
+  
+<script src="https://cdnjs.cloudflare.com/ajax/libs/fancybox/3.5.7/jquery.fancybox.min.js"></script>
+
+
+
+<script src="/js/sayings.js?v=0.js"></script>
+  
+
+<script src="/js/script.js?v=0.js"></script>
+
+<div id="likecoin">
+Please enable JavaScript to view the LikeCoin. :P
+</div>
+<script>
+
+  (function(){
+    var ifrm = document.createElement("iframe");
+    ifrm.setAttribute("src", "https://button.like.co/in/embed/marsenlin/button?referrer=https%3A%2F%2Fblog.marsen.me%2F2025%2F07%2F31%2F2025%2Fai_google_search_api%2F");      
+    ifrm.setAttribute("sandbox","allow-scripts allow-same-origin allow-popups allow-popups-to-escape-sandbox");
+    ifrm.frameborder = "0";
+    ifrm.scrolling = "no";
+    (document.getElementById("likecoin").replaceChild(ifrm, document.getElementById("likecoin").childNodes[0]));
+  })();
+
+</script>
+<script>
+
+  var disqus_shortname = 'marsenlin';
+  
+  var disqus_url = 'https://blog.marsen.me/2025/07/31/2025/ai_google_search_api/';
+  
+  (function(){
+    var dsq = document.createElement('script');
+    dsq.type = 'text/javascript';
+    dsq.async = true;
+    dsq.src = '//' + disqus_shortname + '.disqus.com/embed.js';
+    (document.getElementsByTagName('head')[0] || document.getElementsByTagName('body')[0]).appendChild(dsq);
+  })();
+
+</script>
+
+  </div>
+    
+<!-- Google Tag Manager (noscript) -->
+<noscript><iframe src="https://www.googletagmanager.com/ns.html?id=GTM-NTDGNJZ"
+height="0" width="0" style="display:none;visibility:hidden"></iframe></noscript>
+<!-- End Google Tag Manager (noscript) -->
+
+</body>
+</html>
