@@ -35,15 +35,15 @@ j=d.createElement(s),dl=l!='dataLayer'?'&l='+l:'';j.async=true;j.src=
   
   <title> [架構筆記] Clean Architecture 分層職責：一道值得深思的面試題 | Marsen&#39;s Blog</title>
   <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
-  <meta name="description" content="前情提要最近在 Code Review 時遇到一個有趣的討論：檔案上傳功能中，檔案編碼修復應該放在 Middleware 還是 UseCase？ 這個問題引發了我對 Clean Architecture 分層職責的重新思考，也讓我意識到這是一個很好的面試題目。畢竟，分層架構不只是把程式碼分資料夾這麼簡單，背後有著更深層的設計哲學。 問題背景在一個採用 Clean Architecture 的專案中">
+  <meta name="description" content="前情提要最近在 Code Review 時遇到一個有趣的題目： 檔案上傳功能中，檔案編碼修復應該放在 Middleware 還是 UseCase？ 這個問題引發了我對 Clean Architecture 分層職責的重新思考，與團隊背後的設計哲學。 問題背景在一個採用 Clean Architecture 的專案中，我們有兩個檔案上傳功能：  知識庫檔案上傳 - 支援 PDF、Word、圖片等多種">
 <meta property="og:type" content="article">
 <meta property="og:title" content=" [架構筆記] Clean Architecture 分層職責：一道值得深思的面試題">
 <meta property="og:url" content="https://blog.marsen.me/2025/08/12/2025/backend-architecture-layer-design-principles/index.html">
 <meta property="og:site_name" content="Marsen&#39;s Blog">
-<meta property="og:description" content="前情提要最近在 Code Review 時遇到一個有趣的討論：檔案上傳功能中，檔案編碼修復應該放在 Middleware 還是 UseCase？ 這個問題引發了我對 Clean Architecture 分層職責的重新思考，也讓我意識到這是一個很好的面試題目。畢竟，分層架構不只是把程式碼分資料夾這麼簡單，背後有著更深層的設計哲學。 問題背景在一個採用 Clean Architecture 的專案中">
+<meta property="og:description" content="前情提要最近在 Code Review 時遇到一個有趣的題目： 檔案上傳功能中，檔案編碼修復應該放在 Middleware 還是 UseCase？ 這個問題引發了我對 Clean Architecture 分層職責的重新思考，與團隊背後的設計哲學。 問題背景在一個採用 Clean Architecture 的專案中，我們有兩個檔案上傳功能：  知識庫檔案上傳 - 支援 PDF、Word、圖片等多種">
 <meta property="og:locale" content="zh_TW">
 <meta property="article:published_time" content="2025-08-12T05:29:15.000Z">
-<meta property="article:modified_time" content="2025-08-12T05:30:14.705Z">
+<meta property="article:modified_time" content="2025-08-12T06:59:14.058Z">
 <meta property="article:author" content="Marsen L.">
 <meta property="article:tag" content="學習筆記">
 <meta name="twitter:card" content="summary">
@@ -128,8 +128,9 @@ j=d.createElement(s),dl=l!='dataLayer'?'&l='+l:'';j.async=true;j.src=
     
     <div class="article-entry" itemprop="articleBody">
       
-        <h2 id="前情提要"><a href="#前情提要" class="headerlink" title="前情提要"></a>前情提要</h2><p>最近在 Code Review 時遇到一個有趣的討論：檔案上傳功能中，檔案編碼修復應該放在 Middleware 還是 UseCase？</p>
-<p>這個問題引發了我對 Clean Architecture 分層職責的重新思考，也讓我意識到這是一個很好的面試題目。畢竟，分層架構不只是把程式碼分資料夾這麼簡單，背後有著更深層的設計哲學。</p>
+        <h2 id="前情提要"><a href="#前情提要" class="headerlink" title="前情提要"></a>前情提要</h2><p>最近在 Code Review 時遇到一個有趣的題目：</p>
+<p>檔案上傳功能中，檔案編碼修復應該放在 Middleware 還是 UseCase？</p>
+<p>這個問題引發了我對 Clean Architecture 分層職責的重新思考，與團隊背後的設計哲學。</p>
 <h2 id="問題背景"><a href="#問題背景" class="headerlink" title="問題背景"></a>問題背景</h2><p>在一個採用 Clean Architecture 的專案中，我們有兩個檔案上傳功能：</p>
 <ul>
 <li><strong>知識庫檔案上傳</strong> - 支援 PDF、Word、圖片等多種格式</li>
@@ -150,43 +151,42 @@ j=d.createElement(s),dl=l!='dataLayer'?'&l='+l:'';j.async=true;j.src=
 <li><strong>JWT Token 驗證</strong> - 檢查使用者身份</li>
 <li><strong>檔案內容解析</strong> - 提取 PDF&#x2F;Word 文件內容</li>
 </ol>
-<h2 id="分析思路"><a href="#分析思路" class="headerlink" title="分析思路"></a>分析思路</h2><h3 id="Middleware-的職責：技術基礎設施"><a href="#Middleware-的職責：技術基礎設施" class="headerlink" title="Middleware 的職責：技術基礎設施"></a>Middleware 的職責：技術基礎設施</h3><figure class="highlight typescript"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment">// ✅ 適合放 Middleware</span></span><br><span class="line"><span class="comment">// authMiddleware.ts - HTTP 認證技術處理</span></span><br><span class="line">- <span class="variable constant_">JWT</span> token 解析和驗證  </span><br><span class="line">- <span class="variable constant_">HTTP</span> 權限檢查</span><br><span class="line">- 將認證結果附加到 req.<span class="property">user</span></span><br><span class="line"></span><br><span class="line"><span class="comment">// errorHandler.ts - HTTP 錯誤處理  </span></span><br><span class="line">- 將系統錯誤轉換為 <span class="variable constant_">HTTP</span> 狀態碼</span><br><span class="line">- 統一錯誤格式回應</span><br><span class="line">- 錯誤日誌記錄</span><br><span class="line"></span><br><span class="line"><span class="comment">// uploadFiles.ts - 檔案上傳技術處理</span></span><br><span class="line">- 檔案編碼修復 (<span class="variable constant_">HTTP</span> 上傳技術問題) ✅</span><br><span class="line">- <span class="title class_">Multer</span> 設定和記憶體存儲</span><br></pre></td></tr></table></figure>
-
-<h3 id="UseCase-的職責：業務邏輯驗證"><a href="#UseCase-的職責：業務邏輯驗證" class="headerlink" title="UseCase 的職責：業務邏輯驗證"></a>UseCase 的職責：業務邏輯驗證</h3><figure class="highlight typescript"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br><span class="line">29</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment">// ✅ 適合放 UseCase</span></span><br><span class="line"><span class="comment">// UploadKnowledgeFiles.ts - 知識庫檔案業務邏輯</span></span><br><span class="line"><span class="keyword">class</span> <span class="title class_">UploadKnowledgeFiles</span> &#123;</span><br><span class="line">  <span class="keyword">private</span> <span class="keyword">readonly</span> validMimeTypes = &#123;</span><br><span class="line">    <span class="string">&#x27;application/pdf&#x27;</span>: <span class="string">&#x27;pdf&#x27;</span>,</span><br><span class="line">    <span class="string">&#x27;text/plain&#x27;</span>: <span class="string">&#x27;txt&#x27;</span>,</span><br><span class="line">    <span class="string">&#x27;application/msword&#x27;</span>: <span class="string">&#x27;word&#x27;</span>,</span><br><span class="line">    <span class="string">&#x27;image/jpeg&#x27;</span>: <span class="string">&#x27;image&#x27;</span>,</span><br><span class="line">    <span class="string">&#x27;image/png&#x27;</span>: <span class="string">&#x27;image&#x27;</span>,</span><br><span class="line">    <span class="comment">// ... 更多類型</span></span><br><span class="line">  &#125; <span class="keyword">as</span> <span class="keyword">const</span></span><br><span class="line">  </span><br><span class="line">  <span class="comment">// 檔案類型白名單驗證 (業務規則)</span></span><br><span class="line">  <span class="comment">// 檔案大小限制檢查 (業務需求)  </span></span><br><span class="line">  <span class="comment">// 檔案數量限制驗證 (業務邏輯)</span></span><br><span class="line">&#125;</span><br><span class="line"></span><br><span class="line"><span class="comment">// UploadContractFile.ts - 合約檔案業務邏輯</span></span><br><span class="line"><span class="keyword">class</span> <span class="title class_">UploadContractFile</span> &#123;</span><br><span class="line">  <span class="comment">// 不同類型合約的檔案限制 (業務場景)</span></span><br><span class="line">  <span class="keyword">private</span> <span class="keyword">readonly</span> validMimeTypesForOrigin = &#123;</span><br><span class="line">    <span class="string">&#x27;application/pdf&#x27;</span>: <span class="string">&#x27;pdf&#x27;</span>,</span><br><span class="line">    <span class="string">&#x27;application/vnd.openxmlformats-officedocument.wordprocessingml.document&#x27;</span>: <span class="string">&#x27;word&#x27;</span>,</span><br><span class="line">  &#125; <span class="keyword">as</span> <span class="keyword">const</span></span><br><span class="line"></span><br><span class="line">  <span class="keyword">private</span> <span class="keyword">readonly</span> validMimeTypesForNonOrigin = &#123;</span><br><span class="line">    <span class="string">&#x27;application/pdf&#x27;</span>: <span class="string">&#x27;pdf&#x27;</span>,  <span class="comment">// 簽署後只能 PDF</span></span><br><span class="line">  &#125; <span class="keyword">as</span> <span class="keyword">const</span></span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
-
-<h2 id="設計原則"><a href="#設計原則" class="headerlink" title="設計原則"></a>設計原則</h2><h3 id="Middleware-處理的是…"><a href="#Middleware-處理的是…" class="headerlink" title="Middleware 處理的是…"></a>Middleware 處理的是…</h3><ul>
+<p>分析思路 — 職責角度</p>
+<h3 id="Middleware-的職責：偏向基礎設施"><a href="#Middleware-的職責：偏向基礎設施" class="headerlink" title="Middleware 的職責：偏向基礎設施"></a>Middleware 的職責：偏向基礎設施</h3><p>控制進出流程 → 例：API 請求進來先檢查 Token</p>
+<p>過濾與轉換資料 → 例：將日期字串轉成標準格式</p>
+<p>保護系統邊界 → 例：攔截未授權的存取</p>
+<p>以下不舉例:</p>
+<ul>
 <li><strong>跨領域技術問題</strong> (認證、編碼、錯誤處理)</li>
 <li><strong>HTTP 協議相關</strong> (請求解析、回應格式)  </li>
 <li><strong>基礎設施關注點</strong> (日誌、監控、安全)</li>
 <li><strong>與業務無關的技術細節</strong></li>
 </ul>
-<h3 id="UseCase-處理的是…"><a href="#UseCase-處理的是…" class="headerlink" title="UseCase 處理的是…"></a>UseCase 處理的是…</h3><ul>
+<h3 id="Use-Case-的職責：偏向商業邏輯"><a href="#Use-Case-的職責：偏向商業邏輯" class="headerlink" title="Use Case 的職責：偏向商業邏輯"></a>Use Case 的職責：偏向商業邏輯</h3><p>驅動核心行為 → 例：建立一筆訂單流程</p>
+<p>執行業務規則 → 例：檢查庫存是否足夠</p>
+<p>協調內外資源 → 例：呼叫付款服務並更新資料庫</p>
+<p>以下不舉例:</p>
+<ul>
 <li><strong>特定業務場景的規則</strong> (不同業務有不同檔案限制)</li>
 <li><strong>領域知識驗證</strong> (合約標題、內容檢查)</li>
 <li><strong>業務流程邏輯</strong> (檔案處理、資料儲存)</li>
 <li><strong>動態配置的業務參數</strong> (從環境變數讀取的業務限制)</li>
 </ul>
-<h2 id="實際案例分析"><a href="#實際案例分析" class="headerlink" title="實際案例分析"></a>實際案例分析</h2><h3 id="檔案編碼問題：技術問題-→-Middleware-✅"><a href="#檔案編碼問題：技術問題-→-Middleware-✅" class="headerlink" title="檔案編碼問題：技術問題 → Middleware ✅"></a>檔案編碼問題：技術問題 → Middleware ✅</h3><figure class="highlight typescript"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment">// uploadFiles.ts</span></span><br><span class="line"><span class="keyword">const</span> fixFilenameEncoding = (<span class="attr">filename</span>: <span class="built_in">string</span>): <span class="function"><span class="params">string</span> =&gt;</span> &#123;</span><br><span class="line">  <span class="keyword">return</span> <span class="title class_">Buffer</span>.<span class="title function_">from</span>(filename, <span class="string">&#x27;latin1&#x27;</span>).<span class="title function_">toString</span>(<span class="string">&#x27;utf8&#x27;</span>)</span><br><span class="line">&#125;</span><br><span class="line"></span><br><span class="line"><span class="keyword">const</span> upload = <span class="title function_">multer</span>(&#123;</span><br><span class="line">  <span class="attr">storage</span>: multer.<span class="title function_">memoryStorage</span>(),</span><br><span class="line">  <span class="attr">fileFilter</span>: <span class="function">(<span class="params">_req, file, cb</span>) =&gt;</span> &#123;</span><br><span class="line">    file.<span class="property">originalname</span> = <span class="title function_">fixFilenameEncoding</span>(file.<span class="property">originalname</span>)</span><br><span class="line">    <span class="title function_">cb</span>(<span class="literal">null</span>, <span class="literal">true</span>)</span><br><span class="line">  &#125;,</span><br><span class="line">&#125;)</span><br></pre></td></tr></table></figure>
-
-<p><strong>為什麼放 Middleware？</strong></p>
+<h2 id="實際案例分析"><a href="#實際案例分析" class="headerlink" title="實際案例分析"></a>實際案例分析</h2><h3 id="檔案編碼問題"><a href="#檔案編碼問題" class="headerlink" title="檔案編碼問題"></a>檔案編碼問題</h3><p>技術問題 → 整個系統一體適用，選 Middleware ✅</p>
+<p>細節分析:</p>
 <ul>
 <li>這是 HTTP 上傳過程中的技術問題，不是業務邏輯</li>
 <li>所有檔案上傳都需要這個處理，跨多個 UseCase</li>
 <li>屬於請求處理層面的責任</li>
 </ul>
-<h3 id="檔案類型限制：業務邏輯-→-UseCase-✅"><a href="#檔案類型限制：業務邏輯-→-UseCase-✅" class="headerlink" title="檔案類型限制：業務邏輯 → UseCase ✅"></a>檔案類型限制：業務邏輯 → UseCase ✅</h3><figure class="highlight typescript"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment">// UploadContractFile.ts  </span></span><br><span class="line"><span class="keyword">class</span> <span class="title class_">UploadContractFile</span> &#123;</span><br><span class="line">  <span class="title function_">execute</span>(<span class="params">files: Express.Multer.File[], isOrigin: <span class="built_in">boolean</span></span>) &#123;</span><br><span class="line">    <span class="keyword">const</span> validTypes = isOrigin </span><br><span class="line">      ? <span class="variable language_">this</span>.<span class="property">validMimeTypesForOrigin</span> </span><br><span class="line">      : <span class="variable language_">this</span>.<span class="property">validMimeTypesForNonOrigin</span></span><br><span class="line">      </span><br><span class="line">    <span class="comment">// 業務邏輯：根據合約類型決定允許的檔案格式</span></span><br><span class="line">    <span class="variable language_">this</span>.<span class="title function_">validateFileTypes</span>(files, validTypes)</span><br><span class="line">  &#125;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
-
-<p><strong>為什麼放 UseCase？</strong></p>
+<h3 id="檔案類型限制"><a href="#檔案類型限制" class="headerlink" title="檔案類型限制"></a>檔案類型限制</h3><p>業務邏輯 → 不同的上傳任務有不同限制，屬商業邏輯，選 UseCase ✅</p>
+<p>細節分析:</p>
 <ul>
 <li>不同業務場景有不同的檔案類型限制</li>
 <li>這是領域知識，需要業務邏輯判斷</li>
 <li>可能隨著業務需求變化而調整</li>
 </ul>
-<h2 id="進階思考"><a href="#進階思考" class="headerlink" title="進階思考"></a>進階思考</h2><h3 id="如果檔案大小限制要動態調整呢？"><a href="#如果檔案大小限制要動態調整呢？" class="headerlink" title="如果檔案大小限制要動態調整呢？"></a>如果檔案大小限制要動態調整呢？</h3><figure class="highlight typescript"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment">// UseCase 層處理動態業務配置</span></span><br><span class="line"><span class="keyword">class</span> <span class="title class_">UploadKnowledgeFiles</span> &#123;</span><br><span class="line">  <span class="title function_">constructor</span>(<span class="params"></span></span><br><span class="line"><span class="params">    <span class="keyword">private</span> configService: ConfigService,</span></span><br><span class="line"><span class="params">    <span class="keyword">private</span> userService: UserService</span></span><br><span class="line"><span class="params">  </span>) &#123;&#125;</span><br><span class="line">  </span><br><span class="line">  <span class="keyword">async</span> <span class="title function_">execute</span>(<span class="params">files: Express.Multer.File[], userId: <span class="built_in">string</span></span>) &#123;</span><br><span class="line">    <span class="keyword">const</span> user = <span class="keyword">await</span> <span class="variable language_">this</span>.<span class="property">userService</span>.<span class="title function_">findById</span>(userId)</span><br><span class="line">    <span class="keyword">const</span> maxSize = user.<span class="property">isVip</span> </span><br><span class="line">      ? <span class="variable language_">this</span>.<span class="property">configService</span>.<span class="title function_">get</span>(<span class="string">&#x27;VIP_MAX_FILE_SIZE&#x27;</span>)</span><br><span class="line">      : <span class="variable language_">this</span>.<span class="property">configService</span>.<span class="title function_">get</span>(<span class="string">&#x27;NORMAL_MAX_FILE_SIZE&#x27;</span>)</span><br><span class="line">      </span><br><span class="line">    <span class="variable language_">this</span>.<span class="title function_">validateFileSize</span>(files, maxSize)</span><br><span class="line">  &#125;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
-
-<p>這樣的設計對測試也更友好：</p>
-<figure class="highlight typescript"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment">// 可以輕鬆 mock 依賴，測試不同的業務場景</span></span><br><span class="line"><span class="title function_">describe</span>(<span class="string">&#x27;UploadKnowledgeFiles&#x27;</span>, <span class="function">() =&gt;</span> &#123;</span><br><span class="line">  <span class="title function_">it</span>(<span class="string">&#x27;should allow larger files for VIP users&#x27;</span>, <span class="keyword">async</span> () =&gt; &#123;</span><br><span class="line">    <span class="comment">// Arrange</span></span><br><span class="line">    mockUserService.<span class="property">findById</span>.<span class="title function_">mockResolvedValue</span>(&#123; <span class="attr">isVip</span>: <span class="literal">true</span> &#125;)</span><br><span class="line">    mockConfigService.<span class="property">get</span>.<span class="title function_">mockReturnValue</span>(<span class="number">100</span> * <span class="number">1024</span> * <span class="number">1024</span>) <span class="comment">// 100MB</span></span><br><span class="line">    </span><br><span class="line">    <span class="comment">// Act &amp; Assert</span></span><br><span class="line">    <span class="keyword">await</span> <span class="title function_">expect</span>(uploadUseCase.<span class="title function_">execute</span>(largeFiles, <span class="string">&#x27;vip-user-id&#x27;</span>))</span><br><span class="line">      .<span class="property">resolves</span>.<span class="property">not</span>.<span class="title function_">toThrow</span>()</span><br><span class="line">  &#125;)</span><br><span class="line">&#125;)</span><br></pre></td></tr></table></figure>
-
+<h3 id="這頭給你想"><a href="#這頭給你想" class="headerlink" title="這頭給你想"></a>這頭給你想</h3><p>如果檔案大小限制要動態調整呢？</p>
 <h2 id="總結"><a href="#總結" class="headerlink" title="總結"></a>總結</h2><p>好的架構設計不是憑感覺，而是要有明確的原則：</p>
 <ul>
 <li><strong>Middleware</strong> &#x3D; 技術基礎設施，處理 HTTP 層面的問題</li>
@@ -200,13 +200,12 @@ j=d.createElement(s),dl=l!='dataLayer'?'&l='+l:'';j.async=true;j.src=
 <li>這個處理邏輯需要在多個地方重複嗎？</li>
 </ul>
 <p>Clean Architecture 的精神就在於：<strong>讓業務邏輯獨立於技術細節</strong>。</p>
-<p>面試時遇到類似問題，記得從職責分離的角度思考，相信你會有不錯的表現！</p>
 <p>(fin)</p>
 
       
     </div>
     <footer class="article-footer">
-      <a data-url="https://blog.marsen.me/2025/08/12/2025/backend-architecture-layer-design-principles/" data-id="cme83rxqq00i02sqohjkm3dji" class="article-share-link">Share</a>
+      <a data-url="https://blog.marsen.me/2025/08/12/2025/backend-architecture-layer-design-principles/" data-id="cme86yf2600hy2sqramhv6zkp" class="article-share-link">Share</a>
       
         <a href="https://blog.marsen.me/2025/08/12/2025/backend-architecture-layer-design-principles/#disqus_thread" class="article-comment-link">留言</a>
       
