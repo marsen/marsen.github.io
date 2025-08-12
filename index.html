@@ -103,6 +103,120 @@ j=d.createElement(s),dl=l!='dataLayer'?'&l='+l:'';j.async=true;j.src=
       <div class="outer">
         <section id="main">
   
+    <article id="post-2025/backend-architecture-layer-design-principles" class="article article-type-post" itemscope itemprop="blogPost">
+  <div class="article-meta">
+    <a href="/2025/08/12/2025/backend-architecture-layer-design-principles/" class="article-date">
+  <time datetime="2025-08-12T05:29:15.000Z" itemprop="datePublished">2025-08-12</time>
+</a>
+    
+  </div>
+  <div class="article-inner">
+    
+    
+      <header class="article-header">
+        
+  
+    <h1 itemprop="name">
+      <a class="article-title" href="/2025/08/12/2025/backend-architecture-layer-design-principles/"> [架構筆記] Clean Architecture 分層職責：一道值得深思的面試題</a>
+    </h1>
+  
+
+      </header>
+    
+    <div class="article-entry" itemprop="articleBody">
+      
+        <h2 id="前情提要"><a href="#前情提要" class="headerlink" title="前情提要"></a>前情提要</h2><p>最近在 Code Review 時遇到一個有趣的討論：檔案上傳功能中，檔案編碼修復應該放在 Middleware 還是 UseCase？</p>
+<p>這個問題引發了我對 Clean Architecture 分層職責的重新思考，也讓我意識到這是一個很好的面試題目。畢竟，分層架構不只是把程式碼分資料夾這麼簡單，背後有著更深層的設計哲學。</p>
+<h2 id="問題背景"><a href="#問題背景" class="headerlink" title="問題背景"></a>問題背景</h2><p>在一個採用 Clean Architecture 的專案中，我們有兩個檔案上傳功能：</p>
+<ul>
+<li><strong>知識庫檔案上傳</strong> - 支援 PDF、Word、圖片等多種格式</li>
+<li><strong>合約檔案上傳</strong> - 原始合約支援 PDF&#x2F;Word，簽署後合約只支援 PDF</li>
+</ul>
+<p>當前系統架構包含：</p>
+<ul>
+<li><strong>Middleware</strong> - Express 中介軟體層</li>
+<li><strong>Controller</strong> - HTTP 請求處理層  </li>
+<li><strong>UseCase</strong> - 業務邏輯層</li>
+<li><strong>Service</strong> - 基礎設施服務層</li>
+</ul>
+<h2 id="核心問題：分層職責如何劃分？"><a href="#核心問題：分層職責如何劃分？" class="headerlink" title="核心問題：分層職責如何劃分？"></a>核心問題：分層職責如何劃分？</h2><p>以下邏輯應該放在哪一層？</p>
+<ol>
+<li><strong>檔案編碼修復</strong> - 解決中文檔名亂碼問題 (latin1 → utf8)</li>
+<li><strong>檔案類型驗證</strong> - 檢查 MIME type 是否符合業務需求  </li>
+<li><strong>檔案大小限制</strong> - 根據不同業務場景設定不同大小限制</li>
+<li><strong>JWT Token 驗證</strong> - 檢查使用者身份</li>
+<li><strong>檔案內容解析</strong> - 提取 PDF&#x2F;Word 文件內容</li>
+</ol>
+<h2 id="分析思路"><a href="#分析思路" class="headerlink" title="分析思路"></a>分析思路</h2><h3 id="Middleware-的職責：技術基礎設施"><a href="#Middleware-的職責：技術基礎設施" class="headerlink" title="Middleware 的職責：技術基礎設施"></a>Middleware 的職責：技術基礎設施</h3><figure class="highlight typescript"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment">// ✅ 適合放 Middleware</span></span><br><span class="line"><span class="comment">// authMiddleware.ts - HTTP 認證技術處理</span></span><br><span class="line">- <span class="variable constant_">JWT</span> token 解析和驗證  </span><br><span class="line">- <span class="variable constant_">HTTP</span> 權限檢查</span><br><span class="line">- 將認證結果附加到 req.<span class="property">user</span></span><br><span class="line"></span><br><span class="line"><span class="comment">// errorHandler.ts - HTTP 錯誤處理  </span></span><br><span class="line">- 將系統錯誤轉換為 <span class="variable constant_">HTTP</span> 狀態碼</span><br><span class="line">- 統一錯誤格式回應</span><br><span class="line">- 錯誤日誌記錄</span><br><span class="line"></span><br><span class="line"><span class="comment">// uploadFiles.ts - 檔案上傳技術處理</span></span><br><span class="line">- 檔案編碼修復 (<span class="variable constant_">HTTP</span> 上傳技術問題) ✅</span><br><span class="line">- <span class="title class_">Multer</span> 設定和記憶體存儲</span><br></pre></td></tr></table></figure>
+
+<h3 id="UseCase-的職責：業務邏輯驗證"><a href="#UseCase-的職責：業務邏輯驗證" class="headerlink" title="UseCase 的職責：業務邏輯驗證"></a>UseCase 的職責：業務邏輯驗證</h3><figure class="highlight typescript"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br><span class="line">29</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment">// ✅ 適合放 UseCase</span></span><br><span class="line"><span class="comment">// UploadKnowledgeFiles.ts - 知識庫檔案業務邏輯</span></span><br><span class="line"><span class="keyword">class</span> <span class="title class_">UploadKnowledgeFiles</span> &#123;</span><br><span class="line">  <span class="keyword">private</span> <span class="keyword">readonly</span> validMimeTypes = &#123;</span><br><span class="line">    <span class="string">&#x27;application/pdf&#x27;</span>: <span class="string">&#x27;pdf&#x27;</span>,</span><br><span class="line">    <span class="string">&#x27;text/plain&#x27;</span>: <span class="string">&#x27;txt&#x27;</span>,</span><br><span class="line">    <span class="string">&#x27;application/msword&#x27;</span>: <span class="string">&#x27;word&#x27;</span>,</span><br><span class="line">    <span class="string">&#x27;image/jpeg&#x27;</span>: <span class="string">&#x27;image&#x27;</span>,</span><br><span class="line">    <span class="string">&#x27;image/png&#x27;</span>: <span class="string">&#x27;image&#x27;</span>,</span><br><span class="line">    <span class="comment">// ... 更多類型</span></span><br><span class="line">  &#125; <span class="keyword">as</span> <span class="keyword">const</span></span><br><span class="line">  </span><br><span class="line">  <span class="comment">// 檔案類型白名單驗證 (業務規則)</span></span><br><span class="line">  <span class="comment">// 檔案大小限制檢查 (業務需求)  </span></span><br><span class="line">  <span class="comment">// 檔案數量限制驗證 (業務邏輯)</span></span><br><span class="line">&#125;</span><br><span class="line"></span><br><span class="line"><span class="comment">// UploadContractFile.ts - 合約檔案業務邏輯</span></span><br><span class="line"><span class="keyword">class</span> <span class="title class_">UploadContractFile</span> &#123;</span><br><span class="line">  <span class="comment">// 不同類型合約的檔案限制 (業務場景)</span></span><br><span class="line">  <span class="keyword">private</span> <span class="keyword">readonly</span> validMimeTypesForOrigin = &#123;</span><br><span class="line">    <span class="string">&#x27;application/pdf&#x27;</span>: <span class="string">&#x27;pdf&#x27;</span>,</span><br><span class="line">    <span class="string">&#x27;application/vnd.openxmlformats-officedocument.wordprocessingml.document&#x27;</span>: <span class="string">&#x27;word&#x27;</span>,</span><br><span class="line">  &#125; <span class="keyword">as</span> <span class="keyword">const</span></span><br><span class="line"></span><br><span class="line">  <span class="keyword">private</span> <span class="keyword">readonly</span> validMimeTypesForNonOrigin = &#123;</span><br><span class="line">    <span class="string">&#x27;application/pdf&#x27;</span>: <span class="string">&#x27;pdf&#x27;</span>,  <span class="comment">// 簽署後只能 PDF</span></span><br><span class="line">  &#125; <span class="keyword">as</span> <span class="keyword">const</span></span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+<h2 id="設計原則"><a href="#設計原則" class="headerlink" title="設計原則"></a>設計原則</h2><h3 id="Middleware-處理的是…"><a href="#Middleware-處理的是…" class="headerlink" title="Middleware 處理的是…"></a>Middleware 處理的是…</h3><ul>
+<li><strong>跨領域技術問題</strong> (認證、編碼、錯誤處理)</li>
+<li><strong>HTTP 協議相關</strong> (請求解析、回應格式)  </li>
+<li><strong>基礎設施關注點</strong> (日誌、監控、安全)</li>
+<li><strong>與業務無關的技術細節</strong></li>
+</ul>
+<h3 id="UseCase-處理的是…"><a href="#UseCase-處理的是…" class="headerlink" title="UseCase 處理的是…"></a>UseCase 處理的是…</h3><ul>
+<li><strong>特定業務場景的規則</strong> (不同業務有不同檔案限制)</li>
+<li><strong>領域知識驗證</strong> (合約標題、內容檢查)</li>
+<li><strong>業務流程邏輯</strong> (檔案處理、資料儲存)</li>
+<li><strong>動態配置的業務參數</strong> (從環境變數讀取的業務限制)</li>
+</ul>
+<h2 id="實際案例分析"><a href="#實際案例分析" class="headerlink" title="實際案例分析"></a>實際案例分析</h2><h3 id="檔案編碼問題：技術問題-→-Middleware-✅"><a href="#檔案編碼問題：技術問題-→-Middleware-✅" class="headerlink" title="檔案編碼問題：技術問題 → Middleware ✅"></a>檔案編碼問題：技術問題 → Middleware ✅</h3><figure class="highlight typescript"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment">// uploadFiles.ts</span></span><br><span class="line"><span class="keyword">const</span> fixFilenameEncoding = (<span class="attr">filename</span>: <span class="built_in">string</span>): <span class="function"><span class="params">string</span> =&gt;</span> &#123;</span><br><span class="line">  <span class="keyword">return</span> <span class="title class_">Buffer</span>.<span class="title function_">from</span>(filename, <span class="string">&#x27;latin1&#x27;</span>).<span class="title function_">toString</span>(<span class="string">&#x27;utf8&#x27;</span>)</span><br><span class="line">&#125;</span><br><span class="line"></span><br><span class="line"><span class="keyword">const</span> upload = <span class="title function_">multer</span>(&#123;</span><br><span class="line">  <span class="attr">storage</span>: multer.<span class="title function_">memoryStorage</span>(),</span><br><span class="line">  <span class="attr">fileFilter</span>: <span class="function">(<span class="params">_req, file, cb</span>) =&gt;</span> &#123;</span><br><span class="line">    file.<span class="property">originalname</span> = <span class="title function_">fixFilenameEncoding</span>(file.<span class="property">originalname</span>)</span><br><span class="line">    <span class="title function_">cb</span>(<span class="literal">null</span>, <span class="literal">true</span>)</span><br><span class="line">  &#125;,</span><br><span class="line">&#125;)</span><br></pre></td></tr></table></figure>
+
+<p><strong>為什麼放 Middleware？</strong></p>
+<ul>
+<li>這是 HTTP 上傳過程中的技術問題，不是業務邏輯</li>
+<li>所有檔案上傳都需要這個處理，跨多個 UseCase</li>
+<li>屬於請求處理層面的責任</li>
+</ul>
+<h3 id="檔案類型限制：業務邏輯-→-UseCase-✅"><a href="#檔案類型限制：業務邏輯-→-UseCase-✅" class="headerlink" title="檔案類型限制：業務邏輯 → UseCase ✅"></a>檔案類型限制：業務邏輯 → UseCase ✅</h3><figure class="highlight typescript"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment">// UploadContractFile.ts  </span></span><br><span class="line"><span class="keyword">class</span> <span class="title class_">UploadContractFile</span> &#123;</span><br><span class="line">  <span class="title function_">execute</span>(<span class="params">files: Express.Multer.File[], isOrigin: <span class="built_in">boolean</span></span>) &#123;</span><br><span class="line">    <span class="keyword">const</span> validTypes = isOrigin </span><br><span class="line">      ? <span class="variable language_">this</span>.<span class="property">validMimeTypesForOrigin</span> </span><br><span class="line">      : <span class="variable language_">this</span>.<span class="property">validMimeTypesForNonOrigin</span></span><br><span class="line">      </span><br><span class="line">    <span class="comment">// 業務邏輯：根據合約類型決定允許的檔案格式</span></span><br><span class="line">    <span class="variable language_">this</span>.<span class="title function_">validateFileTypes</span>(files, validTypes)</span><br><span class="line">  &#125;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+<p><strong>為什麼放 UseCase？</strong></p>
+<ul>
+<li>不同業務場景有不同的檔案類型限制</li>
+<li>這是領域知識，需要業務邏輯判斷</li>
+<li>可能隨著業務需求變化而調整</li>
+</ul>
+<h2 id="進階思考"><a href="#進階思考" class="headerlink" title="進階思考"></a>進階思考</h2><h3 id="如果檔案大小限制要動態調整呢？"><a href="#如果檔案大小限制要動態調整呢？" class="headerlink" title="如果檔案大小限制要動態調整呢？"></a>如果檔案大小限制要動態調整呢？</h3><figure class="highlight typescript"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment">// UseCase 層處理動態業務配置</span></span><br><span class="line"><span class="keyword">class</span> <span class="title class_">UploadKnowledgeFiles</span> &#123;</span><br><span class="line">  <span class="title function_">constructor</span>(<span class="params"></span></span><br><span class="line"><span class="params">    <span class="keyword">private</span> configService: ConfigService,</span></span><br><span class="line"><span class="params">    <span class="keyword">private</span> userService: UserService</span></span><br><span class="line"><span class="params">  </span>) &#123;&#125;</span><br><span class="line">  </span><br><span class="line">  <span class="keyword">async</span> <span class="title function_">execute</span>(<span class="params">files: Express.Multer.File[], userId: <span class="built_in">string</span></span>) &#123;</span><br><span class="line">    <span class="keyword">const</span> user = <span class="keyword">await</span> <span class="variable language_">this</span>.<span class="property">userService</span>.<span class="title function_">findById</span>(userId)</span><br><span class="line">    <span class="keyword">const</span> maxSize = user.<span class="property">isVip</span> </span><br><span class="line">      ? <span class="variable language_">this</span>.<span class="property">configService</span>.<span class="title function_">get</span>(<span class="string">&#x27;VIP_MAX_FILE_SIZE&#x27;</span>)</span><br><span class="line">      : <span class="variable language_">this</span>.<span class="property">configService</span>.<span class="title function_">get</span>(<span class="string">&#x27;NORMAL_MAX_FILE_SIZE&#x27;</span>)</span><br><span class="line">      </span><br><span class="line">    <span class="variable language_">this</span>.<span class="title function_">validateFileSize</span>(files, maxSize)</span><br><span class="line">  &#125;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+<p>這樣的設計對測試也更友好：</p>
+<figure class="highlight typescript"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment">// 可以輕鬆 mock 依賴，測試不同的業務場景</span></span><br><span class="line"><span class="title function_">describe</span>(<span class="string">&#x27;UploadKnowledgeFiles&#x27;</span>, <span class="function">() =&gt;</span> &#123;</span><br><span class="line">  <span class="title function_">it</span>(<span class="string">&#x27;should allow larger files for VIP users&#x27;</span>, <span class="keyword">async</span> () =&gt; &#123;</span><br><span class="line">    <span class="comment">// Arrange</span></span><br><span class="line">    mockUserService.<span class="property">findById</span>.<span class="title function_">mockResolvedValue</span>(&#123; <span class="attr">isVip</span>: <span class="literal">true</span> &#125;)</span><br><span class="line">    mockConfigService.<span class="property">get</span>.<span class="title function_">mockReturnValue</span>(<span class="number">100</span> * <span class="number">1024</span> * <span class="number">1024</span>) <span class="comment">// 100MB</span></span><br><span class="line">    </span><br><span class="line">    <span class="comment">// Act &amp; Assert</span></span><br><span class="line">    <span class="keyword">await</span> <span class="title function_">expect</span>(uploadUseCase.<span class="title function_">execute</span>(largeFiles, <span class="string">&#x27;vip-user-id&#x27;</span>))</span><br><span class="line">      .<span class="property">resolves</span>.<span class="property">not</span>.<span class="title function_">toThrow</span>()</span><br><span class="line">  &#125;)</span><br><span class="line">&#125;)</span><br></pre></td></tr></table></figure>
+
+<h2 id="總結"><a href="#總結" class="headerlink" title="總結"></a>總結</h2><p>好的架構設計不是憑感覺，而是要有明確的原則：</p>
+<ul>
+<li><strong>Middleware</strong> &#x3D; 技術基礎設施，處理 HTTP 層面的問題</li>
+<li><strong>UseCase</strong> &#x3D; 業務邏輯驗證，處理領域相關的規則</li>
+</ul>
+<p>這種分層不只讓程式碼更好維護，也讓測試更容易撰寫，更符合單一職責原則。</p>
+<p>下次在設計架構時，不妨問問自己：</p>
+<ul>
+<li>這個邏輯是技術問題還是業務問題？</li>
+<li>這個規則會因為業務需求變化嗎？</li>
+<li>這個處理邏輯需要在多個地方重複嗎？</li>
+</ul>
+<p>Clean Architecture 的精神就在於：<strong>讓業務邏輯獨立於技術細節</strong>。</p>
+<p>面試時遇到類似問題，記得從職責分離的角度思考，相信你會有不錯的表現！</p>
+<p>(fin)</p>
+
+      
+    </div>
+    <footer class="article-footer">
+      <a data-url="https://blog.marsen.me/2025/08/12/2025/backend-architecture-layer-design-principles/" data-id="cme83rxqq00i02sqohjkm3dji" class="article-share-link">Share</a>
+      
+        <a href="https://blog.marsen.me/2025/08/12/2025/backend-architecture-layer-design-principles/#disqus_thread" class="article-comment-link">留言</a>
+      
+      
+  <ul class="article-tag-list" itemprop="keywords"><li class="article-tag-list-item"><a class="article-tag-list-link" href="/tags/%E5%AD%B8%E7%BF%92%E7%AD%86%E8%A8%98/" rel="tag">學習筆記</a></li></ul>
+
+    </footer>
+  </div>
+  
+</article>
+
+
+  
     <article id="post-2025/race-condition-in-file-storage" class="article article-type-post" itemscope itemprop="blogPost">
   <div class="article-meta">
     <a href="/2025/08/07/2025/race-condition-in-file-storage/" class="article-date">
@@ -163,7 +277,7 @@ j=d.createElement(s),dl=l!='dataLayer'?'&l='+l:'';j.async=true;j.src=
       
     </div>
     <footer class="article-footer">
-      <a data-url="https://blog.marsen.me/2025/08/07/2025/race-condition-in-file-storage/" data-id="cme0z8sdh00ip2sqzffhfgbqv" class="article-share-link">Share</a>
+      <a data-url="https://blog.marsen.me/2025/08/07/2025/race-condition-in-file-storage/" data-id="cme83rxqz00is2sqo0kf1gtbv" class="article-share-link">Share</a>
       
         <a href="https://blog.marsen.me/2025/08/07/2025/race-condition-in-file-storage/#disqus_thread" class="article-comment-link">留言</a>
       
@@ -331,7 +445,7 @@ j=d.createElement(s),dl=l!='dataLayer'?'&l='+l:'';j.async=true;j.src=
       
     </div>
     <footer class="article-footer">
-      <a data-url="https://blog.marsen.me/2025/07/31/2025/ai_google_search_api/" data-id="cme0z8sda00hy2sqz4qz1gflw" class="article-share-link">Share</a>
+      <a data-url="https://blog.marsen.me/2025/07/31/2025/ai_google_search_api/" data-id="cme83rxqo00hv2sqod9cqa2a3" class="article-share-link">Share</a>
       
         <a href="https://blog.marsen.me/2025/07/31/2025/ai_google_search_api/#disqus_thread" class="article-comment-link">留言</a>
       
@@ -396,7 +510,7 @@ j=d.createElement(s),dl=l!='dataLayer'?'&l='+l:'';j.async=true;j.src=
       
     </div>
     <footer class="article-footer">
-      <a data-url="https://blog.marsen.me/2025/07/29/2025/ai-eai-browser-install-flatpak-solution/" data-id="cme0z8sd700hj2sqzhy1s0szr" class="article-share-link">Share</a>
+      <a data-url="https://blog.marsen.me/2025/07/29/2025/ai-eai-browser-install-flatpak-solution/" data-id="cme83rxql00hj2sqo03uj85gu" class="article-share-link">Share</a>
       
         <a href="https://blog.marsen.me/2025/07/29/2025/ai-eai-browser-install-flatpak-solution/#disqus_thread" class="article-comment-link">留言</a>
       
@@ -498,7 +612,7 @@ j=d.createElement(s),dl=l!='dataLayer'?'&l='+l:'';j.async=true;j.src=
       
     </div>
     <footer class="article-footer">
-      <a data-url="https://blog.marsen.me/2025/07/25/2025/express-res-locals-auth-best-practice/" data-id="cme0z8sdb00i02sqzafub9w3x" class="article-share-link">Share</a>
+      <a data-url="https://blog.marsen.me/2025/07/25/2025/express-res-locals-auth-best-practice/" data-id="cme83rxqr00i32sqo5qvy6pvh" class="article-share-link">Share</a>
       
         <a href="https://blog.marsen.me/2025/07/25/2025/express-res-locals-auth-best-practice/#disqus_thread" class="article-comment-link">留言</a>
       
@@ -599,7 +713,7 @@ j=d.createElement(s),dl=l!='dataLayer'?'&l='+l:'';j.async=true;j.src=
       
     </div>
     <footer class="article-footer">
-      <a data-url="https://blog.marsen.me/2025/07/22/2025/ithub-action-ssh-keyscan-not-found-fix/" data-id="cme0z8sdg00ik2sqzc3z3ho4x" class="article-share-link">Share</a>
+      <a data-url="https://blog.marsen.me/2025/07/22/2025/ithub-action-ssh-keyscan-not-found-fix/" data-id="cme83rxqx00in2sqo8r63b9k5" class="article-share-link">Share</a>
       
         <a href="https://blog.marsen.me/2025/07/22/2025/ithub-action-ssh-keyscan-not-found-fix/#disqus_thread" class="article-comment-link">留言</a>
       
@@ -714,7 +828,7 @@ j=d.createElement(s),dl=l!='dataLayer'?'&l='+l:'';j.async=true;j.src=
       
     </div>
     <footer class="article-footer">
-      <a data-url="https://blog.marsen.me/2025/06/22/2025/ai-ollama-containerized/" data-id="cme0z8sd700hl2sqz8btnexdq" class="article-share-link">Share</a>
+      <a data-url="https://blog.marsen.me/2025/06/22/2025/ai-ollama-containerized/" data-id="cme83rxql00hl2sqo26693ckh" class="article-share-link">Share</a>
       
         <a href="https://blog.marsen.me/2025/06/22/2025/ai-ollama-containerized/#disqus_thread" class="article-comment-link">留言</a>
       
@@ -888,7 +1002,7 @@ j=d.createElement(s),dl=l!='dataLayer'?'&l='+l:'';j.async=true;j.src=
       
     </div>
     <footer class="article-footer">
-      <a data-url="https://blog.marsen.me/2025/06/20/2025/ai-tools/" data-id="cme0z8sd800hq2sqz5yae94of" class="article-share-link">Share</a>
+      <a data-url="https://blog.marsen.me/2025/06/20/2025/ai-tools/" data-id="cme83rxqm00hq2sqo9yml74hb" class="article-share-link">Share</a>
       
         <a href="https://blog.marsen.me/2025/06/20/2025/ai-tools/#disqus_thread" class="article-comment-link">留言</a>
       
@@ -989,7 +1103,7 @@ j=d.createElement(s),dl=l!='dataLayer'?'&l='+l:'';j.async=true;j.src=
       
     </div>
     <footer class="article-footer">
-      <a data-url="https://blog.marsen.me/2025/06/05/2025/gitlab-cicd-to-registry/" data-id="cme0z8sdf00ii2sqz66z46jz2" class="article-share-link">Share</a>
+      <a data-url="https://blog.marsen.me/2025/06/05/2025/gitlab-cicd-to-registry/" data-id="cme83rxqw00ik2sqo6mzlfci5" class="article-share-link">Share</a>
       
         <a href="https://blog.marsen.me/2025/06/05/2025/gitlab-cicd-to-registry/#disqus_thread" class="article-comment-link">留言</a>
       
@@ -1081,482 +1195,12 @@ j=d.createElement(s),dl=l!='dataLayer'?'&l='+l:'';j.async=true;j.src=
       
     </div>
     <footer class="article-footer">
-      <a data-url="https://blog.marsen.me/2025/06/04/2025/gcp-internal-lb-serivce/" data-id="cme0z8sdf00if2sqz24fgf755" class="article-share-link">Share</a>
+      <a data-url="https://blog.marsen.me/2025/06/04/2025/gcp-internal-lb-serivce/" data-id="cme83rxqw00ii2sqodhgvamkm" class="article-share-link">Share</a>
       
         <a href="https://blog.marsen.me/2025/06/04/2025/gcp-internal-lb-serivce/#disqus_thread" class="article-comment-link">留言</a>
       
       
   <ul class="article-tag-list" itemprop="keywords"><li class="article-tag-list-item"><a class="article-tag-list-link" href="/tags/%E5%AD%B8%E7%BF%92%E7%AD%86%E8%A8%98/" rel="tag">學習筆記</a></li></ul>
-
-    </footer>
-  </div>
-  
-</article>
-
-
-  
-    <article id="post-2025/vim_setting" class="article article-type-post" itemscope itemprop="blogPost">
-  <div class="article-meta">
-    <a href="/2025/05/24/2025/vim_setting/" class="article-date">
-  <time datetime="2025-05-24T05:06:05.000Z" itemprop="datePublished">2025-05-24</time>
-</a>
-    
-  </div>
-  <div class="article-inner">
-    
-    
-      <header class="article-header">
-        
-  
-    <h1 itemprop="name">
-      <a class="article-title" href="/2025/05/24/2025/vim_setting/"> [實作筆記] 我的 Vim 設定</a>
-    </h1>
-  
-
-      </header>
-    
-    <div class="article-entry" itemprop="articleBody">
-      
-        <p>我的 Vim 快捷鍵設定總表，<strong>IdeaVim 與 JetBrain</strong>：</p>
-<hr>
-<table>
-<thead>
-<tr>
-<th>快捷鍵</th>
-<th>模式</th>
-<th>功能說明</th>
-<th>IdeaVim 設定寫法</th>
-</tr>
-</thead>
-<tbody><tr>
-<td>zcc</td>
-<td>n</td>
-<td>清除所有自訂映射</td>
-<td><code>nmap zcc :mapclear!&lt;CR&gt;</code></td>
-</tr>
-<tr>
-<td>zso</td>
-<td>n</td>
-<td>重新載入主 vimrc</td>
-<td><code>nmap zso :source ~/_ideavimrc&lt;CR&gt;</code></td>
-</tr>
-<tr>
-<td>zf</td>
-<td>n&#x2F;i</td>
-<td>跳到定義（Goto Declaration）</td>
-<td><code>nmap zf :action GotoDeclaration&lt;CR&gt;</code><br><code>imap zf &lt;Esc&gt;:action GotoDeclaration&lt;CR&gt;</code></td>
-</tr>
-<tr>
-<td>zrc, zo</td>
-<td>n&#x2F;i</td>
-<td>格式化程式碼（Reformat Code）</td>
-<td><code>nmap zrc :action ReformatCode&lt;CR&gt;</code><br><code>imap zrc &lt;Esc&gt;:action ReformatCode&lt;CR&gt;</code><br><code>nmap zo :action ReformatCode&lt;CR&gt;</code></td>
-</tr>
-<tr>
-<td>zk</td>
-<td>n&#x2F;i</td>
-<td>返回（Back）</td>
-<td><code>nmap zk :action Back&lt;CR&gt;</code><br><code>imap zk &lt;Esc&gt;:action Back&lt;CR&gt;</code></td>
-</tr>
-<tr>
-<td>zj</td>
-<td>n&#x2F;i</td>
-<td>AceAction（自訂動作）</td>
-<td><code>nmap zj :action AceAction&lt;CR&gt;</code><br><code>imap zj &lt;Esc&gt;:action AceAction&lt;CR&gt;</code></td>
-</tr>
-<tr>
-<td>ztt</td>
-<td>n&#x2F;i</td>
-<td>複製區塊並格式化（自訂巨集）</td>
-<td><code>nmap ztt y?[F&lt;CR&gt;/&#123;&lt;CR&gt;%o&lt;Esc&gt;p:action ReformatCode&lt;CR&gt;</code><br><code>imap ztt &lt;Esc&gt;y?[F&lt;CR&gt;/&#123;&lt;CR&gt;%o&lt;Esc&gt;p:action ReformatCode&lt;CR&gt;</code></td>
-</tr>
-<tr>
-<td>zn</td>
-<td>n&#x2F;i</td>
-<td>跳到上一個錯誤（Goto Previous Error）</td>
-<td><code>nmap zn :action GotoPreviousError&lt;CR&gt;</code><br><code>imap zn &lt;Esc&gt;:action GotoPreviousError&lt;CR&gt;</code></td>
-</tr>
-<tr>
-<td>zrr</td>
-<td>n&#x2F;i</td>
-<td>重新命名（Rename Element）</td>
-<td><code>nmap zrr :action RenameElement&lt;CR&gt;</code><br><code>imap zrr &lt;Esc&gt;:action RenameElement&lt;CR&gt;</code></td>
-</tr>
-<tr>
-<td>zra</td>
-<td>n&#x2F;i</td>
-<td>執行所有單元測試</td>
-<td><code>nmap zra :action RiderUnitTestRunSolutionAction&lt;CR&gt;</code><br><code>imap zra &lt;Esc&gt;:action RiderUnitTestRunSolutionAction&lt;CR&gt;</code></td>
-</tr>
-<tr>
-<td>zrm</td>
-<td>n&#x2F;v</td>
-<td>萃取方法（Extract Method）</td>
-<td><code>nmap zrm :action ExtractMethod&lt;CR&gt;</code><br><code>vmap zrm :action ExtractMethod&lt;CR&gt;</code></td>
-</tr>
-<tr>
-<td>zri</td>
-<td>n</td>
-<td>Inline（內聯變數&#x2F;方法）</td>
-<td><code>map zri :action Inline&lt;CR&gt;&lt;Esc&gt;</code></td>
-</tr>
-<tr>
-<td>zrp</td>
-<td>n</td>
-<td>Introduce Parameter（引入參數）</td>
-<td><code>map zrp :action IntroduceParameter&lt;CR&gt;</code></td>
-</tr>
-<tr>
-<td>zrv</td>
-<td>n</td>
-<td>Introduce Variable（引入變數）</td>
-<td><code>map zrv :action IntroduceVariable&lt;CR&gt;</code></td>
-</tr>
-<tr>
-<td>zrf</td>
-<td>n</td>
-<td>Introduce Field（引入欄位）</td>
-<td><code>map zrf :action IntroduceField&lt;CR&gt;</code></td>
-</tr>
-<tr>
-<td>,m</td>
-<td>n</td>
-<td>顯示檔案結構</td>
-<td><code>nmap ,m :action FileStructurePopup&lt;CR&gt;</code></td>
-</tr>
-<tr>
-<td>zrt</td>
-<td>n</td>
-<td>最近檔案</td>
-<td><code>nmap zrt :action RecentFiles&lt;CR&gt;</code></td>
-</tr>
-<tr>
-<td>zgc</td>
-<td>n</td>
-<td>開啟 Commit 工具視窗</td>
-<td><code>nmap zgc :action ActivateCommitToolWindow&lt;CR&gt;</code></td>
-</tr>
-<tr>
-<td>zx</td>
-<td>n</td>
-<td>快速重構選單</td>
-<td><code>nmap zx :action Refactorings.QuickListPopupAction &lt;CR&gt;</code></td>
-</tr>
-<tr>
-<td>zae</td>
-<td>n&#x2F;i</td>
-<td>插入 Assert.Equal(,);</td>
-<td><code>nmap zae aAssert.Equal(,);&lt;Esc&gt;T(i</code><br><code>imap zae Assert.Equal(,);&lt;Esc&gt;T(i</code></td>
-</tr>
-<tr>
-<td>zrs</td>
-<td>n</td>
-<td>新增 class 並格式化（自訂巨集）</td>
-<td><code>nmap zrs &quot;add? class&lt;CR&gt;2w&quot;bywjopublic &lt;Esc&gt;&quot;bpa()&lt;CR&gt;&#123;&lt;Esc&gt;&quot;apo&#125;&lt;Esc&gt;:action ReformatCode&lt;CR&gt;</code></td>
-</tr>
-<tr>
-<td>z;</td>
-<td>n&#x2F;i</td>
-<td>行尾加分號</td>
-<td><code>nmap z; $a;&lt;Esc&gt;</code><br><code>imap z; &lt;Esc&gt;$a;</code></td>
-</tr>
-<tr>
-<td>,p, ,P</td>
-<td>n</td>
-<td>黏貼暫存區 0 的內容</td>
-<td><code>nmap ,p &quot;0p</code><br><code>nmap ,P &quot;0P</code></td>
-</tr>
-<tr>
-<td>z,p, z,P</td>
-<td>i</td>
-<td>插入暫存區 0 的內容</td>
-<td><code>imap z,p &lt;Esc&gt;&quot;0pa</code><br><code>imap z,P &lt;Esc&gt;&quot;0Pa</code></td>
-</tr>
-<tr>
-<td>z,</td>
-<td>n</td>
-<td>選取括號內內容（vi)）</td>
-<td><code>:nmap z, vi)</code></td>
-</tr>
-<tr>
-<td>z.</td>
-<td>n</td>
-<td>選取大括號內內容（vi}）</td>
-<td><code>:nmap z. vi&#125;</code></td>
-</tr>
-<tr>
-<td><Esc></td>
-<td>v</td>
-<td>連續多次離開選取模式</td>
-<td><code>:vmap &lt;Esc&gt; &lt;Esc&gt;&lt;Esc&gt;&lt;Esc&gt;</code></td>
-</tr>
-<tr>
-<td>jj</td>
-<td>i</td>
-<td>退出插入模式</td>
-<td><code>:imap jj &lt;Esc&gt;</code></td>
-</tr>
-<tr>
-<td><BS></td>
-<td>n</td>
-<td>在普通模式下插入 Backspace</td>
-<td><code>:nmap &lt;BS&gt; a&lt;BS&gt;</code></td>
-</tr>
-<tr>
-<td>zh</td>
-<td>n&#x2F;i</td>
-<td>跳到行首</td>
-<td><code>:nmap zh ^</code><br><code>:imap zh &lt;Esc&gt;^i</code></td>
-</tr>
-<tr>
-<td>zl</td>
-<td>n&#x2F;i</td>
-<td>跳到行尾</td>
-<td><code>:nmap zl $</code><br><code>:imap zl &lt;End&gt;</code></td>
-</tr>
-<tr>
-<td>hc</td>
-<td>n</td>
-<td>Ctrl+C</td>
-<td><code>:nmap hc ^C</code></td>
-</tr>
-<tr>
-<td>zb</td>
-<td>n&#x2F;v</td>
-<td>單字取代</td>
-<td><code>:nmap zb bcw</code><br><code>:vmap zb &lt;Esc&gt;bcw</code></td>
-</tr>
-<tr>
-<td>zd</td>
-<td>i</td>
-<td>刪除當前行</td>
-<td><code>:imap zd &lt;Esc&gt;dd</code></td>
-</tr>
-<tr>
-<td>j, k</td>
-<td>n</td>
-<td>軟換行移動</td>
-<td><code>nmap j gj</code><br><code>nmap k gk</code></td>
-</tr>
-<tr>
-<td>qq</td>
-<td>n</td>
-<td>強制關閉檔案</td>
-<td><code>nmap qq ZQ</code></td>
-</tr>
-<tr>
-<td>zq</td>
-<td>n</td>
-<td>儲存並關閉檔案</td>
-<td><code>nmap zq :wq&lt;CR&gt;</code></td>
-</tr>
-<tr>
-<td><C-x></td>
-<td>i</td>
-<td>刪除當前行</td>
-<td><code>:imap &lt;C-x&gt; &lt;Esc&gt;dd</code></td>
-</tr>
-<tr>
-<td><C-a></td>
-<td>i</td>
-<td>全選</td>
-<td><code>:imap &lt;C-a&gt; &lt;Esc&gt;ma&lt;CR&gt;ggVG</code></td>
-</tr>
-<tr>
-<td>,i, ,a</td>
-<td>n</td>
-<td>替換字元</td>
-<td><code>:map ,i &lt;Esc&gt;r</code><br><code>:map ,a &lt;Esc&gt;r</code></td>
-</tr>
-</tbody></table>
-<hr>
-<p><strong>說明：</strong>  </p>
-<ul>
-<li>n：普通模式（normal mode）  </li>
-<li>i：插入模式（insert mode）  </li>
-<li>v：視覺模式（visual mode）  </li>
-<li><code>&lt;CR&gt;</code> 代表 Enter 鍵，<code>&lt;Esc&gt;</code> 代表 Esc 鍵</li>
-</ul>
-<hr>
-<p>以下是我將 JetBrains（IdeaVim）Vim 快捷鍵移植到 VSCode（VSCodeVim）的對應表，<br>並說明哪些已成功移植、哪些無法移植及原因：</p>
-<hr>
-<table>
-<thead>
-<tr>
-<th>JetBrains 快捷鍵</th>
-<th>VSCode 設定 (before)</th>
-<th>VSCode 指令 (commands)</th>
-<th>功能說明</th>
-<th>可否移植</th>
-<th>備註&#x2F;原因</th>
-</tr>
-</thead>
-<tbody><tr>
-<td>zrr</td>
-<td>[“z”,”r”,”r”]</td>
-<td>editor.action.rename</td>
-<td>重新命名</td>
-<td>✅</td>
-<td>完全支援</td>
-</tr>
-<tr>
-<td>zf</td>
-<td>[“z”,”f”]</td>
-<td>editor.action.revealDefinition</td>
-<td>跳到定義</td>
-<td>✅</td>
-<td>完全支援</td>
-</tr>
-<tr>
-<td>zrc&#x2F;zo</td>
-<td>[“z”,”r”,”c”]&#x2F;[“z”,”o”]</td>
-<td>editor.action.formatDocument</td>
-<td>格式化程式碼</td>
-<td>✅</td>
-<td>完全支援（你已設 zrc，zo 也可加）</td>
-</tr>
-<tr>
-<td>zn</td>
-<td>[“z”,”n”]</td>
-<td>editor.action.marker.prev</td>
-<td>跳到上一個錯誤</td>
-<td>✅</td>
-<td>完全支援</td>
-</tr>
-<tr>
-<td>zrt</td>
-<td>[“z”,”r”,”t”]</td>
-<td>workbench.action.openRecent</td>
-<td>最近檔案</td>
-<td>✅</td>
-<td>完全支援</td>
-</tr>
-<tr>
-<td>,m</td>
-<td>[“,”,”m”]</td>
-<td>workbench.action.gotoSymbol</td>
-<td>檔案結構&#x2F;大綱</td>
-<td>✅</td>
-<td>完全支援</td>
-</tr>
-<tr>
-<td>zx</td>
-<td>[“z”,”x”]</td>
-<td>editor.action.refactor</td>
-<td>顯示重構選單</td>
-<td>✅</td>
-<td>完全支援</td>
-</tr>
-<tr>
-<td>zgc</td>
-<td>[“z”,”g”,”c”]</td>
-<td>workbench.view.scm</td>
-<td>開啟 Source Control 面板</td>
-<td>✅</td>
-<td>完全支援</td>
-</tr>
-<tr>
-<td>zh</td>
-<td>[“z”,”h”]</td>
-<td>cursorHome</td>
-<td>跳到行首</td>
-<td>✅</td>
-<td>完全支援</td>
-</tr>
-<tr>
-<td>zl</td>
-<td>[“z”,”l”]</td>
-<td>cursorEnd</td>
-<td>跳到行尾</td>
-<td>✅</td>
-<td>完全支援</td>
-</tr>
-<tr>
-<td>zrv</td>
-<td>[“z”,”r”,”v”]</td>
-<td>editor.action.codeAction.extract.variable</td>
-<td>萃取變數</td>
-<td>⚠️</td>
-<td>VSCodeVim 有選取限制，部分情境下無法觸發</td>
-</tr>
-<tr>
-<td>zrm</td>
-<td>[“z”,”r”,”m”]</td>
-<td>editor.action.codeAction.extract.method</td>
-<td>萃取方法</td>
-<td>⚠️</td>
-<td>VSCodeVim 有選取限制，部分情境下無法觸發</td>
-</tr>
-<tr>
-<td>zri</td>
-<td>-</td>
-<td>-</td>
-<td>Inline（內聯變數&#x2F;方法）</td>
-<td>❌</td>
-<td>VSCode 沒有公開指令 ID，無法 keybinding</td>
-</tr>
-<tr>
-<td>zrp</td>
-<td>-</td>
-<td>-</td>
-<td>Introduce Parameter</td>
-<td>❌</td>
-<td>VSCode 沒有公開指令 ID，無法 keybinding</td>
-</tr>
-<tr>
-<td>zrf</td>
-<td>-</td>
-<td>-</td>
-<td>Introduce Field</td>
-<td>❌</td>
-<td>VSCode 沒有公開指令 ID，無法 keybinding</td>
-</tr>
-<tr>
-<td>ztt</td>
-<td>-</td>
-<td>-</td>
-<td>巨集&#x2F;多步驟自動化</td>
-<td>❌</td>
-<td>VSCode 不支援 Vim 巨集或多步驟自動化</td>
-</tr>
-<tr>
-<td>zso</td>
-<td>-</td>
-<td>-</td>
-<td>重新載入 vimrc</td>
-<td>❌</td>
-<td>VSCodeVim 不支援 :source 或重新載入 vimrc</td>
-</tr>
-<tr>
-<td>zra</td>
-<td>[“z”,”r”,”a”]</td>
-<td>testing.runAll</td>
-<td>執行所有單元測試</td>
-<td>✅</td>
-<td>需安裝 VSCode 官方 Testing 功能，已可 keybinding</td>
-</tr>
-</tbody></table>
-<hr>
-<h3 id="補充說明"><a href="#補充說明" class="headerlink" title="補充說明"></a>補充說明</h3><ul>
-<li>✅：完全支援，已可用於 VSCodeVim。</li>
-<li>⚠️：VSCodeVim 有技術限制（如需選取內容，觸發不一定成功）。</li>
-<li>❌：VSCode&#x2F;VSCodeVim 無對應指令或功能，無法移植。</li>
-<li>你可以持續用 VSCode 內建的 <code>Cmd+.</code> 或右鍵選單補足無法 keybinding 的重構功能。</li>
-<li><strong>zra</strong>：VSCode 1.59 以上內建 Testing 功能，指令為 <code>testing.runAll</code>，可直接 keybinding，無需額外外掛。</li>
-</ul>
-<hr>
-<p><strong>總結：</strong><br>我已成功將大部分常用 JetBrains Vim 快捷鍵移植到 VSCode，<br>僅少數 JetBrains 專屬重構、巨集、vimrc 相關功能因 VSCode 限制無法移植。  </p>
-<p>(fin)</p>
-
-      
-    </div>
-    <footer class="article-footer">
-      <a data-url="https://blog.marsen.me/2025/05/24/2025/vim_setting/" data-id="cme0z8sdk00iz2sqz2dyhdsw2" class="article-share-link">Share</a>
-      
-        <a href="https://blog.marsen.me/2025/05/24/2025/vim_setting/#disqus_thread" class="article-comment-link">留言</a>
-      
-      
-  <ul class="article-tag-list" itemprop="keywords"><li class="article-tag-list-item"><a class="article-tag-list-link" href="/tags/%E5%AF%A6%E4%BD%9C%E7%AD%86%E8%A8%98/" rel="tag">實作筆記</a></li></ul>
 
     </footer>
   </div>
@@ -1581,6 +1225,10 @@ j=d.createElement(s),dl=l!='dataLayer'?'&l='+l:'';j.async=true;j.src=
       <ul>
         
           <li>
+            <a href="/2025/08/12/2025/backend-architecture-layer-design-principles/"> [架構筆記] Clean Architecture 分層職責：一道值得深思的面試題</a>
+          </li>
+        
+          <li>
             <a href="/2025/08/07/2025/race-condition-in-file-storage/"> [學習筆記] Node.js 檔案操作 mkdir 的正確姿勢</a>
           </li>
         
@@ -1596,10 +1244,6 @@ j=d.createElement(s),dl=l!='dataLayer'?'&l='+l:'';j.async=true;j.src=
             <a href="/2025/07/25/2025/express-res-locals-auth-best-practice/"> [學習筆記] Express.js middleware auth 的業界標準(res.locals)</a>
           </li>
         
-          <li>
-            <a href="/2025/07/22/2025/ithub-action-ssh-keyscan-not-found-fix/">[踩雷筆記] GitHub Action ssh-keyscan not found 問題修復</a>
-          </li>
-        
       </ul>
     </div>
   </div>
@@ -1609,7 +1253,7 @@ j=d.createElement(s),dl=l!='dataLayer'?'&l='+l:'';j.async=true;j.src=
   <div class="widget-wrap">
     <h3 class="widget-title">彙整</h3>
     <div class="widget">
-      <ul class="archive-list"><li class="archive-list-item"><a class="archive-list-link" href="/archives/2025/08/">八月 2025</a><span class="archive-list-count">1</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2025/07/">七月 2025</a><span class="archive-list-count">4</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2025/06/">六月 2025</a><span class="archive-list-count">4</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2025/05/">五月 2025</a><span class="archive-list-count">5</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2025/04/">四月 2025</a><span class="archive-list-count">1</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2025/03/">三月 2025</a><span class="archive-list-count">2</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2025/02/">二月 2025</a><span class="archive-list-count">4</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2025/01/">一月 2025</a><span class="archive-list-count">3</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2024/12/">十二月 2024</a><span class="archive-list-count">3</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2024/11/">十一月 2024</a><span class="archive-list-count">3</span></li><span id='list_archives2' style='display:none'><li class="archive-list-item"><a class="archive-list-link" href="/archives/2024/10/">十月 2024</a><span class="archive-list-count">4</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2024/09/">九月 2024</a><span class="archive-list-count">5</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2024/08/">八月 2024</a><span class="archive-list-count">4</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2024/07/">七月 2024</a><span class="archive-list-count">3</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2024/06/">六月 2024</a><span class="archive-list-count">2</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2024/05/">五月 2024</a><span class="archive-list-count">1</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2024/04/">四月 2024</a><span class="archive-list-count">2</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2024/03/">三月 2024</a><span class="archive-list-count">3</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2024/02/">二月 2024</a><span class="archive-list-count">2</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2024/01/">一月 2024</a><span class="archive-list-count">4</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2023/12/">十二月 2023</a><span class="archive-list-count">2</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2023/11/">十一月 2023</a><span class="archive-list-count">3</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2023/10/">十月 2023</a><span class="archive-list-count">2</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2023/09/">九月 2023</a><span class="archive-list-count">3</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2023/08/">八月 2023</a><span class="archive-list-count">2</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2023/07/">七月 2023</a><span class="archive-list-count">6</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2023/06/">六月 2023</a><span class="archive-list-count">6</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2023/05/">五月 2023</a><span class="archive-list-count">1</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2023/04/">四月 2023</a><span class="archive-list-count">9</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2023/03/">三月 2023</a><span class="archive-list-count">4</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2023/02/">二月 2023</a><span class="archive-list-count">2</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2023/01/">一月 2023</a><span class="archive-list-count">2</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2022/12/">十二月 2022</a><span class="archive-list-count">1</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2022/10/">十月 2022</a><span class="archive-list-count">2</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2022/09/">九月 2022</a><span class="archive-list-count">6</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2022/08/">八月 2022</a><span class="archive-list-count">3</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2022/07/">七月 2022</a><span class="archive-list-count">2</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2022/06/">六月 2022</a><span class="archive-list-count">3</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2022/05/">五月 2022</a><span class="archive-list-count">7</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2022/04/">四月 2022</a><span class="archive-list-count">3</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2022/03/">三月 2022</a><span class="archive-list-count">3</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2022/02/">二月 2022</a><span class="archive-list-count">2</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2022/01/">一月 2022</a><span class="archive-list-count">3</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2021/12/">十二月 2021</a><span class="archive-list-count">2</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2021/11/">十一月 2021</a><span class="archive-list-count">2</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2021/10/">十月 2021</a><span class="archive-list-count">2</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2021/09/">九月 2021</a><span class="archive-list-count">1</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2021/08/">八月 2021</a><span class="archive-list-count">2</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2021/07/">七月 2021</a><span class="archive-list-count">4</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2021/06/">六月 2021</a><span class="archive-list-count">1</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2021/05/">五月 2021</a><span class="archive-list-count">2</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2021/04/">四月 2021</a><span class="archive-list-count">3</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2021/03/">三月 2021</a><span class="archive-list-count">3</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2021/02/">二月 2021</a><span class="archive-list-count">1</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2021/01/">一月 2021</a><span class="archive-list-count">7</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2020/12/">十二月 2020</a><span class="archive-list-count">1</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2020/11/">十一月 2020</a><span class="archive-list-count">2</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2020/10/">十月 2020</a><span class="archive-list-count">5</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2020/09/">九月 2020</a><span class="archive-list-count">5</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2020/08/">八月 2020</a><span class="archive-list-count">2</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2020/07/">七月 2020</a><span class="archive-list-count">3</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2020/06/">六月 2020</a><span class="archive-list-count">3</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2020/05/">五月 2020</a><span class="archive-list-count">3</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2020/04/">四月 2020</a><span class="archive-list-count">4</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2020/03/">三月 2020</a><span class="archive-list-count">1</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2020/02/">二月 2020</a><span class="archive-list-count">1</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2020/01/">一月 2020</a><span class="archive-list-count">5</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2019/12/">十二月 2019</a><span class="archive-list-count">1</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2019/11/">十一月 2019</a><span class="archive-list-count">2</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2019/10/">十月 2019</a><span class="archive-list-count">1</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2019/09/">九月 2019</a><span class="archive-list-count">2</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2019/08/">八月 2019</a><span class="archive-list-count">5</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2019/07/">七月 2019</a><span class="archive-list-count">1</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2019/06/">六月 2019</a><span class="archive-list-count">1</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2019/05/">五月 2019</a><span class="archive-list-count">2</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2019/04/">四月 2019</a><span class="archive-list-count">3</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2019/03/">三月 2019</a><span class="archive-list-count">1</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2019/02/">二月 2019</a><span class="archive-list-count">2</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2019/01/">一月 2019</a><span class="archive-list-count">4</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2018/12/">十二月 2018</a><span class="archive-list-count">5</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2018/11/">十一月 2018</a><span class="archive-list-count">7</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2018/10/">十月 2018</a><span class="archive-list-count">6</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2018/09/">九月 2018</a><span class="archive-list-count">3</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2018/08/">八月 2018</a><span class="archive-list-count">2</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2018/07/">七月 2018</a><span class="archive-list-count">6</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2018/06/">六月 2018</a><span class="archive-list-count">2</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2018/05/">五月 2018</a><span class="archive-list-count">1</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2018/04/">四月 2018</a><span class="archive-list-count">5</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2018/03/">三月 2018</a><span class="archive-list-count">5</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2018/02/">二月 2018</a><span class="archive-list-count">1</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2018/01/">一月 2018</a><span class="archive-list-count">5</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2017/12/">十二月 2017</a><span class="archive-list-count">3</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2017/10/">十月 2017</a><span class="archive-list-count">3</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2017/09/">九月 2017</a><span class="archive-list-count">2</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2017/08/">八月 2017</a><span class="archive-list-count">1</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2017/07/">七月 2017</a><span class="archive-list-count">2</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2017/05/">五月 2017</a><span class="archive-list-count">1</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2017/04/">四月 2017</a><span class="archive-list-count">2</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2017/03/">三月 2017</a><span class="archive-list-count">1</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2017/02/">二月 2017</a><span class="archive-list-count">1</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2017/01/">一月 2017</a><span class="archive-list-count">6</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2016/12/">十二月 2016</a><span class="archive-list-count">1</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2016/11/">十一月 2016</a><span class="archive-list-count">2</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2016/10/">十月 2016</a><span class="archive-list-count">4</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2016/09/">九月 2016</a><span class="archive-list-count">1</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2016/08/">八月 2016</a><span class="archive-list-count">6</span></li></span><span id=''></span><span onclick="var d=document.getElementById('list_archives2'); d.style.display===''?d.style='display:none':d.style=''">toggle...</span></ul>
+      <ul class="archive-list"><li class="archive-list-item"><a class="archive-list-link" href="/archives/2025/08/">八月 2025</a><span class="archive-list-count">2</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2025/07/">七月 2025</a><span class="archive-list-count">4</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2025/06/">六月 2025</a><span class="archive-list-count">4</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2025/05/">五月 2025</a><span class="archive-list-count">5</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2025/04/">四月 2025</a><span class="archive-list-count">1</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2025/03/">三月 2025</a><span class="archive-list-count">2</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2025/02/">二月 2025</a><span class="archive-list-count">4</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2025/01/">一月 2025</a><span class="archive-list-count">3</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2024/12/">十二月 2024</a><span class="archive-list-count">3</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2024/11/">十一月 2024</a><span class="archive-list-count">3</span></li><span id='list_archives2' style='display:none'><li class="archive-list-item"><a class="archive-list-link" href="/archives/2024/10/">十月 2024</a><span class="archive-list-count">4</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2024/09/">九月 2024</a><span class="archive-list-count">5</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2024/08/">八月 2024</a><span class="archive-list-count">4</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2024/07/">七月 2024</a><span class="archive-list-count">3</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2024/06/">六月 2024</a><span class="archive-list-count">2</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2024/05/">五月 2024</a><span class="archive-list-count">1</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2024/04/">四月 2024</a><span class="archive-list-count">2</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2024/03/">三月 2024</a><span class="archive-list-count">3</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2024/02/">二月 2024</a><span class="archive-list-count">2</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2024/01/">一月 2024</a><span class="archive-list-count">4</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2023/12/">十二月 2023</a><span class="archive-list-count">2</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2023/11/">十一月 2023</a><span class="archive-list-count">3</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2023/10/">十月 2023</a><span class="archive-list-count">2</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2023/09/">九月 2023</a><span class="archive-list-count">3</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2023/08/">八月 2023</a><span class="archive-list-count">2</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2023/07/">七月 2023</a><span class="archive-list-count">6</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2023/06/">六月 2023</a><span class="archive-list-count">6</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2023/05/">五月 2023</a><span class="archive-list-count">1</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2023/04/">四月 2023</a><span class="archive-list-count">9</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2023/03/">三月 2023</a><span class="archive-list-count">4</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2023/02/">二月 2023</a><span class="archive-list-count">2</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2023/01/">一月 2023</a><span class="archive-list-count">2</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2022/12/">十二月 2022</a><span class="archive-list-count">1</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2022/10/">十月 2022</a><span class="archive-list-count">2</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2022/09/">九月 2022</a><span class="archive-list-count">6</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2022/08/">八月 2022</a><span class="archive-list-count">3</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2022/07/">七月 2022</a><span class="archive-list-count">2</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2022/06/">六月 2022</a><span class="archive-list-count">3</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2022/05/">五月 2022</a><span class="archive-list-count">7</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2022/04/">四月 2022</a><span class="archive-list-count">3</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2022/03/">三月 2022</a><span class="archive-list-count">3</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2022/02/">二月 2022</a><span class="archive-list-count">2</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2022/01/">一月 2022</a><span class="archive-list-count">3</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2021/12/">十二月 2021</a><span class="archive-list-count">2</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2021/11/">十一月 2021</a><span class="archive-list-count">2</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2021/10/">十月 2021</a><span class="archive-list-count">2</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2021/09/">九月 2021</a><span class="archive-list-count">1</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2021/08/">八月 2021</a><span class="archive-list-count">2</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2021/07/">七月 2021</a><span class="archive-list-count">4</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2021/06/">六月 2021</a><span class="archive-list-count">1</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2021/05/">五月 2021</a><span class="archive-list-count">2</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2021/04/">四月 2021</a><span class="archive-list-count">3</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2021/03/">三月 2021</a><span class="archive-list-count">3</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2021/02/">二月 2021</a><span class="archive-list-count">1</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2021/01/">一月 2021</a><span class="archive-list-count">7</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2020/12/">十二月 2020</a><span class="archive-list-count">1</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2020/11/">十一月 2020</a><span class="archive-list-count">2</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2020/10/">十月 2020</a><span class="archive-list-count">5</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2020/09/">九月 2020</a><span class="archive-list-count">5</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2020/08/">八月 2020</a><span class="archive-list-count">2</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2020/07/">七月 2020</a><span class="archive-list-count">3</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2020/06/">六月 2020</a><span class="archive-list-count">3</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2020/05/">五月 2020</a><span class="archive-list-count">3</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2020/04/">四月 2020</a><span class="archive-list-count">4</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2020/03/">三月 2020</a><span class="archive-list-count">1</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2020/02/">二月 2020</a><span class="archive-list-count">1</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2020/01/">一月 2020</a><span class="archive-list-count">5</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2019/12/">十二月 2019</a><span class="archive-list-count">1</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2019/11/">十一月 2019</a><span class="archive-list-count">2</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2019/10/">十月 2019</a><span class="archive-list-count">1</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2019/09/">九月 2019</a><span class="archive-list-count">2</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2019/08/">八月 2019</a><span class="archive-list-count">5</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2019/07/">七月 2019</a><span class="archive-list-count">1</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2019/06/">六月 2019</a><span class="archive-list-count">1</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2019/05/">五月 2019</a><span class="archive-list-count">2</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2019/04/">四月 2019</a><span class="archive-list-count">3</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2019/03/">三月 2019</a><span class="archive-list-count">1</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2019/02/">二月 2019</a><span class="archive-list-count">2</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2019/01/">一月 2019</a><span class="archive-list-count">4</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2018/12/">十二月 2018</a><span class="archive-list-count">5</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2018/11/">十一月 2018</a><span class="archive-list-count">7</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2018/10/">十月 2018</a><span class="archive-list-count">6</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2018/09/">九月 2018</a><span class="archive-list-count">3</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2018/08/">八月 2018</a><span class="archive-list-count">2</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2018/07/">七月 2018</a><span class="archive-list-count">6</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2018/06/">六月 2018</a><span class="archive-list-count">2</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2018/05/">五月 2018</a><span class="archive-list-count">1</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2018/04/">四月 2018</a><span class="archive-list-count">5</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2018/03/">三月 2018</a><span class="archive-list-count">5</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2018/02/">二月 2018</a><span class="archive-list-count">1</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2018/01/">一月 2018</a><span class="archive-list-count">5</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2017/12/">十二月 2017</a><span class="archive-list-count">3</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2017/10/">十月 2017</a><span class="archive-list-count">3</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2017/09/">九月 2017</a><span class="archive-list-count">2</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2017/08/">八月 2017</a><span class="archive-list-count">1</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2017/07/">七月 2017</a><span class="archive-list-count">2</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2017/05/">五月 2017</a><span class="archive-list-count">1</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2017/04/">四月 2017</a><span class="archive-list-count">2</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2017/03/">三月 2017</a><span class="archive-list-count">1</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2017/02/">二月 2017</a><span class="archive-list-count">1</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2017/01/">一月 2017</a><span class="archive-list-count">6</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2016/12/">十二月 2016</a><span class="archive-list-count">1</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2016/11/">十一月 2016</a><span class="archive-list-count">2</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2016/10/">十月 2016</a><span class="archive-list-count">4</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2016/09/">九月 2016</a><span class="archive-list-count">1</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2016/08/">八月 2016</a><span class="archive-list-count">6</span></li></span><span id=''></span><span onclick="var d=document.getElementById('list_archives2'); d.style.display===''?d.style='display:none':d.style=''">toggle...</span></ul>
     </div>
   </div>
 
@@ -1626,7 +1270,7 @@ This work is licensed under a
   <div class="widget-wrap">
     <h3 class="widget-title">標籤雲</h3>
     <div class="widget tagcloud">
-      <a href="/tags/Net-Framework/" style="font-size: 14.67px;">.Net Framework</a> <a href="/tags/API/" style="font-size: 11.33px;">API</a> <a href="/tags/AWS/" style="font-size: 13.33px;">AWS</a> <a href="/tags/Agile/" style="font-size: 17.33px;">Agile</a> <a href="/tags/CI-CD/" style="font-size: 19.33px;">CI/CD</a> <a href="/tags/Cache/" style="font-size: 10px;">Cache</a> <a href="/tags/Coding-Standard/" style="font-size: 10px;">Coding Standard</a> <a href="/tags/Container/" style="font-size: 12px;">Container</a> <a href="/tags/Database/" style="font-size: 12.67px;">Database</a> <a href="/tags/Design-Pattern/" style="font-size: 10.67px;">Design Pattern</a> <a href="/tags/Docker/" style="font-size: 12px;">Docker</a> <a href="/tags/Entity-Framework/" style="font-size: 10.67px;">Entity Framework</a> <a href="/tags/Firebase/" style="font-size: 10px;">Firebase</a> <a href="/tags/Git/" style="font-size: 10.67px;">Git</a> <a href="/tags/Golang/" style="font-size: 11.33px;">Golang</a> <a href="/tags/Google/" style="font-size: 11.33px;">Google</a> <a href="/tags/GulpJs/" style="font-size: 10.67px;">GulpJs</a> <a href="/tags/HTTP/" style="font-size: 10px;">HTTP</a> <a href="/tags/Hexo/" style="font-size: 15.33px;">Hexo</a> <a href="/tags/IIS/" style="font-size: 10px;">IIS</a> <a href="/tags/IO/" style="font-size: 10px;">IO</a> <a href="/tags/Integrated-Testing/" style="font-size: 10px;">Integrated Testing</a> <a href="/tags/Jenkins/" style="font-size: 12px;">Jenkins</a> <a href="/tags/Kubernetes/" style="font-size: 10px;">Kubernetes</a> <a href="/tags/Linux/" style="font-size: 10.67px;">Linux</a> <a href="/tags/Mongodb/" style="font-size: 10px;">Mongodb</a> <a href="/tags/MsSQL/" style="font-size: 11.33px;">MsSQL</a> <a href="/tags/MsTest/" style="font-size: 10px;">MsTest</a> <a href="/tags/Mutation-Testing/" style="font-size: 10px;">Mutation Testing</a> <a href="/tags/Nodejs/" style="font-size: 15.33px;">Nodejs</a> <a href="/tags/OAuth/" style="font-size: 10px;">OAuth</a> <a href="/tags/OOP/" style="font-size: 11.33px;">OOP</a> <a href="/tags/Openshift/" style="font-size: 10.67px;">Openshift</a> <a href="/tags/PowerShell/" style="font-size: 11.33px;">PowerShell</a> <a href="/tags/React/" style="font-size: 12px;">React</a> <a href="/tags/Redis/" style="font-size: 10.67px;">Redis</a> <a href="/tags/SQL/" style="font-size: 12px;">SQL</a> <a href="/tags/Scrum/" style="font-size: 16.67px;">Scrum</a> <a href="/tags/Shell/" style="font-size: 10.67px;">Shell</a> <a href="/tags/Specflow/" style="font-size: 10px;">Specflow</a> <a href="/tags/StyleCop/" style="font-size: 10px;">StyleCop</a> <a href="/tags/TDD/" style="font-size: 16px;">TDD</a> <a href="/tags/Testing/" style="font-size: 14px;">Testing</a> <a href="/tags/Thread/" style="font-size: 10.67px;">Thread</a> <a href="/tags/Trello/" style="font-size: 10px;">Trello</a> <a href="/tags/TypeScript/" style="font-size: 13.33px;">TypeScript</a> <a href="/tags/Unit-Testing/" style="font-size: 18.67px;">Unit Testing</a> <a href="/tags/Unix/" style="font-size: 10.67px;">Unix</a> <a href="/tags/Vim/" style="font-size: 10px;">Vim</a> <a href="/tags/Visual-Studio/" style="font-size: 10px;">Visual Studio</a> <a href="/tags/html/" style="font-size: 10px;">html</a> <a href="/tags/post/" style="font-size: 10px;">post</a> <a href="/tags/%E5%AD%B8%E7%BF%92%E7%AD%86%E8%A8%98/" style="font-size: 16.67px;">學習筆記</a> <a href="/tags/%E5%AF%A6%E4%BD%9C%E7%AD%86%E8%A8%98/" style="font-size: 20px;">實作筆記</a> <a href="/tags/%E6%99%82%E9%96%93%E7%AE%A1%E7%90%86/" style="font-size: 10.67px;">時間管理</a> <a href="/tags/%E6%B4%BB%E5%8B%95%E7%AD%86%E8%A8%98/" style="font-size: 12.67px;">活動筆記</a> <a href="/tags/%E7%94%9F%E6%B4%BB%E7%AD%86%E8%A8%98/" style="font-size: 16.67px;">生活筆記</a> <a href="/tags/%E8%A8%98%E9%8C%84/" style="font-size: 11.33px;">記錄</a> <a href="/tags/%E8%B8%A9%E9%9B%B7%E7%AD%86%E8%A8%98/" style="font-size: 16px;">踩雷筆記</a> <a href="/tags/%E9%87%8D%E6%A7%8B/" style="font-size: 12px;">重構</a> <a href="/tags/%E9%96%B1%E8%AE%80%E7%AD%86%E8%A8%98/" style="font-size: 18px;">閱讀筆記</a>
+      <a href="/tags/Net-Framework/" style="font-size: 14.67px;">.Net Framework</a> <a href="/tags/API/" style="font-size: 11.33px;">API</a> <a href="/tags/AWS/" style="font-size: 13.33px;">AWS</a> <a href="/tags/Agile/" style="font-size: 17.33px;">Agile</a> <a href="/tags/CI-CD/" style="font-size: 19.33px;">CI/CD</a> <a href="/tags/Cache/" style="font-size: 10px;">Cache</a> <a href="/tags/Coding-Standard/" style="font-size: 10px;">Coding Standard</a> <a href="/tags/Container/" style="font-size: 12px;">Container</a> <a href="/tags/Database/" style="font-size: 12.67px;">Database</a> <a href="/tags/Design-Pattern/" style="font-size: 10.67px;">Design Pattern</a> <a href="/tags/Docker/" style="font-size: 12px;">Docker</a> <a href="/tags/Entity-Framework/" style="font-size: 10.67px;">Entity Framework</a> <a href="/tags/Firebase/" style="font-size: 10px;">Firebase</a> <a href="/tags/Git/" style="font-size: 10.67px;">Git</a> <a href="/tags/Golang/" style="font-size: 11.33px;">Golang</a> <a href="/tags/Google/" style="font-size: 11.33px;">Google</a> <a href="/tags/GulpJs/" style="font-size: 10.67px;">GulpJs</a> <a href="/tags/HTTP/" style="font-size: 10px;">HTTP</a> <a href="/tags/Hexo/" style="font-size: 15.33px;">Hexo</a> <a href="/tags/IIS/" style="font-size: 10px;">IIS</a> <a href="/tags/IO/" style="font-size: 10px;">IO</a> <a href="/tags/Integrated-Testing/" style="font-size: 10px;">Integrated Testing</a> <a href="/tags/Jenkins/" style="font-size: 12px;">Jenkins</a> <a href="/tags/Kubernetes/" style="font-size: 10px;">Kubernetes</a> <a href="/tags/Linux/" style="font-size: 10.67px;">Linux</a> <a href="/tags/Mongodb/" style="font-size: 10px;">Mongodb</a> <a href="/tags/MsSQL/" style="font-size: 11.33px;">MsSQL</a> <a href="/tags/MsTest/" style="font-size: 10px;">MsTest</a> <a href="/tags/Mutation-Testing/" style="font-size: 10px;">Mutation Testing</a> <a href="/tags/Nodejs/" style="font-size: 15.33px;">Nodejs</a> <a href="/tags/OAuth/" style="font-size: 10px;">OAuth</a> <a href="/tags/OOP/" style="font-size: 11.33px;">OOP</a> <a href="/tags/Openshift/" style="font-size: 10.67px;">Openshift</a> <a href="/tags/PowerShell/" style="font-size: 11.33px;">PowerShell</a> <a href="/tags/React/" style="font-size: 12px;">React</a> <a href="/tags/Redis/" style="font-size: 10.67px;">Redis</a> <a href="/tags/SQL/" style="font-size: 12px;">SQL</a> <a href="/tags/Scrum/" style="font-size: 16.67px;">Scrum</a> <a href="/tags/Shell/" style="font-size: 10.67px;">Shell</a> <a href="/tags/Specflow/" style="font-size: 10px;">Specflow</a> <a href="/tags/StyleCop/" style="font-size: 10px;">StyleCop</a> <a href="/tags/TDD/" style="font-size: 16px;">TDD</a> <a href="/tags/Testing/" style="font-size: 14px;">Testing</a> <a href="/tags/Thread/" style="font-size: 10.67px;">Thread</a> <a href="/tags/Trello/" style="font-size: 10px;">Trello</a> <a href="/tags/TypeScript/" style="font-size: 13.33px;">TypeScript</a> <a href="/tags/Unit-Testing/" style="font-size: 18.67px;">Unit Testing</a> <a href="/tags/Unix/" style="font-size: 10.67px;">Unix</a> <a href="/tags/Vim/" style="font-size: 10px;">Vim</a> <a href="/tags/Visual-Studio/" style="font-size: 10px;">Visual Studio</a> <a href="/tags/html/" style="font-size: 10px;">html</a> <a href="/tags/post/" style="font-size: 10px;">post</a> <a href="/tags/%E5%AD%B8%E7%BF%92%E7%AD%86%E8%A8%98/" style="font-size: 17.33px;">學習筆記</a> <a href="/tags/%E5%AF%A6%E4%BD%9C%E7%AD%86%E8%A8%98/" style="font-size: 20px;">實作筆記</a> <a href="/tags/%E6%99%82%E9%96%93%E7%AE%A1%E7%90%86/" style="font-size: 10.67px;">時間管理</a> <a href="/tags/%E6%B4%BB%E5%8B%95%E7%AD%86%E8%A8%98/" style="font-size: 12.67px;">活動筆記</a> <a href="/tags/%E7%94%9F%E6%B4%BB%E7%AD%86%E8%A8%98/" style="font-size: 16.67px;">生活筆記</a> <a href="/tags/%E8%A8%98%E9%8C%84/" style="font-size: 11.33px;">記錄</a> <a href="/tags/%E8%B8%A9%E9%9B%B7%E7%AD%86%E8%A8%98/" style="font-size: 16px;">踩雷筆記</a> <a href="/tags/%E9%87%8D%E6%A7%8B/" style="font-size: 12px;">重構</a> <a href="/tags/%E9%96%B1%E8%AE%80%E7%AD%86%E8%A8%98/" style="font-size: 18px;">閱讀筆記</a>
     </div>
   </div>
 
@@ -1635,7 +1279,7 @@ This work is licensed under a
   <div class="widget-wrap">
     <h3 class="widget-title">標籤</h3>
     <div class="widget">
-      <ul class="tag-list" itemprop="keywords"><li class="tag-list-item"><a class="tag-list-link" href="/tags/Net-Framework/" rel="tag">.Net Framework</a><span class="tag-list-count">9</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/API/" rel="tag">API</a><span class="tag-list-count">3</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/AWS/" rel="tag">AWS</a><span class="tag-list-count">7</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/Agile/" rel="tag">Agile</a><span class="tag-list-count">14</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/CI-CD/" rel="tag">CI&#x2F;CD</a><span class="tag-list-count">24</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/Cache/" rel="tag">Cache</a><span class="tag-list-count">1</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/Coding-Standard/" rel="tag">Coding Standard</a><span class="tag-list-count">1</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/Container/" rel="tag">Container</a><span class="tag-list-count">4</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/Database/" rel="tag">Database</a><span class="tag-list-count">6</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/Design-Pattern/" rel="tag">Design Pattern</a><span class="tag-list-count">2</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/Docker/" rel="tag">Docker</a><span class="tag-list-count">4</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/Entity-Framework/" rel="tag">Entity Framework</a><span class="tag-list-count">2</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/Firebase/" rel="tag">Firebase</a><span class="tag-list-count">1</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/Git/" rel="tag">Git</a><span class="tag-list-count">2</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/Golang/" rel="tag">Golang</a><span class="tag-list-count">3</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/Google/" rel="tag">Google</a><span class="tag-list-count">3</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/GulpJs/" rel="tag">GulpJs</a><span class="tag-list-count">2</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/HTTP/" rel="tag">HTTP</a><span class="tag-list-count">1</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/Hexo/" rel="tag">Hexo</a><span class="tag-list-count">10</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/IIS/" rel="tag">IIS</a><span class="tag-list-count">1</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/IO/" rel="tag">IO</a><span class="tag-list-count">1</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/Integrated-Testing/" rel="tag">Integrated Testing</a><span class="tag-list-count">1</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/Jenkins/" rel="tag">Jenkins</a><span class="tag-list-count">4</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/Kubernetes/" rel="tag">Kubernetes</a><span class="tag-list-count">1</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/Linux/" rel="tag">Linux</a><span class="tag-list-count">2</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/Mongodb/" rel="tag">Mongodb</a><span class="tag-list-count">1</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/MsSQL/" rel="tag">MsSQL</a><span class="tag-list-count">3</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/MsTest/" rel="tag">MsTest</a><span class="tag-list-count">1</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/Mutation-Testing/" rel="tag">Mutation Testing</a><span class="tag-list-count">1</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/Nodejs/" rel="tag">Nodejs</a><span class="tag-list-count">10</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/OAuth/" rel="tag">OAuth</a><span class="tag-list-count">1</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/OOP/" rel="tag">OOP</a><span class="tag-list-count">3</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/Openshift/" rel="tag">Openshift</a><span class="tag-list-count">2</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/PowerShell/" rel="tag">PowerShell</a><span class="tag-list-count">3</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/React/" rel="tag">React</a><span class="tag-list-count">4</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/Redis/" rel="tag">Redis</a><span class="tag-list-count">2</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/SQL/" rel="tag">SQL</a><span class="tag-list-count">4</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/Scrum/" rel="tag">Scrum</a><span class="tag-list-count">13</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/Shell/" rel="tag">Shell</a><span class="tag-list-count">2</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/Specflow/" rel="tag">Specflow</a><span class="tag-list-count">1</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/StyleCop/" rel="tag">StyleCop</a><span class="tag-list-count">1</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/TDD/" rel="tag">TDD</a><span class="tag-list-count">11</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/Testing/" rel="tag">Testing</a><span class="tag-list-count">8</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/Thread/" rel="tag">Thread</a><span class="tag-list-count">2</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/Trello/" rel="tag">Trello</a><span class="tag-list-count">1</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/TypeScript/" rel="tag">TypeScript</a><span class="tag-list-count">7</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/Unit-Testing/" rel="tag">Unit Testing</a><span class="tag-list-count">19</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/Unix/" rel="tag">Unix</a><span class="tag-list-count">2</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/Vim/" rel="tag">Vim</a><span class="tag-list-count">1</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/Visual-Studio/" rel="tag">Visual Studio</a><span class="tag-list-count">1</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/html/" rel="tag">html</a><span class="tag-list-count">1</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/post/" rel="tag">post</a><span class="tag-list-count">1</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/%E5%AD%B8%E7%BF%92%E7%AD%86%E8%A8%98/" rel="tag">學習筆記</a><span class="tag-list-count">13</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/%E5%AF%A6%E4%BD%9C%E7%AD%86%E8%A8%98/" rel="tag">實作筆記</a><span class="tag-list-count">126</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/%E6%99%82%E9%96%93%E7%AE%A1%E7%90%86/" rel="tag">時間管理</a><span class="tag-list-count">2</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/%E6%B4%BB%E5%8B%95%E7%AD%86%E8%A8%98/" rel="tag">活動筆記</a><span class="tag-list-count">6</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/%E7%94%9F%E6%B4%BB%E7%AD%86%E8%A8%98/" rel="tag">生活筆記</a><span class="tag-list-count">13</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/%E8%A8%98%E9%8C%84/" rel="tag">記錄</a><span class="tag-list-count">3</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/%E8%B8%A9%E9%9B%B7%E7%AD%86%E8%A8%98/" rel="tag">踩雷筆記</a><span class="tag-list-count">11</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/%E9%87%8D%E6%A7%8B/" rel="tag">重構</a><span class="tag-list-count">4</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/%E9%96%B1%E8%AE%80%E7%AD%86%E8%A8%98/" rel="tag">閱讀筆記</a><span class="tag-list-count">15</span></li></ul>
+      <ul class="tag-list" itemprop="keywords"><li class="tag-list-item"><a class="tag-list-link" href="/tags/Net-Framework/" rel="tag">.Net Framework</a><span class="tag-list-count">9</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/API/" rel="tag">API</a><span class="tag-list-count">3</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/AWS/" rel="tag">AWS</a><span class="tag-list-count">7</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/Agile/" rel="tag">Agile</a><span class="tag-list-count">14</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/CI-CD/" rel="tag">CI&#x2F;CD</a><span class="tag-list-count">24</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/Cache/" rel="tag">Cache</a><span class="tag-list-count">1</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/Coding-Standard/" rel="tag">Coding Standard</a><span class="tag-list-count">1</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/Container/" rel="tag">Container</a><span class="tag-list-count">4</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/Database/" rel="tag">Database</a><span class="tag-list-count">6</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/Design-Pattern/" rel="tag">Design Pattern</a><span class="tag-list-count">2</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/Docker/" rel="tag">Docker</a><span class="tag-list-count">4</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/Entity-Framework/" rel="tag">Entity Framework</a><span class="tag-list-count">2</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/Firebase/" rel="tag">Firebase</a><span class="tag-list-count">1</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/Git/" rel="tag">Git</a><span class="tag-list-count">2</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/Golang/" rel="tag">Golang</a><span class="tag-list-count">3</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/Google/" rel="tag">Google</a><span class="tag-list-count">3</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/GulpJs/" rel="tag">GulpJs</a><span class="tag-list-count">2</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/HTTP/" rel="tag">HTTP</a><span class="tag-list-count">1</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/Hexo/" rel="tag">Hexo</a><span class="tag-list-count">10</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/IIS/" rel="tag">IIS</a><span class="tag-list-count">1</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/IO/" rel="tag">IO</a><span class="tag-list-count">1</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/Integrated-Testing/" rel="tag">Integrated Testing</a><span class="tag-list-count">1</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/Jenkins/" rel="tag">Jenkins</a><span class="tag-list-count">4</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/Kubernetes/" rel="tag">Kubernetes</a><span class="tag-list-count">1</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/Linux/" rel="tag">Linux</a><span class="tag-list-count">2</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/Mongodb/" rel="tag">Mongodb</a><span class="tag-list-count">1</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/MsSQL/" rel="tag">MsSQL</a><span class="tag-list-count">3</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/MsTest/" rel="tag">MsTest</a><span class="tag-list-count">1</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/Mutation-Testing/" rel="tag">Mutation Testing</a><span class="tag-list-count">1</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/Nodejs/" rel="tag">Nodejs</a><span class="tag-list-count">10</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/OAuth/" rel="tag">OAuth</a><span class="tag-list-count">1</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/OOP/" rel="tag">OOP</a><span class="tag-list-count">3</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/Openshift/" rel="tag">Openshift</a><span class="tag-list-count">2</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/PowerShell/" rel="tag">PowerShell</a><span class="tag-list-count">3</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/React/" rel="tag">React</a><span class="tag-list-count">4</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/Redis/" rel="tag">Redis</a><span class="tag-list-count">2</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/SQL/" rel="tag">SQL</a><span class="tag-list-count">4</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/Scrum/" rel="tag">Scrum</a><span class="tag-list-count">13</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/Shell/" rel="tag">Shell</a><span class="tag-list-count">2</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/Specflow/" rel="tag">Specflow</a><span class="tag-list-count">1</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/StyleCop/" rel="tag">StyleCop</a><span class="tag-list-count">1</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/TDD/" rel="tag">TDD</a><span class="tag-list-count">11</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/Testing/" rel="tag">Testing</a><span class="tag-list-count">8</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/Thread/" rel="tag">Thread</a><span class="tag-list-count">2</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/Trello/" rel="tag">Trello</a><span class="tag-list-count">1</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/TypeScript/" rel="tag">TypeScript</a><span class="tag-list-count">7</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/Unit-Testing/" rel="tag">Unit Testing</a><span class="tag-list-count">19</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/Unix/" rel="tag">Unix</a><span class="tag-list-count">2</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/Vim/" rel="tag">Vim</a><span class="tag-list-count">1</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/Visual-Studio/" rel="tag">Visual Studio</a><span class="tag-list-count">1</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/html/" rel="tag">html</a><span class="tag-list-count">1</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/post/" rel="tag">post</a><span class="tag-list-count">1</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/%E5%AD%B8%E7%BF%92%E7%AD%86%E8%A8%98/" rel="tag">學習筆記</a><span class="tag-list-count">14</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/%E5%AF%A6%E4%BD%9C%E7%AD%86%E8%A8%98/" rel="tag">實作筆記</a><span class="tag-list-count">126</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/%E6%99%82%E9%96%93%E7%AE%A1%E7%90%86/" rel="tag">時間管理</a><span class="tag-list-count">2</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/%E6%B4%BB%E5%8B%95%E7%AD%86%E8%A8%98/" rel="tag">活動筆記</a><span class="tag-list-count">6</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/%E7%94%9F%E6%B4%BB%E7%AD%86%E8%A8%98/" rel="tag">生活筆記</a><span class="tag-list-count">13</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/%E8%A8%98%E9%8C%84/" rel="tag">記錄</a><span class="tag-list-count">3</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/%E8%B8%A9%E9%9B%B7%E7%AD%86%E8%A8%98/" rel="tag">踩雷筆記</a><span class="tag-list-count">11</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/%E9%87%8D%E6%A7%8B/" rel="tag">重構</a><span class="tag-list-count">4</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/%E9%96%B1%E8%AE%80%E7%AD%86%E8%A8%98/" rel="tag">閱讀筆記</a><span class="tag-list-count">15</span></li></ul>
     </div>
   </div>
 
@@ -1697,12 +1341,20 @@ This work is licensed under a
 <script src="/js/script.js?v=0.js"></script>
 
 <div id="likecoin">
-  <script type="text/javascript">
-    document.write(
-      "<iframe scrolling='no' frameborder='0' sandbox='allow-scripts allow-same-origin allow-popups allow-popups-to-escape-sandbox allow-storage-access-by-user-activation' style='height: 212px; width: 100%;' src='https://button.like.co/in/embed/marsenlin/button?referrer=" +
-      encodeURIComponent(location.href.split("?")[0].split("#")[0]) + "'></iframe>");
-  </script>
+Please enable JavaScript to view the LikeCoin. :P
 </div>
+<script>
+
+  (function(){
+    var ifrm = document.createElement("iframe");
+    ifrm.setAttribute("src", "https://button.like.co/in/embed/marsenlin/button?referrer=undefined");      
+    ifrm.setAttribute("sandbox","allow-scripts allow-same-origin allow-popups allow-popups-to-escape-sandbox");
+    ifrm.frameborder = "0";
+    ifrm.scrolling = "no";
+    (document.getElementById("likecoin").replaceChild(ifrm, document.getElementById("likecoin").childNodes[0]));
+  })();
+
+</script>
 <script>
 
   var disqus_shortname = 'marsenlin';
