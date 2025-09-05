@@ -1,0 +1,470 @@
+<!DOCTYPE html>
+<html>
+<head>
+  
+<!-- Google Tag Manager -->
+<script>(function(w,d,s,l,i){w[l]=w[l]||[];w[l].push({'gtm.start':
+new Date().getTime(),event:'gtm.js'});var f=d.getElementsByTagName(s)[0],
+j=d.createElement(s),dl=l!='dataLayer'?'&l='+l:'';j.async=true;j.src=
+'https://www.googletagmanager.com/gtm.js?id='+i+dl;f.parentNode.insertBefore(j,f);
+})(window,document,'script','dataLayer','GTM-NTDGNJZ');</script>
+<!-- End Google Tag Manager -->
+
+  
+<!-- Google Analytics -->
+<!-- Global site tag (gtag.js) - Google Analytics -->
+<script async src="https://www.googletagmanager.com/gtag/js?id=G-RF47NNRE5G"></script>
+<script>
+  window.dataLayer = window.dataLayer || [];
+  function gtag(){dataLayer.push(arguments);}
+  gtag('js', new Date());
+
+  gtag('config', 'G-RF47NNRE5G');
+</script>
+<!-- End Google Analytics -->
+
+  
+<!-- Google AdSense -->
+<script async src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-1885096025224905"
+     crossorigin="anonymous"></script>
+<!-- End Google AdSense -->
+
+
+
+  <meta charset="utf-8">
+  
+  <title> [實作筆記] PaddleOCR ONNX 模型發布到 Hugging Face Hub | Marsen&#39;s Blog</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
+  <meta name="description" content="前情提要專案需要使用 PaddleOCR 進行文字辨識，但原始模型檔案需要從 PaddlePaddle 框架轉換成 ONNX 格式才能在不同環境中使用。 轉換完成後，面臨一個選擇：這些模型檔案要怎麼發布？放在專案內部？還是公開分享？ 經過一番討論，決定將轉換後的 ONNX 模型公開發布到 Hugging Face Hub，一方面解決內部使用需求，另一方面也讓社群受益。 這篇記錄整個發布流程的實作過">
+<meta property="og:type" content="article">
+<meta property="og:title" content=" [實作筆記] PaddleOCR ONNX 模型發布到 Hugging Face Hub">
+<meta property="og:url" content="https://blog.marsen.me/2025/09/05/2025/ai-hf-open-model-upload/index.html">
+<meta property="og:site_name" content="Marsen&#39;s Blog">
+<meta property="og:description" content="前情提要專案需要使用 PaddleOCR 進行文字辨識，但原始模型檔案需要從 PaddlePaddle 框架轉換成 ONNX 格式才能在不同環境中使用。 轉換完成後，面臨一個選擇：這些模型檔案要怎麼發布？放在專案內部？還是公開分享？ 經過一番討論，決定將轉換後的 ONNX 模型公開發布到 Hugging Face Hub，一方面解決內部使用需求，另一方面也讓社群受益。 這篇記錄整個發布流程的實作過">
+<meta property="og:locale" content="zh_TW">
+<meta property="article:published_time" content="2025-09-05T09:43:51.000Z">
+<meta property="article:modified_time" content="2025-09-05T10:15:12.363Z">
+<meta property="article:author" content="Marsen L.">
+<meta property="article:tag" content="實作筆記">
+<meta name="twitter:card" content="summary">
+  
+    <link rel="alternate" href="/atom.xml" title="Marsen&#39;s Blog" type="application/atom+xml">
+  
+  
+    <link rel="icon" href="/favicon.ico">
+  
+      
+    <link rel="preconnect" href="https://fonts.gstatic.com">
+    <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@300&display=swap" rel="stylesheet">
+  
+  
+<link rel="stylesheet" href="/css/style.css">
+
+  <meta property ="og:image" content="https://avatars1.githubusercontent.com/u/4269720?s=460&v=4" /> 
+<meta name="generator" content="Hexo 7.3.0"></head>
+
+<body>
+  <div id="container">
+    <div id="wrap">
+      <header id="header">
+  <div id="blog-banner"></div>
+  <div id="header-outer" class="outer">
+    <div id="header-title" class="inner">
+      <h1 id="logo-wrap">
+        <a href="/" id="logo">Marsen&#39;s Blog</a>
+      </h1>
+      
+        <h2 id="subtitle-wrap">
+          <a href="/" id="subtitle"></a>
+          <div>
+          <span style="width: 20px; height: 10px; background: linear-gradient(to bottom, #005BBB 50%, #FFD700 50%); text-align: center; color: white; font-size: 6px; font-weight: bold; line-height: 100px;">
+            #StandWithUkraine
+          </span>
+          </div>
+        </h2>
+      
+    </div>
+    <div id="header-inner" class="inner">
+      <nav id="main-nav">
+        <a id="main-nav-toggle" class="nav-icon"></a>
+        
+          <a class="main-nav-link" href="/">Home</a>
+        
+          <a class="main-nav-link" href="/archives">Archives</a>
+        
+      </nav>
+      <nav id="sub-nav">
+        
+          <a id="nav-rss-link" class="nav-icon" href="/atom.xml" title="RSS Feed"></a>
+        
+        <a id="nav-search-btn" class="nav-icon" title="搜尋"></a>
+      </nav>
+      <div id="search-form-wrap">
+        <form action="//google.com/search" method="get" accept-charset="UTF-8" class="search-form"><input type="search" name="q" class="search-form-input" placeholder="Search"><button type="submit" class="search-form-submit">&#xF002;</button><input type="hidden" name="sitesearch" value="https://blog.marsen.me"></form>
+      </div>
+    </div>
+  </div>
+</header>
+      <div class="outer">
+        <section id="main"><article id="post-2025/ai-hf-open-model-upload" class="article article-type-post" itemscope itemprop="blogPost">
+  <div class="article-meta">
+    <a href="/2025/09/05/2025/ai-hf-open-model-upload/" class="article-date">
+  <time datetime="2025-09-05T09:43:51.000Z" itemprop="datePublished">2025-09-05</time>
+</a>
+    
+  </div>
+  <div class="article-inner">
+    
+    
+      <header class="article-header">
+        
+  
+    <h1 class="article-title" itemprop="name">
+       [實作筆記] PaddleOCR ONNX 模型發布到 Hugging Face Hub
+    </h1>
+  
+
+      </header>
+    
+    <div class="article-entry" itemprop="articleBody">
+      
+        <h2 id="前情提要"><a href="#前情提要" class="headerlink" title="前情提要"></a>前情提要</h2><p>專案需要使用 PaddleOCR 進行文字辨識，但原始模型檔案需要從 PaddlePaddle 框架轉換成 ONNX 格式才能在不同環境中使用。</p>
+<p>轉換完成後，面臨一個選擇：這些模型檔案要怎麼發布？放在專案內部？還是公開分享？</p>
+<p>經過一番討論，決定將轉換後的 ONNX 模型公開發布到 Hugging Face Hub，一方面解決內部使用需求，另一方面也讓社群受益。</p>
+<p>這篇記錄整個發布流程的實作過程與踩雷經驗。</p>
+<h2 id="目標"><a href="#目標" class="headerlink" title="目標"></a>目標</h2><ul>
+<li>將 5 個 PaddleOCR ONNX 模型檔案 (208MB) 發布到 Hugging Face</li>
+<li>建立完整的使用文檔與授權聲明  </li>
+<li>提供簡單的下載方式給其他開發者</li>
+<li>確保版權合規 (原始模型為 Apache 2.0 授權)</li>
+</ul>
+<h2 id="模型檔案清單"><a href="#模型檔案清單" class="headerlink" title="模型檔案清單"></a>模型檔案清單</h2><p>轉換完成的檔案包含：</p>
+<ul>
+<li><code>PP-OCRv5_server_det_infer.onnx</code> (84MB) - 文字檢測</li>
+<li><code>PP-OCRv5_server_rec_infer.onnx</code> (81MB) - 文字識別  </li>
+<li><code>UVDoc_infer.onnx</code> (30MB) - 文檔矯正</li>
+<li><code>PP-LCNet_x1_0_doc_ori_infer.onnx</code> (6.5MB) - 文檔方向</li>
+<li><code>PP-LCNet_x1_0_textline_ori_infer.onnx</code> (6.5MB) - 文字方向</li>
+<li><code>PP-OCRv5_server_rec_infer.yml</code> (145KB) - 配置檔案</li>
+</ul>
+<h2 id="平台選擇：為什麼是-Hugging-Face？"><a href="#平台選擇：為什麼是-Hugging-Face？" class="headerlink" title="平台選擇：為什麼是 Hugging Face？"></a>平台選擇：為什麼是 Hugging Face？</h2><p>本來考慮幾個選項：</p>
+<ul>
+<li><strong>GitLab</strong>：現有平台，整合容易</li>
+<li><strong>GitHub</strong>：開發者友好，但大檔案處理麻煩  </li>
+<li><strong>Hugging Face</strong>：AI 模型專業平台</li>
+</ul>
+<p>最終選擇 Hugging Face 的原因：</p>
+<ul>
+<li>✅ 完全免費，50GB 額度綽綽有餘</li>
+<li>✅ 原生支援 ONNX 格式</li>
+<li>✅ 內建 Git LFS，大檔案處理無痛</li>
+<li>✅ 全球 CDN，下載速度快</li>
+<li>✅ 社群友好，可能吸引貢獻者</li>
+</ul>
+<h2 id="實作過程"><a href="#實作過程" class="headerlink" title="實作過程"></a>實作過程</h2><h3 id="Phase-1-準備階段"><a href="#Phase-1-準備階段" class="headerlink" title="Phase 1: 準備階段"></a>Phase 1: 準備階段</h3><p>首先建立 Hugging Face 帳號並設定環境：</p>
+<figure class="highlight bash"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment"># 安裝 HF CLI</span></span><br><span class="line">uv add huggingface_hub</span><br><span class="line"></span><br><span class="line"><span class="comment"># 設定 Token (需要 Write 權限)</span></span><br><span class="line"><span class="built_in">export</span> HF_TOKEN=<span class="string">&quot;your_token_here&quot;</span></span><br></pre></td></tr></table></figure>
+
+<p>建立模型 Repository：</p>
+<figure class="highlight python"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">from</span> huggingface_hub <span class="keyword">import</span> create_repo, whoami</span><br><span class="line"></span><br><span class="line"><span class="comment"># 驗證登入</span></span><br><span class="line">user = whoami()</span><br><span class="line"><span class="built_in">print</span>(<span class="string">f&quot;登入用戶: <span class="subst">&#123;user[<span class="string">&#x27;name&#x27;</span>]&#125;</span>&quot;</span>)</span><br><span class="line"></span><br><span class="line"><span class="comment"># 建立 repository  </span></span><br><span class="line">repo_url = create_repo(</span><br><span class="line">    repo_id=<span class="string">&quot;paddleocr-test&quot;</span>,</span><br><span class="line">    repo_type=<span class="string">&quot;model&quot;</span>,</span><br><span class="line">    private=<span class="literal">False</span></span><br><span class="line">)</span><br><span class="line"><span class="built_in">print</span>(<span class="string">f&quot;Repository 建立成功: <span class="subst">&#123;repo_url&#125;</span>&quot;</span>)</span><br></pre></td></tr></table></figure>
+
+<h3 id="Phase-2-上傳模型檔案"><a href="#Phase-2-上傳模型檔案" class="headerlink" title="Phase 2: 上傳模型檔案"></a>Phase 2: 上傳模型檔案</h3><figure class="highlight bash"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br></pre></td><td class="code"><pre><span class="line"><span class="built_in">export</span> HF_TOKEN=your_token</span><br><span class="line">hf upload marsena/paddleocr-test ./model_cache/paddleocr_onnx/ --repo-type=model</span><br></pre></td></tr></table></figure>
+
+<p>實際上傳時間約 3 分鐘，比預期快很多。</p>
+<h3 id="Phase-3-撰寫文檔"><a href="#Phase-3-撰寫文檔" class="headerlink" title="Phase 3: 撰寫文檔"></a>Phase 3: 撰寫文檔</h3><p>Hugging Face 的 README.md 比一般 GitHub 專案更重要，因為它就是模型的門面。</p>
+<p>撰寫重點：</p>
+<ol>
+<li><strong>清晰的模型說明</strong>：每個檔案的用途</li>
+<li><strong>具體的使用範例</strong>：Python 程式碼示範</li>
+<li><strong>完整的授權聲明</strong>：避免版權爭議</li>
+<li><strong>技術細節</strong>：系統需求、相容性</li>
+</ol>
+<figure class="highlight markdown"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br></pre></td><td class="code"><pre><span class="line"><span class="section"># PaddleOCR ONNX Models</span></span><br><span class="line"></span><br><span class="line">本倉庫提供 PaddleOCR v5 的 ONNX 格式模型檔案...</span><br><span class="line"></span><br><span class="line"><span class="section">## 快速開始</span></span><br><span class="line"></span><br><span class="line"><span class="code">```python</span></span><br><span class="line"><span class="code">from huggingface_hub import hf_hub_download</span></span><br><span class="line"><span class="code"></span></span><br><span class="line"><span class="code"># 下載檢測模型</span></span><br><span class="line"><span class="code">det_model = hf_hub_download(</span></span><br><span class="line"><span class="code">    repo_id=&quot;marsena/paddleocr-test&quot;,</span></span><br><span class="line"><span class="code">    filename=&quot;PP-OCRv5_server_det_infer.onnx&quot;</span></span><br><span class="line"><span class="code">)</span></span><br></pre></td></tr></table></figure>
+
+<p>需要注意 YAML metadata 的格式問題，HF 會檢查語法：</p>
+<figure class="highlight yaml"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br></pre></td><td class="code"><pre><span class="line"><span class="meta">---</span></span><br><span class="line"><span class="attr">tags:</span></span><br><span class="line"><span class="bullet">-</span> <span class="string">onnx</span></span><br><span class="line"><span class="bullet">-</span> <span class="string">ocr</span>  </span><br><span class="line"><span class="bullet">-</span> <span class="string">paddleocr</span></span><br><span class="line"><span class="bullet">-</span> <span class="string">computer-vision</span></span><br><span class="line"><span class="attr">license:</span> <span class="string">apache-2.0</span></span><br><span class="line"><span class="meta">---</span></span><br></pre></td></tr></table></figure>
+
+<h3 id="Phase-4-測試驗證"><a href="#Phase-4-測試驗證" class="headerlink" title="Phase 4: 測試驗證"></a>Phase 4: 測試驗證</h3><p>上傳完成後務必測試下載功能：</p>
+<figure class="highlight bash"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment"># 測試單檔下載</span></span><br><span class="line">hf download marsena/paddleocr-test PP-OCRv5_server_det_infer.onnx</span><br><span class="line"></span><br><span class="line"><span class="comment"># 測試整包下載</span></span><br><span class="line">hf download marsena/paddleocr-test --local-dir ./test_download \</span><br><span class="line">  --exclude <span class="string">&quot;README.md&quot;</span> --exclude <span class="string">&quot;.gitattributes&quot;</span></span><br></pre></td></tr></table></figure>
+
+<h2 id="一些要注意的小問題"><a href="#一些要注意的小問題" class="headerlink" title="一些要注意的小問題"></a>一些要注意的小問題</h2><h3 id="HF-Token-權限設定"><a href="#HF-Token-權限設定" class="headerlink" title="HF Token 權限設定"></a>HF Token 權限設定</h3><ul>
+<li><strong>Read</strong>：只能下載</li>
+<li><strong>Write</strong>：可以上傳模型  </li>
+<li><strong>Admin</strong>：可以刪除 repo</li>
+</ul>
+<p>建立 token 時記得選擇 <strong>Write</strong> 權限。</p>
+<h3 id="Git-LFS-檔案大小限制"><a href="#Git-LFS-檔案大小限制" class="headerlink" title="Git LFS 檔案大小限制"></a>Git LFS 檔案大小限制</h3><p>Hugging Face 對單檔大小有限制：</p>
+<ul>
+<li>一般檔案：&lt; 10MB</li>
+<li>LFS 檔案：&lt; 50GB</li>
+</ul>
+<p>我們的最大檔案 84MB，自動走 LFS 沒問題。</p>
+<h3 id="背景上傳的重要性"><a href="#背景上傳的重要性" class="headerlink" title="背景上傳的重要性"></a>背景上傳的重要性</h3><p>大檔案上傳可能需要 10-30 分鐘，SSH 連線容易斷開。務必使用 <code>nohup</code> 或 <code>screen</code>。</p>
+<h3 id="README-的-YAML-語法檢查"><a href="#README-的-YAML-語法檢查" class="headerlink" title="README 的 YAML 語法檢查"></a>README 的 YAML 語法檢查</h3><p>Hugging Face 會檢查 YAML metadata 語法，格式錯誤會有警告（但不影響功能）。</p>
+<h2 id="使用方式"><a href="#使用方式" class="headerlink" title="使用方式"></a>使用方式</h2><p>發布完成後，其他開發者可以這樣使用：</p>
+<figure class="highlight bash"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment"># 下載所有模型到專案目錄</span></span><br><span class="line">hf download marsena/paddleocr-test \</span><br><span class="line">  --local-dir ./model_cache/paddleocr_onnx \</span><br><span class="line">  --exclude <span class="string">&quot;README.md&quot;</span> \</span><br><span class="line">  --exclude <span class="string">&quot;.gitattributes&quot;</span></span><br></pre></td></tr></table></figure>
+
+<p>或在 Python 中：</p>
+<figure class="highlight python"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">from</span> huggingface_hub <span class="keyword">import</span> hf_hub_download</span><br><span class="line"><span class="keyword">import</span> os</span><br><span class="line"></span><br><span class="line">model_files = [</span><br><span class="line">    <span class="string">&quot;PP-OCRv5_server_det_infer.onnx&quot;</span>,</span><br><span class="line">    <span class="string">&quot;PP-OCRv5_server_rec_infer.onnx&quot;</span>, </span><br><span class="line">    <span class="string">&quot;UVDoc_infer.onnx&quot;</span>,</span><br><span class="line">    <span class="string">&quot;PP-LCNet_x1_0_doc_ori_infer.onnx&quot;</span>,</span><br><span class="line">    <span class="string">&quot;PP-LCNet_x1_0_textline_ori_infer.onnx&quot;</span>,</span><br><span class="line">    <span class="string">&quot;PP-OCRv5_server_rec_infer.yml&quot;</span></span><br><span class="line">]</span><br><span class="line"></span><br><span class="line">cache_dir = <span class="string">&quot;model_cache/paddleocr_onnx&quot;</span></span><br><span class="line">os.makedirs(cache_dir, exist_ok=<span class="literal">True</span>)</span><br><span class="line"></span><br><span class="line"><span class="keyword">for</span> file <span class="keyword">in</span> model_files:</span><br><span class="line">    hf_hub_download(</span><br><span class="line">        repo_id=<span class="string">&quot;marsena/paddleocr-test&quot;</span>,</span><br><span class="line">        filename=file,</span><br><span class="line">        local_dir=cache_dir</span><br><span class="line">    )</span><br></pre></td></tr></table></figure>
+
+<h2 id="小結"><a href="#小結" class="headerlink" title="小結"></a>小結</h2><p>整個發布流程花費約 5-8 小時：</p>
+<ul>
+<li><strong>準備和上傳</strong>：2 小時</li>
+<li><strong>文檔撰寫</strong>：3 小時  </li>
+<li><strong>系統整合</strong>：2 小時</li>
+<li><strong>測試驗證</strong>：1 小時</li>
+</ul>
+<p>Hugging Face Hub 確實是發布 AI 模型的好選擇，特別是：</p>
+<ol>
+<li><strong>無痛 LFS</strong>：大檔案處理完全自動化</li>
+<li><strong>全球加速</strong>：下載速度比自建服務快</li>
+<li><strong>社群生態</strong>：容易被發現和使用</li>
+<li><strong>版本控制</strong>：Git-based，開發者熟悉</li>
+</ol>
+<p>如果你也有 ONNX 模型需要分享，不妨考慮 Hugging Face Hub。畢竟專業的事交給專業的平台來做，我們專注在模型本身就好。</p>
+<h2 id="參考連結"><a href="#參考連結" class="headerlink" title="參考連結"></a>參考連結</h2><ul>
+<li><a target="_blank" rel="noopener" href="https://huggingface.co/marsena/paddleocr-test">發布的模型</a></li>
+<li><a target="_blank" rel="noopener" href="https://huggingface.co/docs">Hugging Face 文檔</a></li>
+<li><a target="_blank" rel="noopener" href="https://github.com/PaddlePaddle/PaddleOCR">PaddleOCR 原始專案</a></li>
+</ul>
+<p>(fin)</p>
+
+      
+    </div>
+    <footer class="article-footer">
+      <a data-url="https://blog.marsen.me/2025/09/05/2025/ai-hf-open-model-upload/" data-id="cmf6oj1wq00he2soa8cwkdpuj" class="article-share-link">Share</a>
+      
+        <a href="https://blog.marsen.me/2025/09/05/2025/ai-hf-open-model-upload/#disqus_thread" class="article-comment-link">留言</a>
+      
+      
+  <ul class="article-tag-list" itemprop="keywords"><li class="article-tag-list-item"><a class="article-tag-list-link" href="/tags/%E5%AF%A6%E4%BD%9C%E7%AD%86%E8%A8%98/" rel="tag">實作筆記</a></li></ul>
+
+    </footer>
+  </div>
+  
+    
+<nav id="article-nav">
+  
+  
+    <a href="/2025/09/02/2025/gitlab-python-package-registry/" id="article-nav-older" class="article-nav-link-wrap">
+      <strong class="article-nav-caption">Older</strong>
+      <div class="article-nav-title"> [實作筆記] 建立私有 Python Package Registry - 以 ONNX Runtime 為例</div>
+    </a>
+  
+</nav>
+
+  
+</article>
+
+
+<section id="comments">
+  
+    <div id="gitalk-container" >
+  Please enable JavaScript to view the Gitalk. :D
+</div>
+<link rel="stylesheet" href="https://unpkg.com/gitalk/dist/gitalk.css">
+<script src="https://unpkg.com/gitalk/dist/gitalk.min.js"></script>  
+<script src="https://cdnjs.cloudflare.com/ajax/libs/blueimp-md5/2.18.0/js/md5.min.js"></script>
+<script>
+  (function(){
+    const gitalk = new Gitalk({
+      'clientID': '386c8c11178846ff9a31',
+      'clientSecret': '969a7543f3dc518b9e540d1e335df2fcb9c2df57',
+      'repo': 'marsen.github.io',
+      'owner': 'marsen',
+      'admin': ['marsen'],
+      'id': md5(location.pathname),      // Ensure uniqueness and length less than 50( use md5)
+      'distractionFreeMode': false  // Facebook-like distraction free mode
+    })
+
+    gitalk.render('gitalk-container')
+  })();
+</script>
+
+  
+  
+    <div id="likecoin">
+Please enable JavaScript to view the LikeCoin. :P
+</div>
+<script>
+
+  (function(){
+    var ifrm = document.createElement("iframe");
+    ifrm.setAttribute("src", "https://button.like.co/in/embed/marsenlin/button?referrer=https%3A%2F%2Fblog.marsen.me%2F2025%2F09%2F05%2F2025%2Fai-hf-open-model-upload%2F");      
+    ifrm.setAttribute("sandbox","allow-scripts allow-same-origin allow-popups allow-popups-to-escape-sandbox");
+    ifrm.frameborder = "0";
+    ifrm.scrolling = "no";
+    (document.getElementById("likecoin").replaceChild(ifrm, document.getElementById("likecoin").childNodes[0]));
+  })();
+
+</script>
+  
+  <div id="disqus_thread">
+    <noscript>Please enable JavaScript to view the <a target="_blank" rel="noopener" href="//disqus.com/?ref_noscript">comments powered by Disqus.</a></noscript>
+  </div>
+</section>
+</section>
+        
+          <aside id="sidebar">
+  
+    
+  <div class="widget-wrap">
+    <h3 class="widget-title">最新文章</h3>
+    <div class="widget">
+      <ul>
+        
+          <li>
+            <a href="/2025/09/05/2025/ai-hf-open-model-upload/"> [實作筆記] PaddleOCR ONNX 模型發布到 Hugging Face Hub</a>
+          </li>
+        
+          <li>
+            <a href="/2025/09/02/2025/gitlab-python-package-registry/"> [實作筆記] 建立私有 Python Package Registry - 以 ONNX Runtime 為例</a>
+          </li>
+        
+          <li>
+            <a href="/2025/08/27/2025/brevo_smtp/"> [實作筆記] 怎麼建立一個網站？(四) - 自訂網域 EMail 收寄信(使用 Cloudflare 與 Brevo)</a>
+          </li>
+        
+          <li>
+            <a href="/2025/08/12/2025/backend-architecture-layer-design-principles/"> [架構筆記] Clean Architecture 分層職責的反思</a>
+          </li>
+        
+          <li>
+            <a href="/2025/08/07/2025/race-condition-in-file-storage/"> [學習筆記] Node.js 檔案操作 mkdir 的正確姿勢</a>
+          </li>
+        
+      </ul>
+    </div>
+  </div>
+
+  
+    
+  <div class="widget-wrap">
+    <h3 class="widget-title">彙整</h3>
+    <div class="widget">
+      <ul class="archive-list"><li class="archive-list-item"><a class="archive-list-link" href="/archives/2025/09/">九月 2025</a><span class="archive-list-count">2</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2025/08/">八月 2025</a><span class="archive-list-count">3</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2025/07/">七月 2025</a><span class="archive-list-count">4</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2025/06/">六月 2025</a><span class="archive-list-count">4</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2025/05/">五月 2025</a><span class="archive-list-count">5</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2025/04/">四月 2025</a><span class="archive-list-count">1</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2025/03/">三月 2025</a><span class="archive-list-count">2</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2025/02/">二月 2025</a><span class="archive-list-count">4</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2025/01/">一月 2025</a><span class="archive-list-count">3</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2024/12/">十二月 2024</a><span class="archive-list-count">3</span></li><span id='list_archives2' style='display:none'><li class="archive-list-item"><a class="archive-list-link" href="/archives/2024/11/">十一月 2024</a><span class="archive-list-count">3</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2024/10/">十月 2024</a><span class="archive-list-count">4</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2024/09/">九月 2024</a><span class="archive-list-count">5</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2024/08/">八月 2024</a><span class="archive-list-count">4</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2024/07/">七月 2024</a><span class="archive-list-count">3</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2024/06/">六月 2024</a><span class="archive-list-count">2</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2024/05/">五月 2024</a><span class="archive-list-count">1</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2024/04/">四月 2024</a><span class="archive-list-count">2</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2024/03/">三月 2024</a><span class="archive-list-count">3</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2024/02/">二月 2024</a><span class="archive-list-count">2</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2024/01/">一月 2024</a><span class="archive-list-count">4</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2023/12/">十二月 2023</a><span class="archive-list-count">2</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2023/11/">十一月 2023</a><span class="archive-list-count">3</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2023/10/">十月 2023</a><span class="archive-list-count">2</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2023/09/">九月 2023</a><span class="archive-list-count">3</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2023/08/">八月 2023</a><span class="archive-list-count">2</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2023/07/">七月 2023</a><span class="archive-list-count">6</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2023/06/">六月 2023</a><span class="archive-list-count">6</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2023/05/">五月 2023</a><span class="archive-list-count">1</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2023/04/">四月 2023</a><span class="archive-list-count">9</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2023/03/">三月 2023</a><span class="archive-list-count">4</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2023/02/">二月 2023</a><span class="archive-list-count">2</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2023/01/">一月 2023</a><span class="archive-list-count">2</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2022/12/">十二月 2022</a><span class="archive-list-count">1</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2022/10/">十月 2022</a><span class="archive-list-count">2</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2022/09/">九月 2022</a><span class="archive-list-count">6</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2022/08/">八月 2022</a><span class="archive-list-count">3</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2022/07/">七月 2022</a><span class="archive-list-count">2</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2022/06/">六月 2022</a><span class="archive-list-count">3</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2022/05/">五月 2022</a><span class="archive-list-count">7</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2022/04/">四月 2022</a><span class="archive-list-count">3</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2022/03/">三月 2022</a><span class="archive-list-count">3</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2022/02/">二月 2022</a><span class="archive-list-count">2</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2022/01/">一月 2022</a><span class="archive-list-count">3</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2021/12/">十二月 2021</a><span class="archive-list-count">2</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2021/11/">十一月 2021</a><span class="archive-list-count">2</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2021/10/">十月 2021</a><span class="archive-list-count">2</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2021/09/">九月 2021</a><span class="archive-list-count">1</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2021/08/">八月 2021</a><span class="archive-list-count">2</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2021/07/">七月 2021</a><span class="archive-list-count">4</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2021/06/">六月 2021</a><span class="archive-list-count">1</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2021/05/">五月 2021</a><span class="archive-list-count">2</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2021/04/">四月 2021</a><span class="archive-list-count">3</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2021/03/">三月 2021</a><span class="archive-list-count">3</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2021/02/">二月 2021</a><span class="archive-list-count">1</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2021/01/">一月 2021</a><span class="archive-list-count">7</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2020/12/">十二月 2020</a><span class="archive-list-count">1</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2020/11/">十一月 2020</a><span class="archive-list-count">2</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2020/10/">十月 2020</a><span class="archive-list-count">5</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2020/09/">九月 2020</a><span class="archive-list-count">5</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2020/08/">八月 2020</a><span class="archive-list-count">2</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2020/07/">七月 2020</a><span class="archive-list-count">3</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2020/06/">六月 2020</a><span class="archive-list-count">3</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2020/05/">五月 2020</a><span class="archive-list-count">3</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2020/04/">四月 2020</a><span class="archive-list-count">4</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2020/03/">三月 2020</a><span class="archive-list-count">1</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2020/02/">二月 2020</a><span class="archive-list-count">1</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2020/01/">一月 2020</a><span class="archive-list-count">5</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2019/12/">十二月 2019</a><span class="archive-list-count">1</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2019/11/">十一月 2019</a><span class="archive-list-count">2</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2019/10/">十月 2019</a><span class="archive-list-count">1</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2019/09/">九月 2019</a><span class="archive-list-count">2</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2019/08/">八月 2019</a><span class="archive-list-count">5</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2019/07/">七月 2019</a><span class="archive-list-count">1</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2019/06/">六月 2019</a><span class="archive-list-count">1</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2019/05/">五月 2019</a><span class="archive-list-count">2</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2019/04/">四月 2019</a><span class="archive-list-count">3</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2019/03/">三月 2019</a><span class="archive-list-count">1</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2019/02/">二月 2019</a><span class="archive-list-count">2</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2019/01/">一月 2019</a><span class="archive-list-count">4</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2018/12/">十二月 2018</a><span class="archive-list-count">5</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2018/11/">十一月 2018</a><span class="archive-list-count">7</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2018/10/">十月 2018</a><span class="archive-list-count">6</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2018/09/">九月 2018</a><span class="archive-list-count">3</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2018/08/">八月 2018</a><span class="archive-list-count">2</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2018/07/">七月 2018</a><span class="archive-list-count">6</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2018/06/">六月 2018</a><span class="archive-list-count">2</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2018/05/">五月 2018</a><span class="archive-list-count">1</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2018/04/">四月 2018</a><span class="archive-list-count">5</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2018/03/">三月 2018</a><span class="archive-list-count">5</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2018/02/">二月 2018</a><span class="archive-list-count">1</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2018/01/">一月 2018</a><span class="archive-list-count">5</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2017/12/">十二月 2017</a><span class="archive-list-count">3</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2017/10/">十月 2017</a><span class="archive-list-count">3</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2017/09/">九月 2017</a><span class="archive-list-count">2</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2017/08/">八月 2017</a><span class="archive-list-count">1</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2017/07/">七月 2017</a><span class="archive-list-count">2</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2017/05/">五月 2017</a><span class="archive-list-count">1</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2017/04/">四月 2017</a><span class="archive-list-count">2</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2017/03/">三月 2017</a><span class="archive-list-count">1</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2017/02/">二月 2017</a><span class="archive-list-count">1</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2017/01/">一月 2017</a><span class="archive-list-count">6</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2016/12/">十二月 2016</a><span class="archive-list-count">1</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2016/11/">十一月 2016</a><span class="archive-list-count">2</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2016/10/">十月 2016</a><span class="archive-list-count">4</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2016/09/">九月 2016</a><span class="archive-list-count">1</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2016/08/">八月 2016</a><span class="archive-list-count">6</span></li></span><span id=''></span><span onclick="var d=document.getElementById('list_archives2'); d.style.display===''?d.style='display:none':d.style=''">toggle...</span></ul>
+    </div>
+  </div>
+
+
+  
+    <a rel="license noopener" target="_blank" href="http://creativecommons.org/licenses/by-nc-nd/3.0/tw/">
+  <img alt="Creative Commons License" style="border-width:0" src="https://i.creativecommons.org/l/by-nc-nd/3.0/tw/88x31.png" />
+</a>
+  <br />
+This work is licensed under a 
+<a rel="license noopener" target="_blank" href="http://creativecommons.org/licenses/by-nc-nd/3.0/tw/">Creative Commons Attribution-NonCommercial-NoDerivs 3.0 Taiwan License</a>
+  
+    
+  <div class="widget-wrap">
+    <h3 class="widget-title">標籤雲</h3>
+    <div class="widget tagcloud">
+      <a href="/tags/Net-Framework/" style="font-size: 14.67px;">.Net Framework</a> <a href="/tags/API/" style="font-size: 11.33px;">API</a> <a href="/tags/AWS/" style="font-size: 13.33px;">AWS</a> <a href="/tags/Agile/" style="font-size: 17.33px;">Agile</a> <a href="/tags/CI-CD/" style="font-size: 19.33px;">CI/CD</a> <a href="/tags/Cache/" style="font-size: 10px;">Cache</a> <a href="/tags/Coding-Standard/" style="font-size: 10px;">Coding Standard</a> <a href="/tags/Container/" style="font-size: 12px;">Container</a> <a href="/tags/Database/" style="font-size: 12.67px;">Database</a> <a href="/tags/Design-Pattern/" style="font-size: 10.67px;">Design Pattern</a> <a href="/tags/Docker/" style="font-size: 12px;">Docker</a> <a href="/tags/Entity-Framework/" style="font-size: 10.67px;">Entity Framework</a> <a href="/tags/Firebase/" style="font-size: 10px;">Firebase</a> <a href="/tags/Git/" style="font-size: 10.67px;">Git</a> <a href="/tags/Golang/" style="font-size: 11.33px;">Golang</a> <a href="/tags/Google/" style="font-size: 11.33px;">Google</a> <a href="/tags/GulpJs/" style="font-size: 10.67px;">GulpJs</a> <a href="/tags/HTTP/" style="font-size: 10px;">HTTP</a> <a href="/tags/Hexo/" style="font-size: 15.33px;">Hexo</a> <a href="/tags/IIS/" style="font-size: 10px;">IIS</a> <a href="/tags/IO/" style="font-size: 10px;">IO</a> <a href="/tags/Integrated-Testing/" style="font-size: 10px;">Integrated Testing</a> <a href="/tags/Jenkins/" style="font-size: 12px;">Jenkins</a> <a href="/tags/Kubernetes/" style="font-size: 10px;">Kubernetes</a> <a href="/tags/Linux/" style="font-size: 10.67px;">Linux</a> <a href="/tags/Mongodb/" style="font-size: 10px;">Mongodb</a> <a href="/tags/MsSQL/" style="font-size: 11.33px;">MsSQL</a> <a href="/tags/MsTest/" style="font-size: 10px;">MsTest</a> <a href="/tags/Mutation-Testing/" style="font-size: 10px;">Mutation Testing</a> <a href="/tags/Nodejs/" style="font-size: 15.33px;">Nodejs</a> <a href="/tags/OAuth/" style="font-size: 10px;">OAuth</a> <a href="/tags/OOP/" style="font-size: 11.33px;">OOP</a> <a href="/tags/Openshift/" style="font-size: 10.67px;">Openshift</a> <a href="/tags/PowerShell/" style="font-size: 11.33px;">PowerShell</a> <a href="/tags/React/" style="font-size: 12px;">React</a> <a href="/tags/Redis/" style="font-size: 10.67px;">Redis</a> <a href="/tags/SQL/" style="font-size: 12px;">SQL</a> <a href="/tags/Scrum/" style="font-size: 16.67px;">Scrum</a> <a href="/tags/Shell/" style="font-size: 10.67px;">Shell</a> <a href="/tags/Specflow/" style="font-size: 10px;">Specflow</a> <a href="/tags/StyleCop/" style="font-size: 10px;">StyleCop</a> <a href="/tags/TDD/" style="font-size: 16px;">TDD</a> <a href="/tags/Testing/" style="font-size: 14px;">Testing</a> <a href="/tags/Thread/" style="font-size: 10.67px;">Thread</a> <a href="/tags/Trello/" style="font-size: 10px;">Trello</a> <a href="/tags/TypeScript/" style="font-size: 13.33px;">TypeScript</a> <a href="/tags/Unit-Testing/" style="font-size: 18.67px;">Unit Testing</a> <a href="/tags/Unix/" style="font-size: 10.67px;">Unix</a> <a href="/tags/Vim/" style="font-size: 10px;">Vim</a> <a href="/tags/Visual-Studio/" style="font-size: 10px;">Visual Studio</a> <a href="/tags/html/" style="font-size: 10px;">html</a> <a href="/tags/post/" style="font-size: 10px;">post</a> <a href="/tags/%E5%AD%B8%E7%BF%92%E7%AD%86%E8%A8%98/" style="font-size: 17.33px;">學習筆記</a> <a href="/tags/%E5%AF%A6%E4%BD%9C%E7%AD%86%E8%A8%98/" style="font-size: 20px;">實作筆記</a> <a href="/tags/%E6%99%82%E9%96%93%E7%AE%A1%E7%90%86/" style="font-size: 10.67px;">時間管理</a> <a href="/tags/%E6%B4%BB%E5%8B%95%E7%AD%86%E8%A8%98/" style="font-size: 12.67px;">活動筆記</a> <a href="/tags/%E7%94%9F%E6%B4%BB%E7%AD%86%E8%A8%98/" style="font-size: 16.67px;">生活筆記</a> <a href="/tags/%E8%A8%98%E9%8C%84/" style="font-size: 11.33px;">記錄</a> <a href="/tags/%E8%B8%A9%E9%9B%B7%E7%AD%86%E8%A8%98/" style="font-size: 16px;">踩雷筆記</a> <a href="/tags/%E9%87%8D%E6%A7%8B/" style="font-size: 12px;">重構</a> <a href="/tags/%E9%96%B1%E8%AE%80%E7%AD%86%E8%A8%98/" style="font-size: 18px;">閱讀筆記</a>
+    </div>
+  </div>
+
+  
+    
+  <div class="widget-wrap">
+    <h3 class="widget-title">標籤</h3>
+    <div class="widget">
+      <ul class="tag-list" itemprop="keywords"><li class="tag-list-item"><a class="tag-list-link" href="/tags/Net-Framework/" rel="tag">.Net Framework</a><span class="tag-list-count">9</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/API/" rel="tag">API</a><span class="tag-list-count">3</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/AWS/" rel="tag">AWS</a><span class="tag-list-count">7</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/Agile/" rel="tag">Agile</a><span class="tag-list-count">14</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/CI-CD/" rel="tag">CI&#x2F;CD</a><span class="tag-list-count">24</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/Cache/" rel="tag">Cache</a><span class="tag-list-count">1</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/Coding-Standard/" rel="tag">Coding Standard</a><span class="tag-list-count">1</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/Container/" rel="tag">Container</a><span class="tag-list-count">4</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/Database/" rel="tag">Database</a><span class="tag-list-count">6</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/Design-Pattern/" rel="tag">Design Pattern</a><span class="tag-list-count">2</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/Docker/" rel="tag">Docker</a><span class="tag-list-count">4</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/Entity-Framework/" rel="tag">Entity Framework</a><span class="tag-list-count">2</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/Firebase/" rel="tag">Firebase</a><span class="tag-list-count">1</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/Git/" rel="tag">Git</a><span class="tag-list-count">2</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/Golang/" rel="tag">Golang</a><span class="tag-list-count">3</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/Google/" rel="tag">Google</a><span class="tag-list-count">3</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/GulpJs/" rel="tag">GulpJs</a><span class="tag-list-count">2</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/HTTP/" rel="tag">HTTP</a><span class="tag-list-count">1</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/Hexo/" rel="tag">Hexo</a><span class="tag-list-count">10</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/IIS/" rel="tag">IIS</a><span class="tag-list-count">1</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/IO/" rel="tag">IO</a><span class="tag-list-count">1</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/Integrated-Testing/" rel="tag">Integrated Testing</a><span class="tag-list-count">1</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/Jenkins/" rel="tag">Jenkins</a><span class="tag-list-count">4</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/Kubernetes/" rel="tag">Kubernetes</a><span class="tag-list-count">1</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/Linux/" rel="tag">Linux</a><span class="tag-list-count">2</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/Mongodb/" rel="tag">Mongodb</a><span class="tag-list-count">1</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/MsSQL/" rel="tag">MsSQL</a><span class="tag-list-count">3</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/MsTest/" rel="tag">MsTest</a><span class="tag-list-count">1</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/Mutation-Testing/" rel="tag">Mutation Testing</a><span class="tag-list-count">1</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/Nodejs/" rel="tag">Nodejs</a><span class="tag-list-count">10</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/OAuth/" rel="tag">OAuth</a><span class="tag-list-count">1</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/OOP/" rel="tag">OOP</a><span class="tag-list-count">3</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/Openshift/" rel="tag">Openshift</a><span class="tag-list-count">2</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/PowerShell/" rel="tag">PowerShell</a><span class="tag-list-count">3</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/React/" rel="tag">React</a><span class="tag-list-count">4</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/Redis/" rel="tag">Redis</a><span class="tag-list-count">2</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/SQL/" rel="tag">SQL</a><span class="tag-list-count">4</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/Scrum/" rel="tag">Scrum</a><span class="tag-list-count">13</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/Shell/" rel="tag">Shell</a><span class="tag-list-count">2</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/Specflow/" rel="tag">Specflow</a><span class="tag-list-count">1</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/StyleCop/" rel="tag">StyleCop</a><span class="tag-list-count">1</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/TDD/" rel="tag">TDD</a><span class="tag-list-count">11</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/Testing/" rel="tag">Testing</a><span class="tag-list-count">8</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/Thread/" rel="tag">Thread</a><span class="tag-list-count">2</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/Trello/" rel="tag">Trello</a><span class="tag-list-count">1</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/TypeScript/" rel="tag">TypeScript</a><span class="tag-list-count">7</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/Unit-Testing/" rel="tag">Unit Testing</a><span class="tag-list-count">19</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/Unix/" rel="tag">Unix</a><span class="tag-list-count">2</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/Vim/" rel="tag">Vim</a><span class="tag-list-count">1</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/Visual-Studio/" rel="tag">Visual Studio</a><span class="tag-list-count">1</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/html/" rel="tag">html</a><span class="tag-list-count">1</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/post/" rel="tag">post</a><span class="tag-list-count">1</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/%E5%AD%B8%E7%BF%92%E7%AD%86%E8%A8%98/" rel="tag">學習筆記</a><span class="tag-list-count">14</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/%E5%AF%A6%E4%BD%9C%E7%AD%86%E8%A8%98/" rel="tag">實作筆記</a><span class="tag-list-count">129</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/%E6%99%82%E9%96%93%E7%AE%A1%E7%90%86/" rel="tag">時間管理</a><span class="tag-list-count">2</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/%E6%B4%BB%E5%8B%95%E7%AD%86%E8%A8%98/" rel="tag">活動筆記</a><span class="tag-list-count">6</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/%E7%94%9F%E6%B4%BB%E7%AD%86%E8%A8%98/" rel="tag">生活筆記</a><span class="tag-list-count">13</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/%E8%A8%98%E9%8C%84/" rel="tag">記錄</a><span class="tag-list-count">3</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/%E8%B8%A9%E9%9B%B7%E7%AD%86%E8%A8%98/" rel="tag">踩雷筆記</a><span class="tag-list-count">11</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/%E9%87%8D%E6%A7%8B/" rel="tag">重構</a><span class="tag-list-count">4</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/%E9%96%B1%E8%AE%80%E7%AD%86%E8%A8%98/" rel="tag">閱讀筆記</a><span class="tag-list-count">15</span></li></ul>
+    </div>
+  </div>
+
+
+  
+    
+
+  
+    <div class="widget-wrap">
+    <h3 class="widget-title">多語系</h3>
+    <div class="widget">
+        <div id="ytWidget"></div>
+    </div>
+</div>
+<script src="https://translate.yandex.net/website-widget/v1/widget.js?widgetId=ytWidget&pageLang=zh&widgetTheme=dark&autoMode=false" type="text/javascript"></script>
+  
+    <div class="widget-wrap">
+    <h3 class="widget-title">BADGES</h3>
+    <div class="widget">
+        <a target="_blank" rel="noopener" href="https://bcert.me/bc/html/show-badge.html?b=uufxvngl">
+            <img src="/images/2018/csm/seal-csm.png" alt="Certified ScrumMaster®">
+        </a>
+    </div>
+</div>
+  
+</aside>
+        
+      </div>
+      <footer id="footer">
+  
+  <div class="outer">
+    <div id="footer-info" class="inner">
+      &copy; 2025 Marsen L.<br>
+      Powered by <a href="http://hexo.io/" target="_blank">Hexo</a>
+    </div>
+  </div>
+</footer>
+    </div>
+    <nav id="mobile-nav">
+  
+    <a href="/" class="mobile-nav-link">Home</a>
+  
+    <a href="/archives" class="mobile-nav-link">Archives</a>
+  
+</nav>
+    <script src="//ajax.googleapis.com/ajax/libs/jquery/2.0.3/jquery.min.js"></script>
+
+  
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/fancybox/3.5.7/jquery.fancybox.min.css">
+
+  
+<script src="https://cdnjs.cloudflare.com/ajax/libs/fancybox/3.5.7/jquery.fancybox.min.js"></script>
+
+
+
+<script src="/js/sayings.js?v=0.js"></script>
+  
+
+<script src="/js/script.js?v=0.js"></script>
+
+<div id="likecoin">
+Please enable JavaScript to view the LikeCoin. :P
+</div>
+<script>
+
+  (function(){
+    var ifrm = document.createElement("iframe");
+    ifrm.setAttribute("src", "https://button.like.co/in/embed/marsenlin/button?referrer=https%3A%2F%2Fblog.marsen.me%2F2025%2F09%2F05%2F2025%2Fai-hf-open-model-upload%2F");      
+    ifrm.setAttribute("sandbox","allow-scripts allow-same-origin allow-popups allow-popups-to-escape-sandbox");
+    ifrm.frameborder = "0";
+    ifrm.scrolling = "no";
+    (document.getElementById("likecoin").replaceChild(ifrm, document.getElementById("likecoin").childNodes[0]));
+  })();
+
+</script>
+<script>
+
+  var disqus_shortname = 'marsenlin';
+  
+  var disqus_url = 'https://blog.marsen.me/2025/09/05/2025/ai-hf-open-model-upload/';
+  
+  (function(){
+    var dsq = document.createElement('script');
+    dsq.type = 'text/javascript';
+    dsq.async = true;
+    dsq.src = '//' + disqus_shortname + '.disqus.com/embed.js';
+    (document.getElementsByTagName('head')[0] || document.getElementsByTagName('body')[0]).appendChild(dsq);
+  })();
+
+</script>
+
+  </div>
+    
+<!-- Google Tag Manager (noscript) -->
+<noscript><iframe src="https://www.googletagmanager.com/ns.html?id=GTM-NTDGNJZ"
+height="0" width="0" style="display:none;visibility:hidden"></iframe></noscript>
+<!-- End Google Tag Manager (noscript) -->
+
+</body>
+</html>
