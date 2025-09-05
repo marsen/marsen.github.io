@@ -53,5 +53,7 @@ const sayings = [
   "你人生的快樂取決於你思想的品質 --- Marcus Aurelius",
   "我們在想像中受的苦比在現實中還多 --- Lucius Annaeus Seneca minor",
   "He who can, does. He who cannot, teaches",
-  "На свете счастья нет, но есть покой и воля. --- Александр Пушкин(世上沒有幸福，但有寧靜和自由。 --- 普希金) "
+  "На свете счастья нет, но есть покой и воля. --- Александр Пушкин(世上沒有幸福，但有寧靜和自由。 --- 普希金) ",
+  "Elegance doesn't mean being noticed, it means being remembered  --- Giorgio Armani",
+  "人間の怒りには、真っ赤に爆発するものと……静かにゆらぎながら……真っ青に燃え続けるものがあるのさ。 --- ギイ・クリストフ・レッシュ"
 ]
