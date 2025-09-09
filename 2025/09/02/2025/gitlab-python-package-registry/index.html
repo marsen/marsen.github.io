@@ -43,7 +43,7 @@ j=d.createElement(s),dl=l!='dataLayer'?'&l='+l:'';j.async=true;j.src=
 <meta property="og:description" content="前情提要在開發 AI 應用時，我們遇到一些特殊的依賴管理需求，需要私有 Registry 在這個專案中，我們遇到了幾個挑戰：  平台特化需求：Jetson 平台需要特製的 onnxruntime-gpu 版本，PyPI 上沒有現成的 版本一致性：確保所有環境（開發、測試、生產）使用完全相同的依賴版本 安全性考量：避免依賴外部不穩定的來源，降低供應鏈攻擊風險 內部套件分發：團隊開發的內部工具需要有管">
 <meta property="og:locale" content="zh_TW">
 <meta property="article:published_time" content="2025-09-02T06:42:42.000Z">
-<meta property="article:modified_time" content="2025-09-09T03:05:11.353Z">
+<meta property="article:modified_time" content="2025-09-09T07:55:04.208Z">
 <meta property="article:author" content="Marsen L.">
 <meta property="article:tag" content="實作筆記">
 <meta name="twitter:card" content="summary">
@@ -146,7 +146,14 @@ j=d.createElement(s),dl=l!='dataLayer'?'&l='+l:'';j.async=true;j.src=
 </li>
 </ol>
 <p>這樣確保所有環境都使用一致且可控的套件版本。</p>
-<h2 id="實作步驟"><a href="#實作步驟" class="headerlink" title="實作步驟"></a>實作步驟</h2><h3 id="設定-GitLab-Package-Registry"><a href="#設定-GitLab-Package-Registry" class="headerlink" title="設定 GitLab Package Registry"></a>設定 GitLab Package Registry</h3><p>首先，在 GitLab 專案中啟用 Package Registry，並建立 Deploy Token：</p>
+<h2 id="實作步驟"><a href="#實作步驟" class="headerlink" title="實作步驟"></a>實作步驟</h2><h3 id="發佈套件到-GitLab-Package-Registry"><a href="#發佈套件到-GitLab-Package-Registry" class="headerlink" title="發佈套件到 GitLab Package Registry"></a>發佈套件到 GitLab Package Registry</h3><p>在設定和使用私有 Registry 之前，我們需要先將套件上傳到 GitLab Package Registry。</p>
+<h4 id="使用-twine-上傳套件"><a href="#使用-twine-上傳套件" class="headerlink" title="使用 twine 上傳套件"></a>使用 twine 上傳套件</h4><p>twine 是 Python 官方推薦的套件上傳工具，會自動從 wheel 檔案中提取 metadata：</p>
+<figure class="highlight bash"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment"># 安裝 twine</span></span><br><span class="line">pip install twine</span><br><span class="line"></span><br><span class="line"><span class="comment"># 上傳到 GitLab PyPI registry</span></span><br><span class="line">twine upload --repository-url https://gitlab.com/api/v4/projects/&#123;PROJECT_ID&#125;/packages/pypi \</span><br><span class="line">             --username gitlab+deploy-token-&#123;TOKEN_ID&#125; \</span><br><span class="line">             --password &#123;TOKEN&#125; \</span><br><span class="line">             your_package.whl</span><br></pre></td></tr></table></figure>
+
+<p>實際範例（以 ONNX Runtime 為例）：</p>
+<figure class="highlight bash"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br></pre></td><td class="code"><pre><span class="line">twine upload --repository-url https://gitlab.com/api/v4/projects/70410750/packages/pypi \</span><br><span class="line">             --username gitlab+deploy-token-9097451 \</span><br><span class="line">             --password gldt-tQVwLxzydZBhn3WWnwtt \</span><br><span class="line">             onnxruntime_gpu-1.23.0-cp310-cp310-linux_aarch64.whl</span><br></pre></td></tr></table></figure>
+
+<h3 id="設定-GitLab-Package-Registry"><a href="#設定-GitLab-Package-Registry" class="headerlink" title="設定 GitLab Package Registry"></a>設定 GitLab Package Registry</h3><p>首先，在 GitLab 專案中啟用 Package Registry，並建立 Deploy Token：</p>
 <p>在 GitLab 專案設定中建立 Deploy Token, Settings → Repository → Deploy Tokens</p>
 <p>權限：read_package_registry, write_package_registry</p>
 <p>記下 token ID 和 token 值，格式如下：</p>
@@ -167,7 +174,7 @@ j=d.createElement(s),dl=l!='dataLayer'?'&l='+l:'';j.async=true;j.src=
 <figure class="highlight toml"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment"># 定義私有 index</span></span><br><span class="line"><span class="section">[[tool.uv.index]]</span></span><br><span class="line"><span class="attr">name</span> = <span class="string">&quot;onnx&quot;</span></span><br><span class="line"><span class="attr">url</span> = <span class="string">&quot;https://gitlab+deploy-token-&#123;TOKEN_ID&#125;:&#123;TOKEN&#125;@gitlab.com/api/v4/projects/&#123;PROJECT_ID&#125;/packages/pypi/simple&quot;</span></span><br><span class="line"><span class="attr">default</span> = <span class="literal">false</span></span><br><span class="line"></span><br><span class="line"><span class="comment"># 指定套件來源</span></span><br><span class="line"><span class="section">[tool.uv.sources]</span></span><br><span class="line"><span class="attr">onnxruntime-gpu</span> = &#123; index = <span class="string">&quot;onnx&quot;</span> &#125;</span><br><span class="line"></span><br><span class="line"><span class="comment"># 多平台依賴策略</span></span><br><span class="line"><span class="attr">dependencies</span> = [</span><br><span class="line">    <span class="comment"># macOS ARM64 使用 CPU 版本</span></span><br><span class="line">    <span class="string">&quot;onnxruntime==1.19.0; sys_platform == &#x27;darwin&#x27; and platform_machine == &#x27;arm64&#x27;&quot;</span>,</span><br><span class="line">    <span class="comment"># Jetson 使用私有倉庫的 GPU 版本</span></span><br><span class="line">    <span class="string">&quot;onnxruntime-gpu; sys_platform == &#x27;linux&#x27; and platform_machine == &#x27;aarch64&#x27;&quot;</span>,</span><br><span class="line">]</span><br></pre></td></tr></table></figure>
 
 <p>這裡的關鍵是使用條件依賴，根據不同平台安裝不同版本的套件。</p>
-<h3 id="3-開發者使用私有-Registry"><a href="#3-開發者使用私有-Registry" class="headerlink" title="3. 開發者使用私有 Registry"></a>3. 開發者使用私有 Registry</h3><p>根據專案的安全策略，RD 有幾種方式存取私有 registry：</p>
+<h3 id="開發者使用私有-Registry"><a href="#開發者使用私有-Registry" class="headerlink" title="開發者使用私有 Registry"></a>開發者使用私有 Registry</h3><p>根據專案的安全策略，RD 有幾種方式存取私有 registry：</p>
 <h4 id="選項-1：Token-內嵌在-pyproject-toml（簡單但不安全）"><a href="#選項-1：Token-內嵌在-pyproject-toml（簡單但不安全）" class="headerlink" title="選項 1：Token 內嵌在 pyproject.toml（簡單但不安全）"></a>選項 1：Token 內嵌在 pyproject.toml（簡單但不安全）</h4><p>如果 <code>pyproject.toml</code> 中已經包含完整的認證 URL：</p>
 <figure class="highlight bash"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment"># 直接安裝依賴</span></span><br><span class="line">uv <span class="built_in">sync</span></span><br><span class="line"></span><br><span class="line"><span class="comment"># 或使用 pip</span></span><br><span class="line">pip install -e .</span><br></pre></td></tr></table></figure>
 
@@ -183,7 +190,7 @@ j=d.createElement(s),dl=l!='dataLayer'?'&l='+l:'';j.async=true;j.src=
 <h4 id="選項-4：企業內網存取"><a href="#選項-4：企業內網存取" class="headerlink" title="選項 4：企業內網存取"></a>選項 4：企業內網存取</h4><p>如果使用企業內網或 VPN：</p>
 <figure class="highlight bash"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment"># 連接 VPN 後直接使用</span></span><br><span class="line">uv <span class="built_in">sync</span></span><br></pre></td></tr></table></figure>
 
-<h3 id="4-CI-CD-中存取私有-Registry"><a href="#4-CI-CD-中存取私有-Registry" class="headerlink" title="4. CI&#x2F;CD 中存取私有 Registry"></a>4. CI&#x2F;CD 中存取私有 Registry</h3><p>專案在 GitLab CI&#x2F;CD 中需要存取私有 Registry 時，有以下幾種方式：</p>
+<h3 id="CI-CD-中存取私有-Registry"><a href="#CI-CD-中存取私有-Registry" class="headerlink" title="CI&#x2F;CD 中存取私有 Registry"></a>CI&#x2F;CD 中存取私有 Registry</h3><p>專案在 GitLab CI&#x2F;CD 中需要存取私有 Registry 時，有以下幾種方式：</p>
 <h4 id="方法-1：使用-CI-JOB-TOKEN（推薦）"><a href="#方法-1：使用-CI-JOB-TOKEN（推薦）" class="headerlink" title="方法 1：使用 CI_JOB_TOKEN（推薦）"></a>方法 1：使用 CI_JOB_TOKEN（推薦）</h4><figure class="highlight yaml"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment"># .gitlab-ci.yml</span></span><br><span class="line"><span class="attr">variables:</span></span><br><span class="line">  <span class="attr">PIP_INDEX_URL:</span> <span class="string">https://gitlab-ci-token:$&#123;CI_JOB_TOKEN&#125;@gitlab.com/api/v4/projects/$&#123;REGISTRY_PROJECT_ID&#125;/packages/pypi/simple</span></span><br><span class="line">  <span class="attr">PIP_EXTRA_INDEX_URL:</span> <span class="string">https://pypi.org/simple</span></span><br><span class="line"></span><br><span class="line"><span class="attr">build:</span></span><br><span class="line">  <span class="attr">stage:</span> <span class="string">build</span></span><br><span class="line">  <span class="attr">script:</span></span><br><span class="line">    <span class="bullet">-</span> <span class="string">pip</span> <span class="string">install</span> <span class="string">-e</span> <span class="string">.</span></span><br><span class="line">    <span class="bullet">-</span> <span class="comment"># 其他構建步驟</span></span><br></pre></td></tr></table></figure>
 
 <h4 id="方法-2：使用-Deploy-Token"><a href="#方法-2：使用-Deploy-Token" class="headerlink" title="方法 2：使用 Deploy Token"></a>方法 2：使用 Deploy Token</h4><p>在 CI&#x2F;CD 變數中設定 <code>GITLAB_DEPLOY_TOKEN</code>：</p>
@@ -210,7 +217,7 @@ j=d.createElement(s),dl=l!='dataLayer'?'&l='+l:'';j.async=true;j.src=
       
     </div>
     <footer class="article-footer">
-      <a data-url="https://blog.marsen.me/2025/09/02/2025/gitlab-python-package-registry/" data-id="cmfbyxa3o00is2sl51zk807hd" class="article-share-link">Share</a>
+      <a data-url="https://blog.marsen.me/2025/09/02/2025/gitlab-python-package-registry/" data-id="cmfc9a3ji00in2sod9d0z0afc" class="article-share-link">Share</a>
       
         <a href="https://blog.marsen.me/2025/09/02/2025/gitlab-python-package-registry/#disqus_thread" class="article-comment-link">留言</a>
       
@@ -271,20 +278,12 @@ j=d.createElement(s),dl=l!='dataLayer'?'&l='+l:'';j.async=true;j.src=
   
   
     <div id="likecoin">
-Please enable JavaScript to view the LikeCoin. :P
+  <script type="text/javascript">
+    document.write(
+      "<iframe scrolling='no' frameborder='0' sandbox='allow-scripts allow-same-origin allow-popups allow-popups-to-escape-sandbox allow-storage-access-by-user-activation' style='height: 212px; width: 100%;' src='https://button.like.co/in/embed/marsenlin/button?referrer=" +
+      encodeURIComponent(location.href.split("?")[0].split("#")[0]) + "'></iframe>");
+  </script>
 </div>
-<script>
-
-  (function(){
-    var ifrm = document.createElement("iframe");
-    ifrm.setAttribute("src", "https://button.like.co/in/embed/marsenlin/button?referrer=https%3A%2F%2Fblog.marsen.me%2F2025%2F09%2F02%2F2025%2Fgitlab-python-package-registry%2F");      
-    ifrm.setAttribute("sandbox","allow-scripts allow-same-origin allow-popups allow-popups-to-escape-sandbox");
-    ifrm.frameborder = "0";
-    ifrm.scrolling = "no";
-    (document.getElementById("likecoin").replaceChild(ifrm, document.getElementById("likecoin").childNodes[0]));
-  })();
-
-</script>
   
   <div id="disqus_thread">
     <noscript>Please enable JavaScript to view the <a target="_blank" rel="noopener" href="//disqus.com/?ref_noscript">comments powered by Disqus.</a></noscript>
@@ -417,20 +416,12 @@ This work is licensed under a
 <script src="/js/script.js?v=0.js"></script>
 
 <div id="likecoin">
-Please enable JavaScript to view the LikeCoin. :P
+  <script type="text/javascript">
+    document.write(
+      "<iframe scrolling='no' frameborder='0' sandbox='allow-scripts allow-same-origin allow-popups allow-popups-to-escape-sandbox allow-storage-access-by-user-activation' style='height: 212px; width: 100%;' src='https://button.like.co/in/embed/marsenlin/button?referrer=" +
+      encodeURIComponent(location.href.split("?")[0].split("#")[0]) + "'></iframe>");
+  </script>
 </div>
-<script>
-
-  (function(){
-    var ifrm = document.createElement("iframe");
-    ifrm.setAttribute("src", "https://button.like.co/in/embed/marsenlin/button?referrer=https%3A%2F%2Fblog.marsen.me%2F2025%2F09%2F02%2F2025%2Fgitlab-python-package-registry%2F");      
-    ifrm.setAttribute("sandbox","allow-scripts allow-same-origin allow-popups allow-popups-to-escape-sandbox");
-    ifrm.frameborder = "0";
-    ifrm.scrolling = "no";
-    (document.getElementById("likecoin").replaceChild(ifrm, document.getElementById("likecoin").childNodes[0]));
-  })();
-
-</script>
 <script>
 
   var disqus_shortname = 'marsenlin';
