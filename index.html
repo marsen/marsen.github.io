@@ -56,7 +56,7 @@ j=d.createElement(s),dl=l!='dataLayer'?'&l='+l:'';j.async=true;j.src=
 <link rel="stylesheet" href="/css/style.css">
 
   <meta property ="og:image" content="https://avatars1.githubusercontent.com/u/4269720?s=460&v=4" /> 
-<meta name="generator" content="Hexo 7.3.0"></head>
+<meta name="generator" content="Hexo 8.0.0"></head>
 
 <body>
   <div id="container">
@@ -125,12 +125,12 @@ j=d.createElement(s),dl=l!='dataLayer'?'&l='+l:'';j.async=true;j.src=
     
     <div class="article-entry" itemprop="articleBody">
       
-        <h2 id="前言"><a href="#前言" class="headerlink" title="前言"></a>前言</h2><p>最近小朋友在進行中文轉換規則的開發時，遇到了一個典型的程式碼異味。</p>
-<p>你可以先挑戰看一下有沒有辦法識別。</p>
+        <h2 id="前言"><a href="#前言" class="headerlink" title="前言"></a>前言</h2><p>最近有位小朋友在進行中文轉換規則的開發時，遇到了一些典型的程式碼異味。</p>
+<p>這些異味提示著我們需要重構，你可以先挑戰看一下有沒有辦法識別。</p>
 <figure class="highlight typescript"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment">// 重構前的程式碼</span></span><br><span class="line"><span class="title function_">apply</span>(<span class="attr">text</span>: <span class="built_in">string</span>): <span class="built_in">string</span> &#123;</span><br><span class="line">  <span class="keyword">const</span> protectedChars = [<span class="string">&#x27;台&#x27;</span>]</span><br><span class="line">  </span><br><span class="line">  <span class="comment">// 1. 標記階段</span></span><br><span class="line">  <span class="keyword">let</span> protectedText = text</span><br><span class="line">  protectedChars.<span class="title function_">forEach</span>(<span class="function">(<span class="params">char</span>) =&gt;</span> &#123;</span><br><span class="line">    protectedText = protectedText.<span class="title function_">replaceAll</span>(char, <span class="string">`&lt;&lt;&lt;<span class="subst">$&#123;char&#125;</span>&gt;&gt;&gt;`</span>)</span><br><span class="line">  &#125;)</span><br><span class="line"></span><br><span class="line">  <span class="comment">// 2. 轉換階段</span></span><br><span class="line">  <span class="keyword">let</span> result = <span class="variable language_">this</span>.<span class="title function_">baseConverter</span>(protectedText)</span><br><span class="line"></span><br><span class="line">  <span class="comment">// 3. 還原階段</span></span><br><span class="line">  protectedChars.<span class="title function_">forEach</span>(<span class="function">(<span class="params">char</span>) =&gt;</span> &#123;</span><br><span class="line">    <span class="keyword">const</span> convertedChar = <span class="variable language_">this</span>.<span class="title function_">baseConverter</span>(char)</span><br><span class="line">    result = result.<span class="title function_">replaceAll</span>(<span class="string">`&lt;&lt;&lt;<span class="subst">$&#123;convertedChar&#125;</span>&gt;&gt;&gt;`</span>, char)</span><br><span class="line">  &#125;)</span><br><span class="line"></span><br><span class="line">  <span class="comment">// 4. 自訂轉換</span></span><br><span class="line">  result = <span class="variable language_">this</span>.<span class="title function_">customConverter</span>(result)</span><br><span class="line">  </span><br><span class="line">  <span class="keyword">return</span> result</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
 
-<p>這篇文章記錄了我如何將一個命令式的方法重構為函數式的 pipe 流水線，</p>
-<p>讓程式碼變得更加簡潔和易讀。</p>
+<p>這篇文章記錄重構的過程，讓程式碼變得更加簡潔和易讀。</p>
+<p>當然，這只是其中一種可能的重構方式，可能有別的解法，或是單純的接受它。</p>
 <h2 id="壞味道"><a href="#壞味道" class="headerlink" title="壞味道"></a>壞味道</h2><p>原始的 <code>ChineseConversionRule</code> 中的 <code>apply</code> 方法存在以下問題：</p>
 <ol>
 <li><strong>過多中間變數</strong>：<code>text</code> → <code>protectedText</code> → <code>result</code></li>
@@ -142,7 +142,7 @@ j=d.createElement(s),dl=l!='dataLayer'?'&l='+l:'';j.async=true;j.src=
 <p>這裡的挑戰是要對原始的字串加工</p>
 <p>在不破壞原本邏輯的情況下，保留擴充的彈性，並保持程式結構清晰、可維護。</p>
 <p>可能有很多模式可以解決(Decorator &#x2F; Template Method &#x2F; Pipeline)</p>
-<p>小朋友寫也得也不差了，我們試著讓它更好</p>
+<p>小朋友寫得也不差了，我們來試著讓它更好</p>
 <h2 id="重構過程"><a href="#重構過程" class="headerlink" title="重構過程"></a>重構過程</h2><h3 id="階段一：消除中間變數"><a href="#階段一：消除中間變數" class="headerlink" title="階段一：消除中間變數"></a>階段一：消除中間變數</h3><p>第一步是消除不必要的中間變數，直接在同一個變數上操作：</p>
 <p>可以看到修改後，只有 text 一個變數，還是傳入了的</p>
 <p>越少變數，越不用花心思思考命名，減少認知負擔，而本質上這些冗餘的變數的確是同質可以刪除的</p>
@@ -203,7 +203,7 @@ j=d.createElement(s),dl=l!='dataLayer'?'&l='+l:'';j.async=true;j.src=
       
     </div>
     <footer class="article-footer">
-      <a data-url="https://blog.marsen.me/2025/09/17/2025/ai-refactor-rule-apply-dp/" data-id="cmfns0yb100ho2snxh3bz7b5c" class="article-share-link">Share</a>
+      <a data-url="https://blog.marsen.me/2025/09/17/2025/ai-refactor-rule-apply-dp/" data-id="cuidu3wQlN6Zy3YtNCUrL7R_n" class="article-share-link">Share</a>
       
         <a href="https://blog.marsen.me/2025/09/17/2025/ai-refactor-rule-apply-dp/#disqus_thread" class="article-comment-link">留言</a>
       
@@ -348,7 +348,7 @@ j=d.createElement(s),dl=l!='dataLayer'?'&l='+l:'';j.async=true;j.src=
       
     </div>
     <footer class="article-footer">
-      <a data-url="https://blog.marsen.me/2025/09/11/2025/clean-architecture-avoid-type-hell/" data-id="cmfns0yb400i32snx4y4l2wnk" class="article-share-link">Share</a>
+      <a data-url="https://blog.marsen.me/2025/09/11/2025/clean-architecture-avoid-type-hell/" data-id="cuidd_mrlioW4fDAYYjDtn6Ij" class="article-share-link">Share</a>
       
         <a href="https://blog.marsen.me/2025/09/11/2025/clean-architecture-avoid-type-hell/#disqus_thread" class="article-comment-link">留言</a>
       
@@ -487,7 +487,7 @@ j=d.createElement(s),dl=l!='dataLayer'?'&l='+l:'';j.async=true;j.src=
       
     </div>
     <footer class="article-footer">
-      <a data-url="https://blog.marsen.me/2025/09/05/2025/ai-hf-open-model-upload/" data-id="cmfns0yaz00hg2snxb15wek4b" class="article-share-link">Share</a>
+      <a data-url="https://blog.marsen.me/2025/09/05/2025/ai-hf-open-model-upload/" data-id="cuidv65cGR5KZaEbjoE4LXe5L" class="article-share-link">Share</a>
       
         <a href="https://blog.marsen.me/2025/09/05/2025/ai-hf-open-model-upload/#disqus_thread" class="article-comment-link">留言</a>
       
@@ -598,7 +598,7 @@ j=d.createElement(s),dl=l!='dataLayer'?'&l='+l:'';j.async=true;j.src=
 <h3 id="Registry-URL-格式錯誤？"><a href="#Registry-URL-格式錯誤？" class="headerlink" title="Registry URL 格式錯誤？"></a>Registry URL 格式錯誤？</h3><p>GitLab PyPI registry URL 格式為：</p>
 <figure class="highlight text"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">https://gitlab.com/api/v4/projects/&#123;PROJECT_ID&#125;/packages/pypi/simple</span><br></pre></td></tr></table></figure>
 
-<p>注意將 <code>&#123;PROJECT_ID&#125;</code> 替換為實際的專案 ID。</p>
+<p>注意將 <code>{PROJECT_ID}</code> 替換為實際的專案 ID。</p>
 <h2 id="小結"><a href="#小結" class="headerlink" title="小結"></a>小結</h2><p>透過建立私有 Package Registry，我們成功解決了：</p>
 <ul>
 <li><strong>特製版本管理</strong>：Jetson 平台的特殊 ONNX Runtime 版本需求</li>
@@ -612,7 +612,7 @@ j=d.createElement(s),dl=l!='dataLayer'?'&l='+l:'';j.async=true;j.src=
       
     </div>
     <footer class="article-footer">
-      <a data-url="https://blog.marsen.me/2025/09/02/2025/gitlab-python-package-registry/" data-id="cmfns0yb900is2snxfyrtg84c" class="article-share-link">Share</a>
+      <a data-url="https://blog.marsen.me/2025/09/02/2025/gitlab-python-package-registry/" data-id="cuidGVGPc5FneuWS7DZ12AWLL" class="article-share-link">Share</a>
       
         <a href="https://blog.marsen.me/2025/09/02/2025/gitlab-python-package-registry/#disqus_thread" class="article-comment-link">留言</a>
       
@@ -732,7 +732,7 @@ j=d.createElement(s),dl=l!='dataLayer'?'&l='+l:'';j.async=true;j.src=
       
     </div>
     <footer class="article-footer">
-      <a data-url="https://blog.marsen.me/2025/08/27/2025/brevo_smtp/" data-id="cmfns0yb300i02snx2iuv1q6n" class="article-share-link">Share</a>
+      <a data-url="https://blog.marsen.me/2025/08/27/2025/brevo_smtp/" data-id="cuidzqdxAFRcyejLam6I2aGW0" class="article-share-link">Share</a>
       
         <a href="https://blog.marsen.me/2025/08/27/2025/brevo_smtp/#disqus_thread" class="article-comment-link">留言</a>
       
@@ -845,7 +845,7 @@ j=d.createElement(s),dl=l!='dataLayer'?'&l='+l:'';j.async=true;j.src=
       
     </div>
     <footer class="article-footer">
-      <a data-url="https://blog.marsen.me/2025/08/12/2025/backend-architecture-layer-design-principles/" data-id="cmfns0yb300hy2snxd8p391z4" class="article-share-link">Share</a>
+      <a data-url="https://blog.marsen.me/2025/08/12/2025/backend-architecture-layer-design-principles/" data-id="cuidVN_otnSR4MOebFgA-2_K9" class="article-share-link">Share</a>
       
         <a href="https://blog.marsen.me/2025/08/12/2025/backend-architecture-layer-design-principles/#disqus_thread" class="article-comment-link">留言</a>
       
@@ -894,7 +894,7 @@ j=d.createElement(s),dl=l!='dataLayer'?'&l='+l:'';j.async=true;j.src=
 
 <h2 id="解決方案"><a href="#解決方案" class="headerlink" title="解決方案"></a>解決方案</h2><h3 id="方法1-直接使用-mkdir（推薦）"><a href="#方法1-直接使用-mkdir（推薦）" class="headerlink" title="方法1: 直接使用 mkdir（推薦）"></a>方法1: 直接使用 mkdir（推薦）</h3><figure class="highlight typescript"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">async</span> <span class="title function_">uploadFile</span>(<span class="attr">file</span>: <span class="title class_">UploadedFile</span>, pathToStore?: <span class="string">`/<span class="subst">$&#123;<span class="built_in">string</span>&#125;</span>`</span>): <span class="title class_">Promise</span>&lt;<span class="built_in">string</span>&gt; &#123;</span><br><span class="line">  <span class="keyword">const</span> fullPath = <span class="string">`<span class="subst">$&#123;<span class="variable language_">this</span>.uploadDir&#125;</span><span class="subst">$&#123;pathToStore ?? <span class="string">&#x27;&#x27;</span>&#125;</span>`</span></span><br><span class="line">  <span class="comment">// 直接建立目錄，recursive: true 會自動處理已存在的情況</span></span><br><span class="line">  <span class="keyword">await</span> fs.<span class="property">promises</span>.<span class="title function_">mkdir</span>(fullPath, &#123; <span class="attr">recursive</span>: <span class="literal">true</span> &#125;)</span><br><span class="line">  <span class="keyword">const</span> uploadPath = path.<span class="title function_">join</span>(fullPath, file.<span class="property">originalName</span>)</span><br><span class="line">  <span class="keyword">await</span> fs.<span class="property">promises</span>.<span class="title function_">writeFile</span>(uploadPath, file.<span class="property">buffer</span>)</span><br><span class="line">  <span class="keyword">return</span> uploadPath</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
 
-<h2 id="為什麼-recursive-true-已經足夠"><a href="#為什麼-recursive-true-已經足夠" class="headerlink" title="為什麼 recursive: true 已經足夠"></a>為什麼 recursive: true 已經足夠</h2><p>根據 Node.js 官方文件，<code>fs.promises.mkdir(path, &#123; recursive: true &#125;)</code> 具有以下特性：</p>
+<h2 id="為什麼-recursive-true-已經足夠"><a href="#為什麼-recursive-true-已經足夠" class="headerlink" title="為什麼 recursive: true 已經足夠"></a>為什麼 recursive: true 已經足夠</h2><p>根據 Node.js 官方文件，<code>fs.promises.mkdir(path, { recursive: true })</code> 具有以下特性：</p>
 <ol>
 <li><strong>自動建立父目錄</strong>：如果父目錄不存在會自動建立</li>
 <li><strong>處理已存在目錄</strong>：當 <code>recursive</code> 為 <code>true</code> 時，如果目錄已存在不會拋出錯誤</li>
@@ -919,7 +919,7 @@ j=d.createElement(s),dl=l!='dataLayer'?'&l='+l:'';j.async=true;j.src=
       
     </div>
     <footer class="article-footer">
-      <a data-url="https://blog.marsen.me/2025/08/07/2025/race-condition-in-file-storage/" data-id="cmfns0ybb00iz2snx5jsp0pvw" class="article-share-link">Share</a>
+      <a data-url="https://blog.marsen.me/2025/08/07/2025/race-condition-in-file-storage/" data-id="cuid25OklwE5CO1jJ0tVd3rg2" class="article-share-link">Share</a>
       
         <a href="https://blog.marsen.me/2025/08/07/2025/race-condition-in-file-storage/#disqus_thread" class="article-comment-link">留言</a>
       
@@ -973,8 +973,8 @@ j=d.createElement(s),dl=l!='dataLayer'?'&l='+l:'';j.async=true;j.src=
 
 <h2 id="需求分析與設計決策"><a href="#需求分析與設計決策" class="headerlink" title="需求分析與設計決策"></a>需求分析與設計決策</h2><h3 id="API-規格定義"><a href="#API-規格定義" class="headerlink" title="API 規格定義"></a>API 規格定義</h3><ul>
 <li><strong>端點</strong>: <code>GET /api/v1/websearch?keyword=關鍵字</code></li>
-<li><strong>輸入</strong>: Query 參數 <code>&#123; keyword: string &#125;</code></li>
-<li><strong>輸出</strong>: <code>&#123; data: [&#123; title: string, url: string, description: string &#125;] &#125;</code></li>
+<li><strong>輸入</strong>: Query 參數 <code>{ keyword: string }</code></li>
+<li><strong>輸出</strong>: <code>{ data: [{ title: string, url: string, description: string }] }</code></li>
 <li><strong>結果數</strong>: 10 筆</li>
 <li><strong>權限</strong>: 所有 API 都需要權限檢查(我們之前開發好的 RBAC 權限系統 )，一個功能對應一個權限，為此我需要新增 <code>web_search</code> 權限</li>
 </ul>
@@ -1087,7 +1087,7 @@ j=d.createElement(s),dl=l!='dataLayer'?'&l='+l:'';j.async=true;j.src=
       
     </div>
     <footer class="article-footer">
-      <a data-url="https://blog.marsen.me/2025/07/31/2025/ai_google_search_api/" data-id="cmfns0yb200hv2snxc3ah1k0y" class="article-share-link">Share</a>
+      <a data-url="https://blog.marsen.me/2025/07/31/2025/ai_google_search_api/" data-id="cuid20iyDXeFUpqDQADFtBnTh" class="article-share-link">Share</a>
       
         <a href="https://blog.marsen.me/2025/07/31/2025/ai_google_search_api/#disqus_thread" class="article-comment-link">留言</a>
       
@@ -1152,7 +1152,7 @@ j=d.createElement(s),dl=l!='dataLayer'?'&l='+l:'';j.async=true;j.src=
       
     </div>
     <footer class="article-footer">
-      <a data-url="https://blog.marsen.me/2025/07/29/2025/ai-eai-browser-install-flatpak-solution/" data-id="cmfns0yaz00he2snxh9nq4sv3" class="article-share-link">Share</a>
+      <a data-url="https://blog.marsen.me/2025/07/29/2025/ai-eai-browser-install-flatpak-solution/" data-id="cuidPHIYJSrz-H_FbbiI4_PMz" class="article-share-link">Share</a>
       
         <a href="https://blog.marsen.me/2025/07/29/2025/ai-eai-browser-install-flatpak-solution/#disqus_thread" class="article-comment-link">留言</a>
       
@@ -1254,7 +1254,7 @@ j=d.createElement(s),dl=l!='dataLayer'?'&l='+l:'';j.async=true;j.src=
       
     </div>
     <footer class="article-footer">
-      <a data-url="https://blog.marsen.me/2025/07/25/2025/express-res-locals-auth-best-practice/" data-id="cmfns0yb500i82snx27g7a9s9" class="article-share-link">Share</a>
+      <a data-url="https://blog.marsen.me/2025/07/25/2025/express-res-locals-auth-best-practice/" data-id="cuidv-dfQ7qNkJ4MyH3jF1qPa" class="article-share-link">Share</a>
       
         <a href="https://blog.marsen.me/2025/07/25/2025/express-res-locals-auth-best-practice/#disqus_thread" class="article-comment-link">留言</a>
       
