@@ -1,0 +1,445 @@
+<!DOCTYPE html>
+<html>
+<head>
+  
+<!-- Google Tag Manager -->
+<script>(function(w,d,s,l,i){w[l]=w[l]||[];w[l].push({'gtm.start':
+new Date().getTime(),event:'gtm.js'});var f=d.getElementsByTagName(s)[0],
+j=d.createElement(s),dl=l!='dataLayer'?'&l='+l:'';j.async=true;j.src=
+'https://www.googletagmanager.com/gtm.js?id='+i+dl;f.parentNode.insertBefore(j,f);
+})(window,document,'script','dataLayer','GTM-NTDGNJZ');</script>
+<!-- End Google Tag Manager -->
+
+  
+<!-- Google Analytics -->
+<!-- Global site tag (gtag.js) - Google Analytics -->
+<script async src="https://www.googletagmanager.com/gtag/js?id=G-RF47NNRE5G"></script>
+<script>
+  window.dataLayer = window.dataLayer || [];
+  function gtag(){dataLayer.push(arguments);}
+  gtag('js', new Date());
+
+  gtag('config', 'G-RF47NNRE5G');
+</script>
+<!-- End Google Analytics -->
+
+  
+<!-- Google AdSense -->
+<script async src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-1885096025224905"
+     crossorigin="anonymous"></script>
+<!-- End Google AdSense -->
+
+
+
+  <meta charset="utf-8">
+  
+  <title> [實作筆記] 命令式程式碼重構到函數式 Pipe 流水線 | Marsen&#39;s Blog</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
+  <meta name="description" content="前言最近小朋友在進行中文轉換規則的開發時，遇到了一個典型的程式碼異味。 你可以先挑戰看一下有沒有辦法識別。 123456789101112131415161718192021222324&#x2F;&#x2F; 重構前的程式碼apply(text: string): string &#123;  const protectedChars &#x3D; [&#x27;台&#x27;]    &#x2F;&#x2F; 1. 標記階段  let pro">
+<meta property="og:type" content="article">
+<meta property="og:title" content=" [實作筆記] 命令式程式碼重構到函數式 Pipe 流水線">
+<meta property="og:url" content="https://blog.marsen.me/2025/09/17/2025/ai-refactor-rule-apply-dp/index.html">
+<meta property="og:site_name" content="Marsen&#39;s Blog">
+<meta property="og:description" content="前言最近小朋友在進行中文轉換規則的開發時，遇到了一個典型的程式碼異味。 你可以先挑戰看一下有沒有辦法識別。 123456789101112131415161718192021222324&#x2F;&#x2F; 重構前的程式碼apply(text: string): string &#123;  const protectedChars &#x3D; [&#x27;台&#x27;]    &#x2F;&#x2F; 1. 標記階段  let pro">
+<meta property="og:locale" content="zh_TW">
+<meta property="article:published_time" content="2025-09-17T08:53:43.000Z">
+<meta property="article:modified_time" content="2025-09-17T09:25:12.783Z">
+<meta property="article:author" content="Marsen L.">
+<meta property="article:tag" content="實作筆記">
+<meta name="twitter:card" content="summary">
+  
+    <link rel="alternate" href="/atom.xml" title="Marsen&#39;s Blog" type="application/atom+xml">
+  
+  
+    <link rel="icon" href="/favicon.ico">
+  
+      
+    <link rel="preconnect" href="https://fonts.gstatic.com">
+    <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@300&display=swap" rel="stylesheet">
+  
+  
+<link rel="stylesheet" href="/css/style.css">
+
+  <meta property ="og:image" content="https://avatars1.githubusercontent.com/u/4269720?s=460&v=4" /> 
+<meta name="generator" content="Hexo 7.3.0"></head>
+
+<body>
+  <div id="container">
+    <div id="wrap">
+      <header id="header">
+  <div id="blog-banner"></div>
+  <div id="header-outer" class="outer">
+    <div id="header-title" class="inner">
+      <h1 id="logo-wrap">
+        <a href="/" id="logo">Marsen&#39;s Blog</a>
+      </h1>
+      
+        <h2 id="subtitle-wrap">
+          <a href="/" id="subtitle"></a>
+          <div>
+          <span style="width: 20px; height: 10px; background: linear-gradient(to bottom, #005BBB 50%, #FFD700 50%); text-align: center; color: white; font-size: 6px; font-weight: bold; line-height: 100px;">
+            #StandWithUkraine
+          </span>
+          </div>
+        </h2>
+      
+    </div>
+    <div id="header-inner" class="inner">
+      <nav id="main-nav">
+        <a id="main-nav-toggle" class="nav-icon"></a>
+        
+          <a class="main-nav-link" href="/">Home</a>
+        
+          <a class="main-nav-link" href="/archives">Archives</a>
+        
+      </nav>
+      <nav id="sub-nav">
+        
+          <a id="nav-rss-link" class="nav-icon" href="/atom.xml" title="RSS Feed"></a>
+        
+        <a id="nav-search-btn" class="nav-icon" title="搜尋"></a>
+      </nav>
+      <div id="search-form-wrap">
+        <form action="//google.com/search" method="get" accept-charset="UTF-8" class="search-form"><input type="search" name="q" class="search-form-input" placeholder="Search"><button type="submit" class="search-form-submit">&#xF002;</button><input type="hidden" name="sitesearch" value="https://blog.marsen.me"></form>
+      </div>
+    </div>
+  </div>
+</header>
+      <div class="outer">
+        <section id="main"><article id="post-2025/ai-refactor-rule-apply-dp" class="article article-type-post" itemscope itemprop="blogPost">
+  <div class="article-meta">
+    <a href="/2025/09/17/2025/ai-refactor-rule-apply-dp/" class="article-date">
+  <time datetime="2025-09-17T08:53:43.000Z" itemprop="datePublished">2025-09-17</time>
+</a>
+    
+  </div>
+  <div class="article-inner">
+    
+    
+      <header class="article-header">
+        
+  
+    <h1 class="article-title" itemprop="name">
+       [實作筆記] 命令式程式碼重構到函數式 Pipe 流水線
+    </h1>
+  
+
+      </header>
+    
+    <div class="article-entry" itemprop="articleBody">
+      
+        <h2 id="前言"><a href="#前言" class="headerlink" title="前言"></a>前言</h2><p>最近小朋友在進行中文轉換規則的開發時，遇到了一個典型的程式碼異味。</p>
+<p>你可以先挑戰看一下有沒有辦法識別。</p>
+<figure class="highlight typescript"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment">// 重構前的程式碼</span></span><br><span class="line"><span class="title function_">apply</span>(<span class="attr">text</span>: <span class="built_in">string</span>): <span class="built_in">string</span> &#123;</span><br><span class="line">  <span class="keyword">const</span> protectedChars = [<span class="string">&#x27;台&#x27;</span>]</span><br><span class="line">  </span><br><span class="line">  <span class="comment">// 1. 標記階段</span></span><br><span class="line">  <span class="keyword">let</span> protectedText = text</span><br><span class="line">  protectedChars.<span class="title function_">forEach</span>(<span class="function">(<span class="params">char</span>) =&gt;</span> &#123;</span><br><span class="line">    protectedText = protectedText.<span class="title function_">replaceAll</span>(char, <span class="string">`&lt;&lt;&lt;<span class="subst">$&#123;char&#125;</span>&gt;&gt;&gt;`</span>)</span><br><span class="line">  &#125;)</span><br><span class="line"></span><br><span class="line">  <span class="comment">// 2. 轉換階段</span></span><br><span class="line">  <span class="keyword">let</span> result = <span class="variable language_">this</span>.<span class="title function_">baseConverter</span>(protectedText)</span><br><span class="line"></span><br><span class="line">  <span class="comment">// 3. 還原階段</span></span><br><span class="line">  protectedChars.<span class="title function_">forEach</span>(<span class="function">(<span class="params">char</span>) =&gt;</span> &#123;</span><br><span class="line">    <span class="keyword">const</span> convertedChar = <span class="variable language_">this</span>.<span class="title function_">baseConverter</span>(char)</span><br><span class="line">    result = result.<span class="title function_">replaceAll</span>(<span class="string">`&lt;&lt;&lt;<span class="subst">$&#123;convertedChar&#125;</span>&gt;&gt;&gt;`</span>, char)</span><br><span class="line">  &#125;)</span><br><span class="line"></span><br><span class="line">  <span class="comment">// 4. 自訂轉換</span></span><br><span class="line">  result = <span class="variable language_">this</span>.<span class="title function_">customConverter</span>(result)</span><br><span class="line">  </span><br><span class="line">  <span class="keyword">return</span> result</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+<p>這篇文章記錄了我如何將一個命令式的方法重構為函數式的 pipe 流水線，</p>
+<p>讓程式碼變得更加簡潔和易讀。</p>
+<h2 id="壞味道"><a href="#壞味道" class="headerlink" title="壞味道"></a>壞味道</h2><p>原始的 <code>ChineseConversionRule</code> 中的 <code>apply</code> 方法存在以下問題：</p>
+<ol>
+<li><strong>過多中間變數</strong>：<code>text</code> → <code>protectedText</code> → <code>result</code></li>
+<li><strong>命令式寫法</strong>：透過變數重新賦值來處理資料流</li>
+<li><strong>邏輯分散</strong>：標記保護字符和還原的邏輯內嵌在主方法中</li>
+</ol>
+<p>過多的中間變數和命令式的寫法讓程式碼顯得冗長且不夠優雅。</p>
+<p>protectedText、result、text　都是。</p>
+<p>這裡的挑戰是要對原始的字串加工</p>
+<p>在不破壞原本邏輯的情況下，保留擴充的彈性，並保持程式結構清晰、可維護。</p>
+<p>可能有很多模式可以解決(Decorator &#x2F; Template Method &#x2F; Pipeline)</p>
+<p>小朋友寫也得也不差了，我們試著讓它更好</p>
+<h2 id="重構過程"><a href="#重構過程" class="headerlink" title="重構過程"></a>重構過程</h2><h3 id="階段一：消除中間變數"><a href="#階段一：消除中間變數" class="headerlink" title="階段一：消除中間變數"></a>階段一：消除中間變數</h3><p>第一步是消除不必要的中間變數，直接在同一個變數上操作：</p>
+<p>可以看到修改後，只有 text 一個變數，還是傳入了的</p>
+<p>越少變數，越不用花心思思考命名，減少認知負擔，而本質上這些冗餘的變數的確是同質可以刪除的</p>
+<p>這是一種隱性的重複壞味道。</p>
+<figure class="highlight typescript"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br></pre></td><td class="code"><pre><span class="line"><span class="title function_">apply</span>(<span class="attr">text</span>: <span class="built_in">string</span>): <span class="built_in">string</span> &#123;</span><br><span class="line">  <span class="keyword">const</span> protectedChars = [<span class="string">&#x27;台&#x27;</span>]</span><br><span class="line">  </span><br><span class="line">  <span class="comment">// 直接操作 text 變數，消除 protectedText 和 result</span></span><br><span class="line">  protectedChars.<span class="title function_">forEach</span>(<span class="function">(<span class="params">char</span>) =&gt;</span> &#123;</span><br><span class="line">    text = text.<span class="title function_">replaceAll</span>(char, <span class="string">`&lt;&lt;&lt;<span class="subst">$&#123;char&#125;</span>&gt;&gt;&gt;`</span>)</span><br><span class="line">  &#125;)</span><br><span class="line"></span><br><span class="line">  text = <span class="variable language_">this</span>.<span class="title function_">baseConverter</span>(text)</span><br><span class="line"></span><br><span class="line">  protectedChars.<span class="title function_">forEach</span>(<span class="function">(<span class="params">char</span>) =&gt;</span> &#123;</span><br><span class="line">    <span class="keyword">const</span> convertedChar = <span class="variable language_">this</span>.<span class="title function_">baseConverter</span>(char)</span><br><span class="line">    text = text.<span class="title function_">replaceAll</span>(<span class="string">`&lt;&lt;&lt;<span class="subst">$&#123;convertedChar&#125;</span>&gt;&gt;&gt;`</span>, char)</span><br><span class="line">  &#125;)</span><br><span class="line"></span><br><span class="line">  <span class="keyword">return</span> <span class="variable language_">this</span>.<span class="title function_">customConverter</span>(text)</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+<h3 id="階段二：引入-Functional-Programming"><a href="#階段二：引入-Functional-Programming" class="headerlink" title="階段二：引入 Functional Programming"></a>階段二：引入 Functional Programming</h3><p>接下來導入函數式程式設計的概念，使用 pipe 模式來處理資料流：</p>
+<p>這裡要先看懂 <code>pipe</code>，簡單理解它把一個初始值依序丟進多個函數，前一個輸出就是下一個的輸入。</p>
+<p>可以看到一些明顯的壞味道，<strong>重複的 protectedChars</strong>，1 跟 3 本身是匿名函數，讀起來也沒那麼好理解，</p>
+<p>這是重構必經之路，我們再往下走</p>
+<figure class="highlight typescript"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br></pre></td><td class="code"><pre><span class="line"><span class="title function_">apply</span>(<span class="attr">text</span>: <span class="built_in">string</span>): <span class="built_in">string</span> &#123;</span><br><span class="line">  <span class="keyword">const</span> protectedChars = [<span class="string">&#x27;台&#x27;</span>]</span><br><span class="line">  </span><br><span class="line">  <span class="keyword">return</span> <span class="variable language_">this</span>.<span class="title function_">pipe</span>(</span><br><span class="line">    text,</span><br><span class="line">    <span class="comment">// 1. 標記階段：將需要保護的字符標記為不轉換</span></span><br><span class="line">    <span class="function">(<span class="params">input</span>) =&gt;</span> protectedChars.<span class="title function_">reduce</span>(<span class="function">(<span class="params">acc, char</span>) =&gt;</span></span><br><span class="line">      acc.<span class="title function_">replaceAll</span>(char, <span class="string">`&lt;&lt;&lt;<span class="subst">$&#123;char&#125;</span>&gt;&gt;&gt;`</span>), input),</span><br><span class="line">    </span><br><span class="line">    <span class="comment">// 2. 轉換階段：使用 OpenCC 進行轉換</span></span><br><span class="line">    <span class="variable language_">this</span>.<span class="property">baseConverter</span>,</span><br><span class="line">    </span><br><span class="line">    <span class="comment">// 3. 還原階段：將標記的字符還原為原始字符</span></span><br><span class="line">    <span class="function">(<span class="params">input</span>) =&gt;</span> protectedChars.<span class="title function_">reduce</span>(<span class="function">(<span class="params">acc, char</span>) =&gt;</span> &#123;</span><br><span class="line">      <span class="keyword">const</span> convertedChar = <span class="variable language_">this</span>.<span class="title function_">baseConverter</span>(char)</span><br><span class="line">      <span class="keyword">return</span> acc.<span class="title function_">replaceAll</span>(<span class="string">`&lt;&lt;&lt;<span class="subst">$&#123;convertedChar&#125;</span>&gt;&gt;&gt;`</span>, char)</span><br><span class="line">    &#125;, input),</span><br><span class="line">    </span><br><span class="line">    <span class="comment">// 4. 使用自訂轉換器進行模糊字詞的修正</span></span><br><span class="line">    <span class="variable language_">this</span>.<span class="property">customConverter</span></span><br><span class="line">  )</span><br><span class="line">&#125;</span><br><span class="line"></span><br><span class="line"><span class="comment">// 自製的 pipe 函數</span></span><br><span class="line"><span class="keyword">private</span> pipe&lt;T&gt;(<span class="attr">value</span>: T, ...<span class="attr">fns</span>: <span class="title class_">Array</span>&lt;<span class="function">(<span class="params">arg: T</span>) =&gt;</span> T&gt;): T &#123;</span><br><span class="line">  <span class="keyword">return</span> fns.<span class="title function_">reduce</span>(<span class="function">(<span class="params">acc, fn</span>) =&gt;</span> <span class="title function_">fn</span>(acc), value)</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+<h3 id="階段三：職責分離"><a href="#階段三：職責分離" class="headerlink" title="階段三：職責分離"></a>階段三：職責分離</h3><p>將標記和還原邏輯抽取成獨立的私有方法：</p>
+<p>將重複出現的 <code>protectedChars</code> 提升為類別屬性：</p>
+<p>也不需要把匿名函數寫一坨在 pipe 裡面，這時要煩惱的只有方法的名字要怎麼才達意</p>
+<p>但至少我們還有註解。</p>
+<p>更進一步可以簡化方法內的參數名，因為 scope 很小，不會有認知負擔</p>
+<figure class="highlight typescript"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br><span class="line">29</span><br><span class="line">30</span><br><span class="line">31</span><br><span class="line">32</span><br><span class="line">33</span><br><span class="line">34</span><br><span class="line">35</span><br><span class="line">36</span><br><span class="line">37</span><br><span class="line">38</span><br><span class="line">39</span><br><span class="line">40</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">export</span> <span class="keyword">class</span> <span class="title class_">ChineseConversionRule</span> <span class="keyword">implements</span> <span class="title class_">IRule</span> &#123;</span><br><span class="line">  <span class="keyword">private</span> <span class="attr">baseConverter</span>: <span class="title class_">ConvertText</span></span><br><span class="line">  <span class="keyword">private</span> <span class="attr">customConverter</span>: <span class="title class_">ConvertText</span></span><br><span class="line">  <span class="keyword">private</span> <span class="keyword">readonly</span> protectedChars = [<span class="string">&#x27;台&#x27;</span>]  <span class="comment">// 統一管理</span></span><br><span class="line"></span><br><span class="line">  <span class="comment">// ... constructor</span></span><br><span class="line"></span><br><span class="line"><span class="title function_">apply</span>(<span class="attr">text</span>: <span class="built_in">string</span>): <span class="built_in">string</span> &#123;</span><br><span class="line">  <span class="keyword">return</span> <span class="variable language_">this</span>.<span class="title function_">pipe</span>(</span><br><span class="line">    text,</span><br><span class="line">    <span class="comment">// 1. 標記階段：將需要保護的字符標記為不轉換</span></span><br><span class="line">    <span class="variable language_">this</span>.<span class="property">markProtectedChars</span>,</span><br><span class="line">    </span><br><span class="line">    <span class="comment">// 2. 轉換階段：使用 OpenCC 進行轉換</span></span><br><span class="line">    <span class="variable language_">this</span>.<span class="property">baseConverter</span>,</span><br><span class="line">    </span><br><span class="line">    <span class="comment">// 3. 還原階段：將標記的字符還原為原始字符</span></span><br><span class="line">    <span class="variable language_">this</span>.<span class="property">restoreProtectedChars</span>,</span><br><span class="line">    </span><br><span class="line">    <span class="comment">// 4. 使用自訂轉換器進行模糊字詞的修正</span></span><br><span class="line">    <span class="variable language_">this</span>.<span class="property">customConverter</span></span><br><span class="line">  )</span><br><span class="line">&#125;</span><br><span class="line"></span><br><span class="line">  <span class="comment">/**</span></span><br><span class="line"><span class="comment">   * 標記需要保護的字符</span></span><br><span class="line"><span class="comment">   */</span></span><br><span class="line">  <span class="keyword">private</span> markProtectedChars = (<span class="attr">input</span>: <span class="built_in">string</span>): <span class="function"><span class="params">string</span> =&gt;</span> &#123;</span><br><span class="line">    <span class="keyword">return</span> <span class="variable language_">this</span>.<span class="property">protectedChars</span>.<span class="title function_">reduce</span>(<span class="function">(<span class="params">acc, c</span>) =&gt;</span> acc.<span class="title function_">replaceAll</span>(c, <span class="string">`&lt;&lt;&lt;<span class="subst">$&#123;c&#125;</span>&gt;&gt;&gt;`</span>), input)</span><br><span class="line">  &#125;</span><br><span class="line"></span><br><span class="line">  <span class="comment">/**</span></span><br><span class="line"><span class="comment">   * 還原被標記的保護字符</span></span><br><span class="line"><span class="comment">   */</span></span><br><span class="line">  <span class="keyword">private</span> restoreProtectedChars = (<span class="attr">input</span>: <span class="built_in">string</span>): <span class="function"><span class="params">string</span> =&gt;</span> &#123;</span><br><span class="line">    <span class="keyword">return</span> <span class="variable language_">this</span>.<span class="property">protectedChars</span>.<span class="title function_">reduce</span>(<span class="function">(<span class="params">acc, c</span>) =&gt;</span> &#123;</span><br><span class="line">      <span class="keyword">const</span> convertedChar = <span class="variable language_">this</span>.<span class="title function_">baseConverter</span>(c) <span class="comment">// 例如：&#x27;台&#x27; -&gt; &#x27;臺&#x27;</span></span><br><span class="line">      <span class="keyword">return</span> acc.<span class="title function_">replaceAll</span>(<span class="string">`&lt;&lt;&lt;<span class="subst">$&#123;convertedChar&#125;</span>&gt;&gt;&gt;`</span>, c)</span><br><span class="line">    &#125;, input)</span><br><span class="line">  &#125;</span><br></pre></td></tr></table></figure>
+
+<h2 id="重構成果"><a href="#重構成果" class="headerlink" title="重構成果"></a>重構成果</h2><ol>
+<li><strong>簡潔性</strong>：主方法從 20 行縮減到 8 行</li>
+<li><strong>可讀性</strong>：資料流向清晰，從上到下一目了然</li>
+<li><strong>可測試性</strong>：每個步驟都是純函數，可以獨立測試</li>
+<li><strong>可維護性</strong>：職責分離，邏輯集中管理</li>
+<li><strong>函數式</strong>：無副作用，符合 FP 原則</li>
+</ol>
+<h3 id="效能考量"><a href="#效能考量" class="headerlink" title="效能考量"></a>效能考量</h3><ul>
+<li>測試結果顯示功能完全正常，262 個測試案例全數通過，這是個大前提，沒有測試沒有重構</li>
+<li>重構過程中沒有改變演算法複雜度</li>
+<li>Pipe 函數本身的開銷微乎其微</li>
+</ul>
+<h2 id="關於-Pipe-的選擇"><a href="#關於-Pipe-的選擇" class="headerlink" title="關於 Pipe 的選擇"></a>關於 Pipe 的選擇</h2><p>在重構過程中考慮過使用現成的函式庫：</p>
+<ul>
+<li><strong>Ramda</strong>：功能最完整的 FP 函式庫</li>
+<li><strong>Lodash&#x2F;fp</strong>：輕量級選擇</li>
+<li><strong>fp-ts</strong>：型別安全的 FP 函式庫</li>
+</ul>
+<p>最終選擇自製 pipe 函數的理由：</p>
+<p>兩行程式碼，沒有多餘依賴，寫法完全貼合專案需求。</p>
+<p>團隊看了就能用，不用再去學新的函式庫。</p>
+<p>邏輯也很單純，後續維護起來相對輕鬆。</p>
+<p>除非更大範圍的重複發生，不然不需要額外引用套件突增學習成本</p>
+<figure class="highlight typescript"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">private</span> pipe&lt;T&gt;(<span class="attr">value</span>: T, ...<span class="attr">fns</span>: <span class="title class_">Array</span>&lt;<span class="function">(<span class="params">arg: T</span>) =&gt;</span> T&gt;): T &#123;</span><br><span class="line">  <span class="keyword">return</span> fns.<span class="title function_">reduce</span>(<span class="function">(<span class="params">acc, fn</span>) =&gt;</span> <span class="title function_">fn</span>(acc), value)</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+<h2 id="RD-反饋"><a href="#RD-反饋" class="headerlink" title="RD 反饋"></a>RD 反饋</h2><p>這次重構讓我深刻體會到函數式程式設計的優雅之處：</p>
+<ol>
+<li><strong>資料即流水線</strong>：透過 pipe 讓資料在各個函數間流動</li>
+<li><strong>純函數的威力</strong>：每個步驟都可預測、可測試</li>
+<li><strong>組合勝過繼承</strong>：透過函數組合建構複雜邏輯</li>
+<li><strong>漸進式重構</strong>：一步步改善，降低風險</li>
+</ol>
+<p>從命令式到函數式的重構不僅讓程式碼變得更優雅，也提升了整體的可維護性。</p>
+<p>雖然函數式程式設計有一定的學習曲線，但一旦掌握了基本概念，就能寫出更簡潔、更易懂的程式碼。</p>
+<p>重構的關鍵在於：<strong>小步快跑，持續改善</strong>。每一次小的改進都讓程式碼朝著更好的方向發展，這正是軟體工藝精神的體現。</p>
+<h2 id="小結"><a href="#小結" class="headerlink" title="小結"></a>小結</h2><p>嗯，小朋友很會用 AI 寫作文呢。</p>
+<p>(fin)</p>
+
+      
+    </div>
+    <footer class="article-footer">
+      <a data-url="https://blog.marsen.me/2025/09/17/2025/ai-refactor-rule-apply-dp/" data-id="cmfns0yb100ho2snxh3bz7b5c" class="article-share-link">Share</a>
+      
+        <a href="https://blog.marsen.me/2025/09/17/2025/ai-refactor-rule-apply-dp/#disqus_thread" class="article-comment-link">留言</a>
+      
+      
+  <ul class="article-tag-list" itemprop="keywords"><li class="article-tag-list-item"><a class="article-tag-list-link" href="/tags/%E5%AF%A6%E4%BD%9C%E7%AD%86%E8%A8%98/" rel="tag">實作筆記</a></li></ul>
+
+    </footer>
+  </div>
+  
+    
+<nav id="article-nav">
+  
+  
+    <a href="/2025/09/11/2025/clean-architecture-avoid-type-hell/" id="article-nav-older" class="article-nav-link-wrap">
+      <strong class="article-nav-caption">Older</strong>
+      <div class="article-nav-title"> [實作筆記] Clean Architecture 思考：避免過度設計</div>
+    </a>
+  
+</nav>
+
+  
+</article>
+
+
+<section id="comments">
+  
+    <div id="gitalk-container" >
+  Please enable JavaScript to view the Gitalk. :D
+</div>
+<link rel="stylesheet" href="https://unpkg.com/gitalk/dist/gitalk.css">
+<script src="https://unpkg.com/gitalk/dist/gitalk.min.js"></script>  
+<script src="https://cdnjs.cloudflare.com/ajax/libs/blueimp-md5/2.18.0/js/md5.min.js"></script>
+<script>
+  (function(){
+    const gitalk = new Gitalk({
+      'clientID': '386c8c11178846ff9a31',
+      'clientSecret': '969a7543f3dc518b9e540d1e335df2fcb9c2df57',
+      'repo': 'marsen.github.io',
+      'owner': 'marsen',
+      'admin': ['marsen'],
+      'id': md5(location.pathname),      // Ensure uniqueness and length less than 50( use md5)
+      'distractionFreeMode': false  // Facebook-like distraction free mode
+    })
+
+    gitalk.render('gitalk-container')
+  })();
+</script>
+
+  
+  
+    <div id="likecoin">
+Please enable JavaScript to view the LikeCoin. :P
+</div>
+<script>
+
+  (function(){
+    var ifrm = document.createElement("iframe");
+    ifrm.setAttribute("src", "https://button.like.co/in/embed/marsenlin/button?referrer=https%3A%2F%2Fblog.marsen.me%2F2025%2F09%2F17%2F2025%2Fai-refactor-rule-apply-dp%2F");      
+    ifrm.setAttribute("sandbox","allow-scripts allow-same-origin allow-popups allow-popups-to-escape-sandbox");
+    ifrm.frameborder = "0";
+    ifrm.scrolling = "no";
+    (document.getElementById("likecoin").replaceChild(ifrm, document.getElementById("likecoin").childNodes[0]));
+  })();
+
+</script>
+  
+  <div id="disqus_thread">
+    <noscript>Please enable JavaScript to view the <a target="_blank" rel="noopener" href="//disqus.com/?ref_noscript">comments powered by Disqus.</a></noscript>
+  </div>
+</section>
+</section>
+        
+          <aside id="sidebar">
+  
+    
+  <div class="widget-wrap">
+    <h3 class="widget-title">最新文章</h3>
+    <div class="widget">
+      <ul>
+        
+          <li>
+            <a href="/2025/09/17/2025/ai-refactor-rule-apply-dp/"> [實作筆記] 命令式程式碼重構到函數式 Pipe 流水線</a>
+          </li>
+        
+          <li>
+            <a href="/2025/09/11/2025/clean-architecture-avoid-type-hell/"> [實作筆記] Clean Architecture 思考：避免過度設計</a>
+          </li>
+        
+          <li>
+            <a href="/2025/09/05/2025/ai-hf-open-model-upload/"> [實作筆記] PaddleOCR ONNX 模型發布到 Hugging Face Hub</a>
+          </li>
+        
+          <li>
+            <a href="/2025/09/02/2025/gitlab-python-package-registry/"> [實作筆記] 建立私有 Python Package Registry - 以 ONNX Runtime 為例</a>
+          </li>
+        
+          <li>
+            <a href="/2025/08/27/2025/brevo_smtp/"> [實作筆記] 怎麼建立一個網站？(四) - 自訂網域 EMail 收寄信(使用 Cloudflare 與 Brevo)</a>
+          </li>
+        
+      </ul>
+    </div>
+  </div>
+
+  
+    
+  <div class="widget-wrap">
+    <h3 class="widget-title">彙整</h3>
+    <div class="widget">
+      <ul class="archive-list"><li class="archive-list-item"><a class="archive-list-link" href="/archives/2025/09/">九月 2025</a><span class="archive-list-count">4</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2025/08/">八月 2025</a><span class="archive-list-count">3</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2025/07/">七月 2025</a><span class="archive-list-count">4</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2025/06/">六月 2025</a><span class="archive-list-count">4</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2025/05/">五月 2025</a><span class="archive-list-count">5</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2025/04/">四月 2025</a><span class="archive-list-count">1</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2025/03/">三月 2025</a><span class="archive-list-count">2</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2025/02/">二月 2025</a><span class="archive-list-count">4</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2025/01/">一月 2025</a><span class="archive-list-count">3</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2024/12/">十二月 2024</a><span class="archive-list-count">3</span></li><span id='list_archives2' style='display:none'><li class="archive-list-item"><a class="archive-list-link" href="/archives/2024/11/">十一月 2024</a><span class="archive-list-count">3</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2024/10/">十月 2024</a><span class="archive-list-count">4</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2024/09/">九月 2024</a><span class="archive-list-count">5</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2024/08/">八月 2024</a><span class="archive-list-count">4</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2024/07/">七月 2024</a><span class="archive-list-count">3</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2024/06/">六月 2024</a><span class="archive-list-count">2</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2024/05/">五月 2024</a><span class="archive-list-count">1</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2024/04/">四月 2024</a><span class="archive-list-count">2</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2024/03/">三月 2024</a><span class="archive-list-count">3</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2024/02/">二月 2024</a><span class="archive-list-count">2</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2024/01/">一月 2024</a><span class="archive-list-count">4</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2023/12/">十二月 2023</a><span class="archive-list-count">2</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2023/11/">十一月 2023</a><span class="archive-list-count">3</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2023/10/">十月 2023</a><span class="archive-list-count">2</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2023/09/">九月 2023</a><span class="archive-list-count">3</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2023/08/">八月 2023</a><span class="archive-list-count">2</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2023/07/">七月 2023</a><span class="archive-list-count">6</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2023/06/">六月 2023</a><span class="archive-list-count">6</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2023/05/">五月 2023</a><span class="archive-list-count">1</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2023/04/">四月 2023</a><span class="archive-list-count">9</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2023/03/">三月 2023</a><span class="archive-list-count">4</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2023/02/">二月 2023</a><span class="archive-list-count">2</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2023/01/">一月 2023</a><span class="archive-list-count">2</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2022/12/">十二月 2022</a><span class="archive-list-count">1</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2022/10/">十月 2022</a><span class="archive-list-count">2</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2022/09/">九月 2022</a><span class="archive-list-count">6</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2022/08/">八月 2022</a><span class="archive-list-count">3</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2022/07/">七月 2022</a><span class="archive-list-count">2</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2022/06/">六月 2022</a><span class="archive-list-count">3</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2022/05/">五月 2022</a><span class="archive-list-count">7</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2022/04/">四月 2022</a><span class="archive-list-count">3</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2022/03/">三月 2022</a><span class="archive-list-count">3</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2022/02/">二月 2022</a><span class="archive-list-count">2</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2022/01/">一月 2022</a><span class="archive-list-count">3</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2021/12/">十二月 2021</a><span class="archive-list-count">2</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2021/11/">十一月 2021</a><span class="archive-list-count">2</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2021/10/">十月 2021</a><span class="archive-list-count">2</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2021/09/">九月 2021</a><span class="archive-list-count">1</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2021/08/">八月 2021</a><span class="archive-list-count">2</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2021/07/">七月 2021</a><span class="archive-list-count">4</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2021/06/">六月 2021</a><span class="archive-list-count">1</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2021/05/">五月 2021</a><span class="archive-list-count">2</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2021/04/">四月 2021</a><span class="archive-list-count">3</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2021/03/">三月 2021</a><span class="archive-list-count">3</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2021/02/">二月 2021</a><span class="archive-list-count">1</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2021/01/">一月 2021</a><span class="archive-list-count">7</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2020/12/">十二月 2020</a><span class="archive-list-count">1</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2020/11/">十一月 2020</a><span class="archive-list-count">2</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2020/10/">十月 2020</a><span class="archive-list-count">5</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2020/09/">九月 2020</a><span class="archive-list-count">5</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2020/08/">八月 2020</a><span class="archive-list-count">2</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2020/07/">七月 2020</a><span class="archive-list-count">3</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2020/06/">六月 2020</a><span class="archive-list-count">3</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2020/05/">五月 2020</a><span class="archive-list-count">3</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2020/04/">四月 2020</a><span class="archive-list-count">4</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2020/03/">三月 2020</a><span class="archive-list-count">1</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2020/02/">二月 2020</a><span class="archive-list-count">1</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2020/01/">一月 2020</a><span class="archive-list-count">5</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2019/12/">十二月 2019</a><span class="archive-list-count">1</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2019/11/">十一月 2019</a><span class="archive-list-count">2</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2019/10/">十月 2019</a><span class="archive-list-count">1</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2019/09/">九月 2019</a><span class="archive-list-count">2</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2019/08/">八月 2019</a><span class="archive-list-count">5</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2019/07/">七月 2019</a><span class="archive-list-count">1</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2019/06/">六月 2019</a><span class="archive-list-count">1</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2019/05/">五月 2019</a><span class="archive-list-count">2</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2019/04/">四月 2019</a><span class="archive-list-count">3</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2019/03/">三月 2019</a><span class="archive-list-count">1</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2019/02/">二月 2019</a><span class="archive-list-count">2</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2019/01/">一月 2019</a><span class="archive-list-count">4</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2018/12/">十二月 2018</a><span class="archive-list-count">5</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2018/11/">十一月 2018</a><span class="archive-list-count">7</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2018/10/">十月 2018</a><span class="archive-list-count">6</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2018/09/">九月 2018</a><span class="archive-list-count">3</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2018/08/">八月 2018</a><span class="archive-list-count">2</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2018/07/">七月 2018</a><span class="archive-list-count">6</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2018/06/">六月 2018</a><span class="archive-list-count">2</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2018/05/">五月 2018</a><span class="archive-list-count">1</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2018/04/">四月 2018</a><span class="archive-list-count">5</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2018/03/">三月 2018</a><span class="archive-list-count">5</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2018/02/">二月 2018</a><span class="archive-list-count">1</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2018/01/">一月 2018</a><span class="archive-list-count">5</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2017/12/">十二月 2017</a><span class="archive-list-count">3</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2017/10/">十月 2017</a><span class="archive-list-count">3</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2017/09/">九月 2017</a><span class="archive-list-count">2</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2017/08/">八月 2017</a><span class="archive-list-count">1</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2017/07/">七月 2017</a><span class="archive-list-count">2</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2017/05/">五月 2017</a><span class="archive-list-count">1</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2017/04/">四月 2017</a><span class="archive-list-count">2</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2017/03/">三月 2017</a><span class="archive-list-count">1</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2017/02/">二月 2017</a><span class="archive-list-count">1</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2017/01/">一月 2017</a><span class="archive-list-count">6</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2016/12/">十二月 2016</a><span class="archive-list-count">1</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2016/11/">十一月 2016</a><span class="archive-list-count">2</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2016/10/">十月 2016</a><span class="archive-list-count">4</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2016/09/">九月 2016</a><span class="archive-list-count">1</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2016/08/">八月 2016</a><span class="archive-list-count">6</span></li></span><span id=''></span><span onclick="var d=document.getElementById('list_archives2'); d.style.display===''?d.style='display:none':d.style=''">toggle...</span></ul>
+    </div>
+  </div>
+
+
+  
+    <a rel="license noopener" target="_blank" href="http://creativecommons.org/licenses/by-nc-nd/3.0/tw/">
+  <img alt="Creative Commons License" style="border-width:0" src="https://i.creativecommons.org/l/by-nc-nd/3.0/tw/88x31.png" />
+</a>
+  <br />
+This work is licensed under a 
+<a rel="license noopener" target="_blank" href="http://creativecommons.org/licenses/by-nc-nd/3.0/tw/">Creative Commons Attribution-NonCommercial-NoDerivs 3.0 Taiwan License</a>
+  
+    
+  <div class="widget-wrap">
+    <h3 class="widget-title">標籤雲</h3>
+    <div class="widget tagcloud">
+      <a href="/tags/Net-Framework/" style="font-size: 14.67px;">.Net Framework</a> <a href="/tags/API/" style="font-size: 11.33px;">API</a> <a href="/tags/AWS/" style="font-size: 13.33px;">AWS</a> <a href="/tags/Agile/" style="font-size: 17.33px;">Agile</a> <a href="/tags/CI-CD/" style="font-size: 19.33px;">CI/CD</a> <a href="/tags/Cache/" style="font-size: 10px;">Cache</a> <a href="/tags/Coding-Standard/" style="font-size: 10px;">Coding Standard</a> <a href="/tags/Container/" style="font-size: 12px;">Container</a> <a href="/tags/Database/" style="font-size: 12.67px;">Database</a> <a href="/tags/Design-Pattern/" style="font-size: 10.67px;">Design Pattern</a> <a href="/tags/Docker/" style="font-size: 12px;">Docker</a> <a href="/tags/Entity-Framework/" style="font-size: 10.67px;">Entity Framework</a> <a href="/tags/Firebase/" style="font-size: 10px;">Firebase</a> <a href="/tags/Git/" style="font-size: 10.67px;">Git</a> <a href="/tags/Golang/" style="font-size: 11.33px;">Golang</a> <a href="/tags/Google/" style="font-size: 11.33px;">Google</a> <a href="/tags/GulpJs/" style="font-size: 10.67px;">GulpJs</a> <a href="/tags/HTTP/" style="font-size: 10px;">HTTP</a> <a href="/tags/Hexo/" style="font-size: 15.33px;">Hexo</a> <a href="/tags/IIS/" style="font-size: 10px;">IIS</a> <a href="/tags/IO/" style="font-size: 10px;">IO</a> <a href="/tags/Integrated-Testing/" style="font-size: 10px;">Integrated Testing</a> <a href="/tags/Jenkins/" style="font-size: 12px;">Jenkins</a> <a href="/tags/Kubernetes/" style="font-size: 10px;">Kubernetes</a> <a href="/tags/Linux/" style="font-size: 10.67px;">Linux</a> <a href="/tags/Mongodb/" style="font-size: 10px;">Mongodb</a> <a href="/tags/MsSQL/" style="font-size: 11.33px;">MsSQL</a> <a href="/tags/MsTest/" style="font-size: 10px;">MsTest</a> <a href="/tags/Mutation-Testing/" style="font-size: 10px;">Mutation Testing</a> <a href="/tags/Nodejs/" style="font-size: 15.33px;">Nodejs</a> <a href="/tags/OAuth/" style="font-size: 10px;">OAuth</a> <a href="/tags/OOP/" style="font-size: 11.33px;">OOP</a> <a href="/tags/Openshift/" style="font-size: 10.67px;">Openshift</a> <a href="/tags/PowerShell/" style="font-size: 11.33px;">PowerShell</a> <a href="/tags/React/" style="font-size: 12px;">React</a> <a href="/tags/Redis/" style="font-size: 10.67px;">Redis</a> <a href="/tags/SQL/" style="font-size: 12px;">SQL</a> <a href="/tags/Scrum/" style="font-size: 16.67px;">Scrum</a> <a href="/tags/Shell/" style="font-size: 10.67px;">Shell</a> <a href="/tags/Specflow/" style="font-size: 10px;">Specflow</a> <a href="/tags/StyleCop/" style="font-size: 10px;">StyleCop</a> <a href="/tags/TDD/" style="font-size: 16px;">TDD</a> <a href="/tags/Testing/" style="font-size: 14px;">Testing</a> <a href="/tags/Thread/" style="font-size: 10.67px;">Thread</a> <a href="/tags/Trello/" style="font-size: 10px;">Trello</a> <a href="/tags/TypeScript/" style="font-size: 13.33px;">TypeScript</a> <a href="/tags/Unit-Testing/" style="font-size: 18.67px;">Unit Testing</a> <a href="/tags/Unix/" style="font-size: 10.67px;">Unix</a> <a href="/tags/Vim/" style="font-size: 10px;">Vim</a> <a href="/tags/Visual-Studio/" style="font-size: 10px;">Visual Studio</a> <a href="/tags/html/" style="font-size: 10px;">html</a> <a href="/tags/post/" style="font-size: 10px;">post</a> <a href="/tags/%E5%AD%B8%E7%BF%92%E7%AD%86%E8%A8%98/" style="font-size: 17.33px;">學習筆記</a> <a href="/tags/%E5%AF%A6%E4%BD%9C%E7%AD%86%E8%A8%98/" style="font-size: 20px;">實作筆記</a> <a href="/tags/%E6%99%82%E9%96%93%E7%AE%A1%E7%90%86/" style="font-size: 10.67px;">時間管理</a> <a href="/tags/%E6%B4%BB%E5%8B%95%E7%AD%86%E8%A8%98/" style="font-size: 12.67px;">活動筆記</a> <a href="/tags/%E7%94%9F%E6%B4%BB%E7%AD%86%E8%A8%98/" style="font-size: 16.67px;">生活筆記</a> <a href="/tags/%E8%A8%98%E9%8C%84/" style="font-size: 11.33px;">記錄</a> <a href="/tags/%E8%B8%A9%E9%9B%B7%E7%AD%86%E8%A8%98/" style="font-size: 16px;">踩雷筆記</a> <a href="/tags/%E9%87%8D%E6%A7%8B/" style="font-size: 12px;">重構</a> <a href="/tags/%E9%96%B1%E8%AE%80%E7%AD%86%E8%A8%98/" style="font-size: 18px;">閱讀筆記</a>
+    </div>
+  </div>
+
+  
+    
+  <div class="widget-wrap">
+    <h3 class="widget-title">標籤</h3>
+    <div class="widget">
+      <ul class="tag-list" itemprop="keywords"><li class="tag-list-item"><a class="tag-list-link" href="/tags/Net-Framework/" rel="tag">.Net Framework</a><span class="tag-list-count">9</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/API/" rel="tag">API</a><span class="tag-list-count">3</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/AWS/" rel="tag">AWS</a><span class="tag-list-count">7</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/Agile/" rel="tag">Agile</a><span class="tag-list-count">14</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/CI-CD/" rel="tag">CI&#x2F;CD</a><span class="tag-list-count">24</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/Cache/" rel="tag">Cache</a><span class="tag-list-count">1</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/Coding-Standard/" rel="tag">Coding Standard</a><span class="tag-list-count">1</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/Container/" rel="tag">Container</a><span class="tag-list-count">4</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/Database/" rel="tag">Database</a><span class="tag-list-count">6</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/Design-Pattern/" rel="tag">Design Pattern</a><span class="tag-list-count">2</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/Docker/" rel="tag">Docker</a><span class="tag-list-count">4</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/Entity-Framework/" rel="tag">Entity Framework</a><span class="tag-list-count">2</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/Firebase/" rel="tag">Firebase</a><span class="tag-list-count">1</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/Git/" rel="tag">Git</a><span class="tag-list-count">2</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/Golang/" rel="tag">Golang</a><span class="tag-list-count">3</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/Google/" rel="tag">Google</a><span class="tag-list-count">3</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/GulpJs/" rel="tag">GulpJs</a><span class="tag-list-count">2</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/HTTP/" rel="tag">HTTP</a><span class="tag-list-count">1</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/Hexo/" rel="tag">Hexo</a><span class="tag-list-count">10</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/IIS/" rel="tag">IIS</a><span class="tag-list-count">1</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/IO/" rel="tag">IO</a><span class="tag-list-count">1</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/Integrated-Testing/" rel="tag">Integrated Testing</a><span class="tag-list-count">1</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/Jenkins/" rel="tag">Jenkins</a><span class="tag-list-count">4</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/Kubernetes/" rel="tag">Kubernetes</a><span class="tag-list-count">1</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/Linux/" rel="tag">Linux</a><span class="tag-list-count">2</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/Mongodb/" rel="tag">Mongodb</a><span class="tag-list-count">1</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/MsSQL/" rel="tag">MsSQL</a><span class="tag-list-count">3</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/MsTest/" rel="tag">MsTest</a><span class="tag-list-count">1</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/Mutation-Testing/" rel="tag">Mutation Testing</a><span class="tag-list-count">1</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/Nodejs/" rel="tag">Nodejs</a><span class="tag-list-count">10</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/OAuth/" rel="tag">OAuth</a><span class="tag-list-count">1</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/OOP/" rel="tag">OOP</a><span class="tag-list-count">3</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/Openshift/" rel="tag">Openshift</a><span class="tag-list-count">2</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/PowerShell/" rel="tag">PowerShell</a><span class="tag-list-count">3</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/React/" rel="tag">React</a><span class="tag-list-count">4</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/Redis/" rel="tag">Redis</a><span class="tag-list-count">2</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/SQL/" rel="tag">SQL</a><span class="tag-list-count">4</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/Scrum/" rel="tag">Scrum</a><span class="tag-list-count">13</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/Shell/" rel="tag">Shell</a><span class="tag-list-count">2</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/Specflow/" rel="tag">Specflow</a><span class="tag-list-count">1</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/StyleCop/" rel="tag">StyleCop</a><span class="tag-list-count">1</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/TDD/" rel="tag">TDD</a><span class="tag-list-count">11</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/Testing/" rel="tag">Testing</a><span class="tag-list-count">8</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/Thread/" rel="tag">Thread</a><span class="tag-list-count">2</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/Trello/" rel="tag">Trello</a><span class="tag-list-count">1</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/TypeScript/" rel="tag">TypeScript</a><span class="tag-list-count">7</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/Unit-Testing/" rel="tag">Unit Testing</a><span class="tag-list-count">19</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/Unix/" rel="tag">Unix</a><span class="tag-list-count">2</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/Vim/" rel="tag">Vim</a><span class="tag-list-count">1</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/Visual-Studio/" rel="tag">Visual Studio</a><span class="tag-list-count">1</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/html/" rel="tag">html</a><span class="tag-list-count">1</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/post/" rel="tag">post</a><span class="tag-list-count">1</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/%E5%AD%B8%E7%BF%92%E7%AD%86%E8%A8%98/" rel="tag">學習筆記</a><span class="tag-list-count">14</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/%E5%AF%A6%E4%BD%9C%E7%AD%86%E8%A8%98/" rel="tag">實作筆記</a><span class="tag-list-count">131</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/%E6%99%82%E9%96%93%E7%AE%A1%E7%90%86/" rel="tag">時間管理</a><span class="tag-list-count">2</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/%E6%B4%BB%E5%8B%95%E7%AD%86%E8%A8%98/" rel="tag">活動筆記</a><span class="tag-list-count">6</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/%E7%94%9F%E6%B4%BB%E7%AD%86%E8%A8%98/" rel="tag">生活筆記</a><span class="tag-list-count">13</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/%E8%A8%98%E9%8C%84/" rel="tag">記錄</a><span class="tag-list-count">3</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/%E8%B8%A9%E9%9B%B7%E7%AD%86%E8%A8%98/" rel="tag">踩雷筆記</a><span class="tag-list-count">11</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/%E9%87%8D%E6%A7%8B/" rel="tag">重構</a><span class="tag-list-count">4</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/%E9%96%B1%E8%AE%80%E7%AD%86%E8%A8%98/" rel="tag">閱讀筆記</a><span class="tag-list-count">15</span></li></ul>
+    </div>
+  </div>
+
+
+  
+    
+
+  
+    <div class="widget-wrap">
+    <h3 class="widget-title">多語系</h3>
+    <div class="widget">
+        <div id="ytWidget"></div>
+    </div>
+</div>
+<script src="https://translate.yandex.net/website-widget/v1/widget.js?widgetId=ytWidget&pageLang=zh&widgetTheme=dark&autoMode=false" type="text/javascript"></script>
+  
+    <div class="widget-wrap">
+    <h3 class="widget-title">BADGES</h3>
+    <div class="widget">
+        <a target="_blank" rel="noopener" href="https://bcert.me/bc/html/show-badge.html?b=uufxvngl">
+            <img src="/images/2018/csm/seal-csm.png" alt="Certified ScrumMaster®">
+        </a>
+    </div>
+</div>
+  
+</aside>
+        
+      </div>
+      <footer id="footer">
+  
+  <div class="outer">
+    <div id="footer-info" class="inner">
+      &copy; 2025 Marsen L.<br>
+      Powered by <a href="http://hexo.io/" target="_blank">Hexo</a>
+    </div>
+  </div>
+</footer>
+    </div>
+    <nav id="mobile-nav">
+  
+    <a href="/" class="mobile-nav-link">Home</a>
+  
+    <a href="/archives" class="mobile-nav-link">Archives</a>
+  
+</nav>
+    <script src="//ajax.googleapis.com/ajax/libs/jquery/2.0.3/jquery.min.js"></script>
+
+  
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/fancybox/3.5.7/jquery.fancybox.min.css">
+
+  
+<script src="https://cdnjs.cloudflare.com/ajax/libs/fancybox/3.5.7/jquery.fancybox.min.js"></script>
+
+
+
+<script src="/js/sayings.js?v=0.js"></script>
+  
+
+<script src="/js/script.js?v=0.js"></script>
+
+<div id="likecoin">
+Please enable JavaScript to view the LikeCoin. :P
+</div>
+<script>
+
+  (function(){
+    var ifrm = document.createElement("iframe");
+    ifrm.setAttribute("src", "https://button.like.co/in/embed/marsenlin/button?referrer=https%3A%2F%2Fblog.marsen.me%2F2025%2F09%2F17%2F2025%2Fai-refactor-rule-apply-dp%2F");      
+    ifrm.setAttribute("sandbox","allow-scripts allow-same-origin allow-popups allow-popups-to-escape-sandbox");
+    ifrm.frameborder = "0";
+    ifrm.scrolling = "no";
+    (document.getElementById("likecoin").replaceChild(ifrm, document.getElementById("likecoin").childNodes[0]));
+  })();
+
+</script>
+<script>
+
+  var disqus_shortname = 'marsenlin';
+  
+  var disqus_url = 'https://blog.marsen.me/2025/09/17/2025/ai-refactor-rule-apply-dp/';
+  
+  (function(){
+    var dsq = document.createElement('script');
+    dsq.type = 'text/javascript';
+    dsq.async = true;
+    dsq.src = '//' + disqus_shortname + '.disqus.com/embed.js';
+    (document.getElementsByTagName('head')[0] || document.getElementsByTagName('body')[0]).appendChild(dsq);
+  })();
+
+</script>
+
+  </div>
+    
+<!-- Google Tag Manager (noscript) -->
+<noscript><iframe src="https://www.googletagmanager.com/ns.html?id=GTM-NTDGNJZ"
+height="0" width="0" style="display:none;visibility:hidden"></iframe></noscript>
+<!-- End Google Tag Manager (noscript) -->
+
+</body>
+</html>
