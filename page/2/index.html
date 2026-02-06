@@ -103,6 +103,193 @@ j=d.createElement(s),dl=l!='dataLayer'?'&l='+l:'';j.async=true;j.src=
       <div class="outer">
         <section id="main">
   
+    <article id="post-2025/backend-architecture-layer-design-principles" class="article article-type-post" itemscope itemprop="blogPost">
+  <div class="article-meta">
+    <a href="/2025/08/12/2025/backend-architecture-layer-design-principles/" class="article-date">
+  <time datetime="2025-08-12T05:29:15.000Z" itemprop="datePublished">2025-08-12</time>
+</a>
+    
+  </div>
+  <div class="article-inner">
+    
+    
+      <header class="article-header">
+        
+  
+    <h1 itemprop="name">
+      <a class="article-title" href="/2025/08/12/2025/backend-architecture-layer-design-principles/"> [架構筆記] Clean Architecture 分層職責的反思</a>
+    </h1>
+  
+
+      </header>
+    
+    <div class="article-entry" itemprop="articleBody">
+      
+        <h2 id="前情提要"><a href="#前情提要" class="headerlink" title="前情提要"></a>前情提要</h2><p>最近在 Code Review 時遇到一個有趣的題目：</p>
+<p>檔案上傳功能中，檔案編碼修復應該放在 Middleware 還是 UseCase？</p>
+<p>這個問題引發了我對 Clean Architecture 分層職責的重新思考，與團隊背後的設計哲學。</p>
+<h2 id="問題背景"><a href="#問題背景" class="headerlink" title="問題背景"></a>問題背景</h2><p>在一個採用 Clean Architecture 的專案中，我們有兩個檔案上傳功能：</p>
+<ul>
+<li><strong>知識庫檔案上傳</strong> - 支援 PDF、Word、圖片等多種格式</li>
+<li><strong>合約檔案上傳</strong> - 原始合約支援 PDF&#x2F;Word，簽署後合約只支援 PDF</li>
+</ul>
+<p>當前系統架構包含：</p>
+<ul>
+<li><strong>Middleware</strong> - Express 中介軟體層</li>
+<li><strong>Controller</strong> - HTTP 請求處理層  </li>
+<li><strong>UseCase</strong> - 業務邏輯層</li>
+<li><strong>Service</strong> - 基礎設施服務層</li>
+</ul>
+<h2 id="核心問題：分層職責如何劃分？"><a href="#核心問題：分層職責如何劃分？" class="headerlink" title="核心問題：分層職責如何劃分？"></a>核心問題：分層職責如何劃分？</h2><p>以下邏輯應該放在哪一層？</p>
+<ol>
+<li><strong>檔案編碼修復</strong> - 解決中文檔名亂碼問題 (latin1 → utf8)</li>
+<li><strong>檔案類型驗證</strong> - 檢查 MIME type 是否符合業務需求  </li>
+<li><strong>檔案大小限制</strong> - 根據不同業務場景設定不同大小限制</li>
+<li><strong>JWT Token 驗證</strong> - 檢查使用者身份</li>
+<li><strong>檔案內容解析</strong> - 提取 PDF&#x2F;Word 文件內容</li>
+</ol>
+<p>分析思路 — 職責角度</p>
+<h3 id="Middleware-的職責：偏向基礎設施"><a href="#Middleware-的職責：偏向基礎設施" class="headerlink" title="Middleware 的職責：偏向基礎設施"></a>Middleware 的職責：偏向基礎設施</h3><p>控制進出流程 → 例：API 請求進來先檢查 Token</p>
+<p>過濾與轉換資料 → 例：將日期字串轉成標準格式</p>
+<p>保護系統邊界 → 例：攔截未授權的存取</p>
+<p>以下不舉例:</p>
+<ul>
+<li><strong>跨領域技術問題</strong> (認證、編碼、錯誤處理)</li>
+<li><strong>HTTP 協議相關</strong> (請求解析、回應格式)  </li>
+<li><strong>基礎設施關注點</strong> (日誌、監控、安全)</li>
+<li><strong>與業務無關的技術細節</strong></li>
+</ul>
+<h3 id="Use-Case-的職責：偏向商業邏輯"><a href="#Use-Case-的職責：偏向商業邏輯" class="headerlink" title="Use Case 的職責：偏向商業邏輯"></a>Use Case 的職責：偏向商業邏輯</h3><p>驅動核心行為 → 例：建立一筆訂單流程</p>
+<p>執行業務規則 → 例：檢查庫存是否足夠</p>
+<p>協調內外資源 → 例：呼叫付款服務並更新資料庫</p>
+<p>以下不舉例:</p>
+<ul>
+<li><strong>特定業務場景的規則</strong> (不同業務有不同檔案限制)</li>
+<li><strong>領域知識驗證</strong> (合約標題、內容檢查)</li>
+<li><strong>業務流程邏輯</strong> (檔案處理、資料儲存)</li>
+<li><strong>動態配置的業務參數</strong> (從環境變數讀取的業務限制)</li>
+</ul>
+<h2 id="實際案例分析"><a href="#實際案例分析" class="headerlink" title="實際案例分析"></a>實際案例分析</h2><h3 id="檔案編碼問題"><a href="#檔案編碼問題" class="headerlink" title="檔案編碼問題"></a>檔案編碼問題</h3><p>技術問題 → 整個系統一體適用，選 Middleware ✅</p>
+<p>細節分析:</p>
+<ul>
+<li>這是 HTTP 上傳過程中的技術問題，不是業務邏輯</li>
+<li>所有檔案上傳都需要這個處理，跨多個 UseCase</li>
+<li>屬於請求處理層面的責任</li>
+</ul>
+<h3 id="檔案類型限制"><a href="#檔案類型限制" class="headerlink" title="檔案類型限制"></a>檔案類型限制</h3><p>業務邏輯 → 不同的上傳任務有不同限制，屬商業邏輯，選 UseCase ✅</p>
+<p>細節分析:</p>
+<ul>
+<li>不同業務場景有不同的檔案類型限制</li>
+<li>這是領域知識，需要業務邏輯判斷</li>
+<li>可能隨著業務需求變化而調整</li>
+</ul>
+<h3 id="這頭給你想"><a href="#這頭給你想" class="headerlink" title="這頭給你想"></a>這頭給你想</h3><p>如果檔案大小限制要動態調整呢？</p>
+<h2 id="總結"><a href="#總結" class="headerlink" title="總結"></a>總結</h2><p>好的架構設計不是憑感覺，而是要有明確的原則：</p>
+<ul>
+<li><strong>Middleware</strong> &#x3D; 技術基礎設施，處理 HTTP 層面的問題</li>
+<li><strong>UseCase</strong> &#x3D; 業務邏輯驗證，處理領域相關的規則</li>
+</ul>
+<p>這種分層不只讓程式碼更好維護，也讓測試更容易撰寫，更符合單一職責原則。</p>
+<p>下次在設計架構時，不妨問問自己：</p>
+<ul>
+<li>這個邏輯是技術問題還是業務問題？</li>
+<li>這個規則會因為業務需求變化嗎？</li>
+<li>這個處理邏輯需要在多個地方重複嗎？</li>
+</ul>
+<p>Clean Architecture 的精神就在於：<strong>讓業務邏輯獨立於技術細節</strong>。</p>
+<p>(fin)</p>
+
+      
+    </div>
+    <footer class="article-footer">
+      <a data-url="https://blog.marsen.me/2025/08/12/2025/backend-architecture-layer-design-principles/" data-id="cuidDnOrfD5AQ8R1lfmv5DoMJ" class="article-share-link">Share</a>
+      
+        <a href="https://blog.marsen.me/2025/08/12/2025/backend-architecture-layer-design-principles/#disqus_thread" class="article-comment-link">留言</a>
+      
+      
+  <ul class="article-tag-list" itemprop="keywords"><li class="article-tag-list-item"><a class="article-tag-list-link" href="/tags/%E5%AD%B8%E7%BF%92%E7%AD%86%E8%A8%98/" rel="tag">學習筆記</a></li></ul>
+
+    </footer>
+  </div>
+  
+</article>
+
+
+  
+    <article id="post-2025/race-condition-in-file-storage" class="article article-type-post" itemscope itemprop="blogPost">
+  <div class="article-meta">
+    <a href="/2025/08/07/2025/race-condition-in-file-storage/" class="article-date">
+  <time datetime="2025-08-07T05:15:41.000Z" itemprop="datePublished">2025-08-07</time>
+</a>
+    
+  </div>
+  <div class="article-inner">
+    
+    
+      <header class="article-header">
+        
+  
+    <h1 itemprop="name">
+      <a class="article-title" href="/2025/08/07/2025/race-condition-in-file-storage/"> [學習筆記] Node.js 檔案操作 mkdir 的正確姿勢</a>
+    </h1>
+  
+
+      </header>
+    
+    <div class="article-entry" itemprop="articleBody">
+      
+        <h2 id="前情提要"><a href="#前情提要" class="headerlink" title="前情提要"></a>前情提要</h2><p>在 code review 中 RD 寫了以下的程式</p>
+<figure class="highlight typescript"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">if</span> (!<span class="keyword">await</span> <span class="variable language_">this</span>.<span class="title function_">exists</span>(fullPath)) &#123;</span><br><span class="line">  <span class="keyword">await</span> fs.<span class="property">promises</span>.<span class="title function_">mkdir</span>(fullPath, &#123; <span class="attr">recursive</span>: <span class="literal">true</span> &#125;)</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+<p>看似合理的「檢查然後執行」（Check-Then-Act）模式可能導致的併發問題。</p>
+<p>假設兩個請求同時上傳檔案到同一個不存在的目錄：</p>
+<figure class="highlight text"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br></pre></td><td class="code"><pre><span class="line">時間線：</span><br><span class="line">T1: 請求A 執行 this.exists(fullPath) → 返回 false (目錄不存在)</span><br><span class="line">T2: 請求B 執行 this.exists(fullPath) → 返回 false (目錄不存在)</span><br><span class="line">T3: 請求A 執行 mkdir(fullPath) → 成功建立目錄</span><br><span class="line">T4: 請求B 執行 mkdir(fullPath) → 可能拋出 EEXIST 錯誤(fs.promises.mkdir 已在底層排除這個問題)</span><br></pre></td></tr></table></figure>
+
+<p>雖然使用了 <code>recursive: true</code>，那前面的檢查很可能是不必要的行為。</p>
+<h3 id="為什麼會這樣？"><a href="#為什麼會這樣？" class="headerlink" title="為什麼會這樣？"></a>為什麼會這樣？</h3><p>問題的根源在於<strong>時間窗口</strong>。兩個步驟之間存在時間差，而這個時間差就是競態條件的溫床：</p>
+<figure class="highlight typescript"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment">// ❌ 有時間窗口的寫法</span></span><br><span class="line"><span class="keyword">if</span> (!<span class="keyword">await</span> <span class="variable language_">this</span>.<span class="title function_">exists</span>(fullPath)) &#123;  <span class="comment">// 步驟1: 檢查</span></span><br><span class="line">  <span class="comment">// 👆 這裡到下面之間就是危險的時間窗口</span></span><br><span class="line">  <span class="keyword">await</span> fs.<span class="property">promises</span>.<span class="title function_">mkdir</span>(fullPath, &#123; <span class="attr">recursive</span>: <span class="literal">true</span> &#125;)  <span class="comment">// 步驟2: 執行</span></span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+<h2 id="解決方案"><a href="#解決方案" class="headerlink" title="解決方案"></a>解決方案</h2><h3 id="方法1-直接使用-mkdir（推薦）"><a href="#方法1-直接使用-mkdir（推薦）" class="headerlink" title="方法1: 直接使用 mkdir（推薦）"></a>方法1: 直接使用 mkdir（推薦）</h3><figure class="highlight typescript"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">async</span> <span class="title function_">uploadFile</span>(<span class="attr">file</span>: <span class="title class_">UploadedFile</span>, pathToStore?: <span class="string">`/<span class="subst">$&#123;<span class="built_in">string</span>&#125;</span>`</span>): <span class="title class_">Promise</span>&lt;<span class="built_in">string</span>&gt; &#123;</span><br><span class="line">  <span class="keyword">const</span> fullPath = <span class="string">`<span class="subst">$&#123;<span class="variable language_">this</span>.uploadDir&#125;</span><span class="subst">$&#123;pathToStore ?? <span class="string">&#x27;&#x27;</span>&#125;</span>`</span></span><br><span class="line">  <span class="comment">// 直接建立目錄，recursive: true 會自動處理已存在的情況</span></span><br><span class="line">  <span class="keyword">await</span> fs.<span class="property">promises</span>.<span class="title function_">mkdir</span>(fullPath, &#123; <span class="attr">recursive</span>: <span class="literal">true</span> &#125;)</span><br><span class="line">  <span class="keyword">const</span> uploadPath = path.<span class="title function_">join</span>(fullPath, file.<span class="property">originalName</span>)</span><br><span class="line">  <span class="keyword">await</span> fs.<span class="property">promises</span>.<span class="title function_">writeFile</span>(uploadPath, file.<span class="property">buffer</span>)</span><br><span class="line">  <span class="keyword">return</span> uploadPath</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+<h2 id="為什麼-recursive-true-已經足夠"><a href="#為什麼-recursive-true-已經足夠" class="headerlink" title="為什麼 recursive: true 已經足夠"></a>為什麼 recursive: true 已經足夠</h2><p>根據 Node.js 官方文件，<code>fs.promises.mkdir(path, { recursive: true })</code> 具有以下特性：</p>
+<ol>
+<li><strong>自動建立父目錄</strong>：如果父目錄不存在會自動建立</li>
+<li><strong>處理已存在目錄</strong>：當 <code>recursive</code> 為 <code>true</code> 時，如果目錄已存在不會拋出錯誤</li>
+<li><strong>簡化錯誤處理</strong>：避免了手動檢查目錄是否存在的需要</li>
+</ol>
+<p>官方範例：</p>
+<figure class="highlight javascript"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">import</span> &#123; mkdir &#125; <span class="keyword">from</span> <span class="string">&#x27;node:fs&#x27;</span>;</span><br><span class="line"></span><br><span class="line"><span class="comment">// Create ./tmp/a/apple, regardless of whether ./tmp and ./tmp/a exist.</span></span><br><span class="line"><span class="title function_">mkdir</span>(<span class="string">&#x27;./tmp/a/apple&#x27;</span>, &#123; <span class="attr">recursive</span>: <span class="literal">true</span> &#125;, <span class="function">(<span class="params">err</span>) =&gt;</span> &#123;</span><br><span class="line">  <span class="keyword">if</span> (err) <span class="keyword">throw</span> err;</span><br><span class="line">&#125;);</span><br><span class="line"></span><br><span class="line">這就像餐廳點餐的差別：</span><br><span class="line"></span><br><span class="line"><span class="string">``</span><span class="string">`typescript</span></span><br><span class="line"><span class="string">// ❌ 競態條件版本（不好的做法）</span></span><br><span class="line"><span class="string">if (餐廳沒有準備我要的餐) &#123;  // 檢查</span></span><br><span class="line"><span class="string">  請廚師準備這道餐        // 執行</span></span><br><span class="line"><span class="string">&#125;</span></span><br><span class="line"><span class="string">// 問題：兩個客人可能同時檢查到「沒有」，然後都要求準備</span></span><br><span class="line"><span class="string"></span></span><br><span class="line"><span class="string">// ✅ 直接執行版本（好的做法）</span></span><br><span class="line"><span class="string">請廚師準備這道餐，如果已經有了就不用重複準備</span></span><br><span class="line"><span class="string">// 廚師會自己判斷是否需要準備，避免重複工作</span></span><br></pre></td></tr></table></figure>
+
+<h2 id="效能優勢"><a href="#效能優勢" class="headerlink" title="效能優勢"></a>效能優勢</h2><p>修復後還有意外的效能提升：</p>
+<figure class="highlight typescript"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment">// 修復前：2次系統調用</span></span><br><span class="line"><span class="keyword">await</span> <span class="variable language_">this</span>.<span class="title function_">exists</span>(fullPath)  <span class="comment">// 系統調用1: stat()</span></span><br><span class="line"><span class="keyword">await</span> fs.<span class="property">promises</span>.<span class="title function_">mkdir</span>()    <span class="comment">// 系統調用2: mkdir()</span></span><br><span class="line"></span><br><span class="line"><span class="comment">// 修復後：1次系統調用  </span></span><br><span class="line"><span class="keyword">await</span> fs.<span class="property">promises</span>.<span class="title function_">mkdir</span>(fullPath, &#123; <span class="attr">recursive</span>: <span class="literal">true</span> &#125;)  <span class="comment">// 系統調用1: mkdir()</span></span><br></pre></td></tr></table></figure>
+
+<h2 id="經驗教訓"><a href="#經驗教訓" class="headerlink" title="經驗教訓"></a>經驗教訓</h2><ol>
+<li><strong>避免 Check-Then-Act 模式</strong>：這是併發程式設計的經典陷阱，不過這次案例，執行的底層實作已處理好，所以不會有問題</li>
+<li><strong>信任系統調用</strong>：現代 API 通常已經考慮了併發場景</li>
+<li><strong>簡單就是美</strong>：移除不必要的檢查邏輯，程式碼更簡潔也更安全</li>
+</ol>
+<h2 id="參考"><a href="#參考" class="headerlink" title="參考"></a>參考</h2><ul>
+<li><a target="_blank" rel="noopener" href="https://nodejs.org/api/fs.html#fsmkdirpath-options-callback">Nodejs - fsPromises.mkdir(path[, options])</a></li>
+</ul>
+<p>(fin)</p>
+
+      
+    </div>
+    <footer class="article-footer">
+      <a data-url="https://blog.marsen.me/2025/08/07/2025/race-condition-in-file-storage/" data-id="cuidlDNDSq-jG5Xozhctj3_nx" class="article-share-link">Share</a>
+      
+        <a href="https://blog.marsen.me/2025/08/07/2025/race-condition-in-file-storage/#disqus_thread" class="article-comment-link">留言</a>
+      
+      
+  <ul class="article-tag-list" itemprop="keywords"><li class="article-tag-list-item"><a class="article-tag-list-link" href="/tags/%E5%AD%B8%E7%BF%92%E7%AD%86%E8%A8%98/" rel="tag">學習筆記</a></li></ul>
+
+    </footer>
+  </div>
+  
+</article>
+
+
+  
     <article id="post-2025/ai_google_search_api" class="article article-type-post" itemscope itemprop="blogPost">
   <div class="article-meta">
     <a href="/2025/07/31/2025/ai_google_search_api/" class="article-date">
@@ -257,7 +444,7 @@ j=d.createElement(s),dl=l!='dataLayer'?'&l='+l:'';j.async=true;j.src=
       
     </div>
     <footer class="article-footer">
-      <a data-url="https://blog.marsen.me/2025/07/31/2025/ai_google_search_api/" data-id="cuid6OoPvZUT9yGbd411C8Y6W" class="article-share-link">Share</a>
+      <a data-url="https://blog.marsen.me/2025/07/31/2025/ai_google_search_api/" data-id="cuidjJpwDiHpNtCv0rhrjYBIw" class="article-share-link">Share</a>
       
         <a href="https://blog.marsen.me/2025/07/31/2025/ai_google_search_api/#disqus_thread" class="article-comment-link">留言</a>
       
@@ -322,7 +509,7 @@ j=d.createElement(s),dl=l!='dataLayer'?'&l='+l:'';j.async=true;j.src=
       
     </div>
     <footer class="article-footer">
-      <a data-url="https://blog.marsen.me/2025/07/29/2025/ai-eai-browser-install-flatpak-solution/" data-id="cuidpSYNvkKlAsLlyc8HZAATr" class="article-share-link">Share</a>
+      <a data-url="https://blog.marsen.me/2025/07/29/2025/ai-eai-browser-install-flatpak-solution/" data-id="cuidvW2_awhvd4FaEnflKsyOA" class="article-share-link">Share</a>
       
         <a href="https://blog.marsen.me/2025/07/29/2025/ai-eai-browser-install-flatpak-solution/#disqus_thread" class="article-comment-link">留言</a>
       
@@ -424,7 +611,7 @@ j=d.createElement(s),dl=l!='dataLayer'?'&l='+l:'';j.async=true;j.src=
       
     </div>
     <footer class="article-footer">
-      <a data-url="https://blog.marsen.me/2025/07/25/2025/express-res-locals-auth-best-practice/" data-id="cuid8u-1TNDauPsGCOlG7KSq2" class="article-share-link">Share</a>
+      <a data-url="https://blog.marsen.me/2025/07/25/2025/express-res-locals-auth-best-practice/" data-id="cuid6hPS6beLkx_G73F68qwR0" class="article-share-link">Share</a>
       
         <a href="https://blog.marsen.me/2025/07/25/2025/express-res-locals-auth-best-practice/#disqus_thread" class="article-comment-link">留言</a>
       
@@ -525,7 +712,7 @@ j=d.createElement(s),dl=l!='dataLayer'?'&l='+l:'';j.async=true;j.src=
       
     </div>
     <footer class="article-footer">
-      <a data-url="https://blog.marsen.me/2025/07/22/2025/ithub-action-ssh-keyscan-not-found-fix/" data-id="cuidrlXEmAZjDre9NrcoePl9_" class="article-share-link">Share</a>
+      <a data-url="https://blog.marsen.me/2025/07/22/2025/ithub-action-ssh-keyscan-not-found-fix/" data-id="cuidecu-_TXklTz93vRm1h2nn" class="article-share-link">Share</a>
       
         <a href="https://blog.marsen.me/2025/07/22/2025/ithub-action-ssh-keyscan-not-found-fix/#disqus_thread" class="article-comment-link">留言</a>
       
@@ -640,7 +827,7 @@ j=d.createElement(s),dl=l!='dataLayer'?'&l='+l:'';j.async=true;j.src=
       
     </div>
     <footer class="article-footer">
-      <a data-url="https://blog.marsen.me/2025/06/22/2025/ai-ollama-containerized/" data-id="cuid-zvwNtyApcItb8_b4p8QF" class="article-share-link">Share</a>
+      <a data-url="https://blog.marsen.me/2025/06/22/2025/ai-ollama-containerized/" data-id="cuidmQYIGgOLJxokiz25VxL0f" class="article-share-link">Share</a>
       
         <a href="https://blog.marsen.me/2025/06/22/2025/ai-ollama-containerized/#disqus_thread" class="article-comment-link">留言</a>
       
@@ -814,7 +1001,7 @@ j=d.createElement(s),dl=l!='dataLayer'?'&l='+l:'';j.async=true;j.src=
       
     </div>
     <footer class="article-footer">
-      <a data-url="https://blog.marsen.me/2025/06/20/2025/ai-tools/" data-id="cuid_QQ1FsZXkBNJW_VXM5jEm" class="article-share-link">Share</a>
+      <a data-url="https://blog.marsen.me/2025/06/20/2025/ai-tools/" data-id="cuidqjk8ZTTjQz_tlgibx527M" class="article-share-link">Share</a>
       
         <a href="https://blog.marsen.me/2025/06/20/2025/ai-tools/#disqus_thread" class="article-comment-link">留言</a>
       
@@ -915,7 +1102,7 @@ j=d.createElement(s),dl=l!='dataLayer'?'&l='+l:'';j.async=true;j.src=
       
     </div>
     <footer class="article-footer">
-      <a data-url="https://blog.marsen.me/2025/06/05/2025/gitlab-cicd-to-registry/" data-id="cuidmaBtZAEdMAgbr1fCBylUd" class="article-share-link">Share</a>
+      <a data-url="https://blog.marsen.me/2025/06/05/2025/gitlab-cicd-to-registry/" data-id="cuidKpe-gm3oAwRo29r8N-PQv" class="article-share-link">Share</a>
       
         <a href="https://blog.marsen.me/2025/06/05/2025/gitlab-cicd-to-registry/#disqus_thread" class="article-comment-link">留言</a>
       
@@ -1007,537 +1194,9 @@ j=d.createElement(s),dl=l!='dataLayer'?'&l='+l:'';j.async=true;j.src=
       
     </div>
     <footer class="article-footer">
-      <a data-url="https://blog.marsen.me/2025/06/04/2025/gcp-internal-lb-serivce/" data-id="cuidj05vHraHLCwrUZX0eozid" class="article-share-link">Share</a>
+      <a data-url="https://blog.marsen.me/2025/06/04/2025/gcp-internal-lb-serivce/" data-id="cuidJ96_tLxsWXipSIImWY34i" class="article-share-link">Share</a>
       
         <a href="https://blog.marsen.me/2025/06/04/2025/gcp-internal-lb-serivce/#disqus_thread" class="article-comment-link">留言</a>
-      
-      
-  <ul class="article-tag-list" itemprop="keywords"><li class="article-tag-list-item"><a class="article-tag-list-link" href="/tags/%E5%AD%B8%E7%BF%92%E7%AD%86%E8%A8%98/" rel="tag">學習筆記</a></li></ul>
-
-    </footer>
-  </div>
-  
-</article>
-
-
-  
-    <article id="post-2025/vim_setting" class="article article-type-post" itemscope itemprop="blogPost">
-  <div class="article-meta">
-    <a href="/2025/05/24/2025/vim_setting/" class="article-date">
-  <time datetime="2025-05-24T05:06:05.000Z" itemprop="datePublished">2025-05-24</time>
-</a>
-    
-  </div>
-  <div class="article-inner">
-    
-    
-      <header class="article-header">
-        
-  
-    <h1 itemprop="name">
-      <a class="article-title" href="/2025/05/24/2025/vim_setting/"> [實作筆記] 我的 Vim 設定</a>
-    </h1>
-  
-
-      </header>
-    
-    <div class="article-entry" itemprop="articleBody">
-      
-        <p>我的 Vim 快捷鍵設定總表，<strong>IdeaVim 與 JetBrain</strong>：</p>
-<hr>
-<table>
-<thead>
-<tr>
-<th>快捷鍵</th>
-<th>模式</th>
-<th>功能說明</th>
-<th>IdeaVim 設定寫法</th>
-</tr>
-</thead>
-<tbody><tr>
-<td>zcc</td>
-<td>n</td>
-<td>清除所有自訂映射</td>
-<td><code>nmap zcc :mapclear!&lt;CR&gt;</code></td>
-</tr>
-<tr>
-<td>zso</td>
-<td>n</td>
-<td>重新載入主 vimrc</td>
-<td><code>nmap zso :source ~/_ideavimrc&lt;CR&gt;</code></td>
-</tr>
-<tr>
-<td>zf</td>
-<td>n&#x2F;i</td>
-<td>跳到定義（Goto Declaration）</td>
-<td><code>nmap zf :action GotoDeclaration&lt;CR&gt;</code><br><code>imap zf &lt;Esc&gt;:action GotoDeclaration&lt;CR&gt;</code></td>
-</tr>
-<tr>
-<td>zrc, zo</td>
-<td>n&#x2F;i</td>
-<td>格式化程式碼（Reformat Code）</td>
-<td><code>nmap zrc :action ReformatCode&lt;CR&gt;</code><br><code>imap zrc &lt;Esc&gt;:action ReformatCode&lt;CR&gt;</code><br><code>nmap zo :action ReformatCode&lt;CR&gt;</code></td>
-</tr>
-<tr>
-<td>zk</td>
-<td>n&#x2F;i</td>
-<td>返回（Back）</td>
-<td><code>nmap zk :action Back&lt;CR&gt;</code><br><code>imap zk &lt;Esc&gt;:action Back&lt;CR&gt;</code></td>
-</tr>
-<tr>
-<td>zj</td>
-<td>n&#x2F;i</td>
-<td>AceAction（自訂動作）</td>
-<td><code>nmap zj :action AceAction&lt;CR&gt;</code><br><code>imap zj &lt;Esc&gt;:action AceAction&lt;CR&gt;</code></td>
-</tr>
-<tr>
-<td>ztt</td>
-<td>n&#x2F;i</td>
-<td>複製區塊並格式化（自訂巨集）</td>
-<td><code>nmap ztt y?[F&lt;CR&gt;/{&lt;CR&gt;%o&lt;Esc&gt;p:action ReformatCode&lt;CR&gt;</code><br><code>imap ztt &lt;Esc&gt;y?[F&lt;CR&gt;/{&lt;CR&gt;%o&lt;Esc&gt;p:action ReformatCode&lt;CR&gt;</code></td>
-</tr>
-<tr>
-<td>zn</td>
-<td>n&#x2F;i</td>
-<td>跳到上一個錯誤（Goto Previous Error）</td>
-<td><code>nmap zn :action GotoPreviousError&lt;CR&gt;</code><br><code>imap zn &lt;Esc&gt;:action GotoPreviousError&lt;CR&gt;</code></td>
-</tr>
-<tr>
-<td>zrr</td>
-<td>n&#x2F;i</td>
-<td>重新命名（Rename Element）</td>
-<td><code>nmap zrr :action RenameElement&lt;CR&gt;</code><br><code>imap zrr &lt;Esc&gt;:action RenameElement&lt;CR&gt;</code></td>
-</tr>
-<tr>
-<td>zra</td>
-<td>n&#x2F;i</td>
-<td>執行所有單元測試</td>
-<td><code>nmap zra :action RiderUnitTestRunSolutionAction&lt;CR&gt;</code><br><code>imap zra &lt;Esc&gt;:action RiderUnitTestRunSolutionAction&lt;CR&gt;</code></td>
-</tr>
-<tr>
-<td>zrm</td>
-<td>n&#x2F;v</td>
-<td>萃取方法（Extract Method）</td>
-<td><code>nmap zrm :action ExtractMethod&lt;CR&gt;</code><br><code>vmap zrm :action ExtractMethod&lt;CR&gt;</code></td>
-</tr>
-<tr>
-<td>zri</td>
-<td>n</td>
-<td>Inline（內聯變數&#x2F;方法）</td>
-<td><code>map zri :action Inline&lt;CR&gt;&lt;Esc&gt;</code></td>
-</tr>
-<tr>
-<td>zrp</td>
-<td>n</td>
-<td>Introduce Parameter（引入參數）</td>
-<td><code>map zrp :action IntroduceParameter&lt;CR&gt;</code></td>
-</tr>
-<tr>
-<td>zrv</td>
-<td>n</td>
-<td>Introduce Variable（引入變數）</td>
-<td><code>map zrv :action IntroduceVariable&lt;CR&gt;</code></td>
-</tr>
-<tr>
-<td>zrf</td>
-<td>n</td>
-<td>Introduce Field（引入欄位）</td>
-<td><code>map zrf :action IntroduceField&lt;CR&gt;</code></td>
-</tr>
-<tr>
-<td>,m</td>
-<td>n</td>
-<td>顯示檔案結構</td>
-<td><code>nmap ,m :action FileStructurePopup&lt;CR&gt;</code></td>
-</tr>
-<tr>
-<td>zrt</td>
-<td>n</td>
-<td>最近檔案</td>
-<td><code>nmap zrt :action RecentFiles&lt;CR&gt;</code></td>
-</tr>
-<tr>
-<td>zgc</td>
-<td>n</td>
-<td>開啟 Commit 工具視窗</td>
-<td><code>nmap zgc :action ActivateCommitToolWindow&lt;CR&gt;</code></td>
-</tr>
-<tr>
-<td>zx</td>
-<td>n</td>
-<td>快速重構選單</td>
-<td><code>nmap zx :action Refactorings.QuickListPopupAction &lt;CR&gt;</code></td>
-</tr>
-<tr>
-<td>zae</td>
-<td>n&#x2F;i</td>
-<td>插入 Assert.Equal(,);</td>
-<td><code>nmap zae aAssert.Equal(,);&lt;Esc&gt;T(i</code><br><code>imap zae Assert.Equal(,);&lt;Esc&gt;T(i</code></td>
-</tr>
-<tr>
-<td>zrs</td>
-<td>n</td>
-<td>新增 class 並格式化（自訂巨集）</td>
-<td><code>nmap zrs &quot;add? class&lt;CR&gt;2w&quot;bywjopublic &lt;Esc&gt;&quot;bpa()&lt;CR&gt;{&lt;Esc&gt;&quot;apo}&lt;Esc&gt;:action ReformatCode&lt;CR&gt;</code></td>
-</tr>
-<tr>
-<td>z;</td>
-<td>n&#x2F;i</td>
-<td>行尾加分號</td>
-<td><code>nmap z; $a;&lt;Esc&gt;</code><br><code>imap z; &lt;Esc&gt;$a;</code></td>
-</tr>
-<tr>
-<td>,p, ,P</td>
-<td>n</td>
-<td>黏貼暫存區 0 的內容</td>
-<td><code>nmap ,p &quot;0p</code><br><code>nmap ,P &quot;0P</code></td>
-</tr>
-<tr>
-<td>z,p, z,P</td>
-<td>i</td>
-<td>插入暫存區 0 的內容</td>
-<td><code>imap z,p &lt;Esc&gt;&quot;0pa</code><br><code>imap z,P &lt;Esc&gt;&quot;0Pa</code></td>
-</tr>
-<tr>
-<td>z,</td>
-<td>n</td>
-<td>選取括號內內容（vi)）</td>
-<td><code>:nmap z, vi)</code></td>
-</tr>
-<tr>
-<td>z.</td>
-<td>n</td>
-<td>選取大括號內內容（vi}）</td>
-<td><code>:nmap z. vi}</code></td>
-</tr>
-<tr>
-<td><Esc></td>
-<td>v</td>
-<td>連續多次離開選取模式</td>
-<td><code>:vmap &lt;Esc&gt; &lt;Esc&gt;&lt;Esc&gt;&lt;Esc&gt;</code></td>
-</tr>
-<tr>
-<td>jj</td>
-<td>i</td>
-<td>退出插入模式</td>
-<td><code>:imap jj &lt;Esc&gt;</code></td>
-</tr>
-<tr>
-<td><BS></td>
-<td>n</td>
-<td>在普通模式下插入 Backspace</td>
-<td><code>:nmap &lt;BS&gt; a&lt;BS&gt;</code></td>
-</tr>
-<tr>
-<td>zh</td>
-<td>n&#x2F;i</td>
-<td>跳到行首</td>
-<td><code>:nmap zh ^</code><br><code>:imap zh &lt;Esc&gt;^i</code></td>
-</tr>
-<tr>
-<td>zl</td>
-<td>n&#x2F;i</td>
-<td>跳到行尾</td>
-<td><code>:nmap zl $</code><br><code>:imap zl &lt;End&gt;</code></td>
-</tr>
-<tr>
-<td>hc</td>
-<td>n</td>
-<td>Ctrl+C</td>
-<td><code>:nmap hc ^C</code></td>
-</tr>
-<tr>
-<td>zb</td>
-<td>n&#x2F;v</td>
-<td>單字取代</td>
-<td><code>:nmap zb bcw</code><br><code>:vmap zb &lt;Esc&gt;bcw</code></td>
-</tr>
-<tr>
-<td>zd</td>
-<td>i</td>
-<td>刪除當前行</td>
-<td><code>:imap zd &lt;Esc&gt;dd</code></td>
-</tr>
-<tr>
-<td>j, k</td>
-<td>n</td>
-<td>軟換行移動</td>
-<td><code>nmap j gj</code><br><code>nmap k gk</code></td>
-</tr>
-<tr>
-<td>qq</td>
-<td>n</td>
-<td>強制關閉檔案</td>
-<td><code>nmap qq ZQ</code></td>
-</tr>
-<tr>
-<td>zq</td>
-<td>n</td>
-<td>儲存並關閉檔案</td>
-<td><code>nmap zq :wq&lt;CR&gt;</code></td>
-</tr>
-<tr>
-<td><C-x></td>
-<td>i</td>
-<td>刪除當前行</td>
-<td><code>:imap &lt;C-x&gt; &lt;Esc&gt;dd</code></td>
-</tr>
-<tr>
-<td><C-a></td>
-<td>i</td>
-<td>全選</td>
-<td><code>:imap &lt;C-a&gt; &lt;Esc&gt;ma&lt;CR&gt;ggVG</code></td>
-</tr>
-<tr>
-<td>,i, ,a</td>
-<td>n</td>
-<td>替換字元</td>
-<td><code>:map ,i &lt;Esc&gt;r</code><br><code>:map ,a &lt;Esc&gt;r</code></td>
-</tr>
-</tbody></table>
-<hr>
-<p><strong>說明：</strong>  </p>
-<ul>
-<li>n：普通模式（normal mode）  </li>
-<li>i：插入模式（insert mode）  </li>
-<li>v：視覺模式（visual mode）  </li>
-<li><code>&lt;CR&gt;</code> 代表 Enter 鍵，<code>&lt;Esc&gt;</code> 代表 Esc 鍵</li>
-</ul>
-<hr>
-<p>以下是我將 JetBrains（IdeaVim）Vim 快捷鍵移植到 VSCode（VSCodeVim）的對應表，<br>並說明哪些已成功移植、哪些無法移植及原因：</p>
-<hr>
-<table>
-<thead>
-<tr>
-<th>JetBrains 快捷鍵</th>
-<th>VSCode 設定 (before)</th>
-<th>VSCode 指令 (commands)</th>
-<th>功能說明</th>
-<th>可否移植</th>
-<th>備註&#x2F;原因</th>
-</tr>
-</thead>
-<tbody><tr>
-<td>zrr</td>
-<td>[“z”,”r”,”r”]</td>
-<td>editor.action.rename</td>
-<td>重新命名</td>
-<td>✅</td>
-<td>完全支援</td>
-</tr>
-<tr>
-<td>zf</td>
-<td>[“z”,”f”]</td>
-<td>editor.action.revealDefinition</td>
-<td>跳到定義</td>
-<td>✅</td>
-<td>完全支援</td>
-</tr>
-<tr>
-<td>zrc&#x2F;zo</td>
-<td>[“z”,”r”,”c”]&#x2F;[“z”,”o”]</td>
-<td>editor.action.formatDocument</td>
-<td>格式化程式碼</td>
-<td>✅</td>
-<td>完全支援（你已設 zrc，zo 也可加）</td>
-</tr>
-<tr>
-<td>zn</td>
-<td>[“z”,”n”]</td>
-<td>editor.action.marker.prev</td>
-<td>跳到上一個錯誤</td>
-<td>✅</td>
-<td>完全支援</td>
-</tr>
-<tr>
-<td>zrt</td>
-<td>[“z”,”r”,”t”]</td>
-<td>workbench.action.openRecent</td>
-<td>最近檔案</td>
-<td>✅</td>
-<td>完全支援</td>
-</tr>
-<tr>
-<td>,m</td>
-<td>[“,”,”m”]</td>
-<td>workbench.action.gotoSymbol</td>
-<td>檔案結構&#x2F;大綱</td>
-<td>✅</td>
-<td>完全支援</td>
-</tr>
-<tr>
-<td>zx</td>
-<td>[“z”,”x”]</td>
-<td>editor.action.refactor</td>
-<td>顯示重構選單</td>
-<td>✅</td>
-<td>完全支援</td>
-</tr>
-<tr>
-<td>zgc</td>
-<td>[“z”,”g”,”c”]</td>
-<td>workbench.view.scm</td>
-<td>開啟 Source Control 面板</td>
-<td>✅</td>
-<td>完全支援</td>
-</tr>
-<tr>
-<td>zh</td>
-<td>[“z”,”h”]</td>
-<td>cursorHome</td>
-<td>跳到行首</td>
-<td>✅</td>
-<td>完全支援</td>
-</tr>
-<tr>
-<td>zl</td>
-<td>[“z”,”l”]</td>
-<td>cursorEnd</td>
-<td>跳到行尾</td>
-<td>✅</td>
-<td>完全支援</td>
-</tr>
-<tr>
-<td>zrv</td>
-<td>[“z”,”r”,”v”]</td>
-<td>editor.action.codeAction.extract.variable</td>
-<td>萃取變數</td>
-<td>⚠️</td>
-<td>VSCodeVim 有選取限制，部分情境下無法觸發</td>
-</tr>
-<tr>
-<td>zrm</td>
-<td>[“z”,”r”,”m”]</td>
-<td>editor.action.codeAction.extract.method</td>
-<td>萃取方法</td>
-<td>⚠️</td>
-<td>VSCodeVim 有選取限制，部分情境下無法觸發</td>
-</tr>
-<tr>
-<td>zri</td>
-<td>-</td>
-<td>-</td>
-<td>Inline（內聯變數&#x2F;方法）</td>
-<td>❌</td>
-<td>VSCode 沒有公開指令 ID，無法 keybinding</td>
-</tr>
-<tr>
-<td>zrp</td>
-<td>-</td>
-<td>-</td>
-<td>Introduce Parameter</td>
-<td>❌</td>
-<td>VSCode 沒有公開指令 ID，無法 keybinding</td>
-</tr>
-<tr>
-<td>zrf</td>
-<td>-</td>
-<td>-</td>
-<td>Introduce Field</td>
-<td>❌</td>
-<td>VSCode 沒有公開指令 ID，無法 keybinding</td>
-</tr>
-<tr>
-<td>ztt</td>
-<td>-</td>
-<td>-</td>
-<td>巨集&#x2F;多步驟自動化</td>
-<td>❌</td>
-<td>VSCode 不支援 Vim 巨集或多步驟自動化</td>
-</tr>
-<tr>
-<td>zso</td>
-<td>-</td>
-<td>-</td>
-<td>重新載入 vimrc</td>
-<td>❌</td>
-<td>VSCodeVim 不支援 :source 或重新載入 vimrc</td>
-</tr>
-<tr>
-<td>zra</td>
-<td>[“z”,”r”,”a”]</td>
-<td>testing.runAll</td>
-<td>執行所有單元測試</td>
-<td>✅</td>
-<td>需安裝 VSCode 官方 Testing 功能，已可 keybinding</td>
-</tr>
-</tbody></table>
-<hr>
-<h3 id="補充說明"><a href="#補充說明" class="headerlink" title="補充說明"></a>補充說明</h3><ul>
-<li>✅：完全支援，已可用於 VSCodeVim。</li>
-<li>⚠️：VSCodeVim 有技術限制（如需選取內容，觸發不一定成功）。</li>
-<li>❌：VSCode&#x2F;VSCodeVim 無對應指令或功能，無法移植。</li>
-<li>你可以持續用 VSCode 內建的 <code>Cmd+.</code> 或右鍵選單補足無法 keybinding 的重構功能。</li>
-<li><strong>zra</strong>：VSCode 1.59 以上內建 Testing 功能，指令為 <code>testing.runAll</code>，可直接 keybinding，無需額外外掛。</li>
-</ul>
-<hr>
-<p><strong>總結：</strong><br>我已成功將大部分常用 JetBrains Vim 快捷鍵移植到 VSCode，<br>僅少數 JetBrains 專屬重構、巨集、vimrc 相關功能因 VSCode 限制無法移植。  </p>
-<p>(fin)</p>
-
-      
-    </div>
-    <footer class="article-footer">
-      <a data-url="https://blog.marsen.me/2025/05/24/2025/vim_setting/" data-id="cuid4IG1x86uuKpjIS9TAbWKL" class="article-share-link">Share</a>
-      
-        <a href="https://blog.marsen.me/2025/05/24/2025/vim_setting/#disqus_thread" class="article-comment-link">留言</a>
-      
-      
-  <ul class="article-tag-list" itemprop="keywords"><li class="article-tag-list-item"><a class="article-tag-list-link" href="/tags/%E5%AF%A6%E4%BD%9C%E7%AD%86%E8%A8%98/" rel="tag">實作筆記</a></li></ul>
-
-    </footer>
-  </div>
-  
-</article>
-
-
-  
-    <article id="post-2025/typescript_error_handle_ways" class="article article-type-post" itemscope itemprop="blogPost">
-  <div class="article-meta">
-    <a href="/2025/05/17/2025/typescript_error_handle_ways/" class="article-date">
-  <time datetime="2025-05-17T05:23:41.000Z" itemprop="datePublished">2025-05-17</time>
-</a>
-    
-  </div>
-  <div class="article-inner">
-    
-    
-      <header class="article-header">
-        
-  
-    <h1 itemprop="name">
-      <a class="article-title" href="/2025/05/17/2025/typescript_error_handle_ways/"> [學習筆記] TypeScript 不同寫法的除錯難易比較</a>
-    </h1>
-  
-
-      </header>
-    
-    <div class="article-entry" itemprop="articleBody">
-      
-        <h2 id="前情提要"><a href="#前情提要" class="headerlink" title="前情提要"></a>前情提要</h2><p>最近在整理一個專案的 API 路由權限設定，<br>對同樣的資料結構、不同的寫法，對於型別檢查和除錯有一點小小心得，稍微作個記錄。</p>
-<h2 id="情境說明"><a href="#情境說明" class="headerlink" title="情境說明"></a>情境說明</h2><p>假設我有一個 API 權限設定如下，每個路由對應一組角色才能訪問：</p>
-<figure class="highlight ts"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br></pre></td><td class="code"><pre><span class="line">&#123;</span><br><span class="line">  <span class="attr">endpoint</span>: <span class="string">&quot;/admin&quot;</span>,</span><br><span class="line">  <span class="attr">roles</span>: [<span class="string">&quot;admin&quot;</span>, <span class="string">&quot;superuser&quot;</span>]</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
-
-<p>然後我有一個函式 registerPermissions 要吃這個設定。</p>
-<h3 id="建議寫法"><a href="#建議寫法" class="headerlink" title="建議寫法"></a>建議寫法</h3><p>先給最近建議的寫法，先定義型別，然後變數也套型別<br>好處是能具體的抓到錯誤，壞處是要多考慮一個型別(命名、擺放位置都會是一個要考量的點)</p>
-<figure class="highlight ts"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">type</span> <span class="title class_">PermissionConfig</span> = &#123;</span><br><span class="line">  <span class="attr">routes</span>: &#123;</span><br><span class="line">    <span class="attr">endpoint</span>: <span class="built_in">string</span>;</span><br><span class="line">    <span class="attr">roles</span>: <span class="built_in">string</span>[];</span><br><span class="line">  &#125;[];</span><br><span class="line">&#125;;</span><br><span class="line"></span><br><span class="line"><span class="keyword">const</span> <span class="attr">permissionConfig</span>: <span class="title class_">PermissionConfig</span> = &#123;</span><br><span class="line">  <span class="attr">routes</span>: [</span><br><span class="line">    &#123;</span><br><span class="line">      <span class="attr">endpoint</span>: <span class="string">&quot;/admin&quot;</span>,</span><br><span class="line">      <span class="attr">roles</span>: [<span class="string">&quot;admin&quot;</span>, <span class="string">&quot;superuser&quot;</span>],</span><br><span class="line">    &#125;,</span><br><span class="line">    &#123;</span><br><span class="line">      <span class="attr">endpoint</span>: <span class="string">&quot;/profile&quot;</span>,</span><br><span class="line">      <span class="attr">roles</span>: <span class="string">&quot;user&quot;</span>, <span class="comment">// ❌ 馬上紅字報錯</span></span><br><span class="line">    &#125;,</span><br><span class="line">  ],</span><br><span class="line">&#125;;</span><br><span class="line"></span><br><span class="line"><span class="keyword">const</span> <span class="title function_">registerPermissions</span> = (<span class="params">config: PermissionConfig</span>) =&gt; &#123;</span><br><span class="line">  <span class="comment">// 註冊權限邏輯</span></span><br><span class="line">&#125;;</span><br><span class="line"></span><br><span class="line"><span class="title function_">registerPermissions</span>(permissionConfig);</span><br></pre></td></tr></table></figure>
-
-<h3 id="先定義變數，但沒套型別"><a href="#先定義變數，但沒套型別" class="headerlink" title="先定義變數，但沒套型別"></a>先定義變數，但沒套型別</h3><p>這是最不推薦的寫法。雖然寫起來最快、最順手，不用考慮命名和檔案擺放的位置，但錯誤訊息會一大坨，難以閱讀。</p>
-<p>在現在這個 AI 時代，也許 AI 能幫你更快理解錯誤，但我還是不建議這麼做。因為一旦習慣這種寫法，很容易錯上加錯。單一錯誤 AI 還能理解，但錯中錯時，AI 也可能會搞不清楚狀況。</p>
-<figure class="highlight ts"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">const</span> permissionConfig = &#123;</span><br><span class="line">  <span class="attr">routes</span>: [</span><br><span class="line">    &#123;</span><br><span class="line">      <span class="attr">endpoint</span>: <span class="string">&quot;/admin&quot;</span>,</span><br><span class="line">      <span class="attr">roles</span>: [<span class="string">&quot;admin&quot;</span>, <span class="string">&quot;superuser&quot;</span>],</span><br><span class="line">    &#125;,</span><br><span class="line">    &#123;</span><br><span class="line">      <span class="attr">endpoint</span>: <span class="string">&quot;/profile&quot;</span>,</span><br><span class="line">      <span class="attr">roles</span>: <span class="string">&quot;user&quot;</span>, <span class="comment">// 🧨 這裡故意寫錯，應該是 array</span></span><br><span class="line">    &#125;,</span><br><span class="line">  ],</span><br><span class="line">&#125;;</span><br><span class="line"></span><br><span class="line"><span class="keyword">const</span> <span class="title function_">registerPermissions</span> = (<span class="params">config: &#123;</span></span><br><span class="line"><span class="params">  routes: &#123;</span></span><br><span class="line"><span class="params">    endpoint: <span class="built_in">string</span>;</span></span><br><span class="line"><span class="params">    roles: <span class="built_in">string</span>[];</span></span><br><span class="line"><span class="params">  &#125;[];</span></span><br><span class="line"><span class="params">&#125;</span>) =&gt; &#123;</span><br><span class="line">  <span class="comment">// 註冊權限邏輯</span></span><br><span class="line">&#125;;</span><br><span class="line"></span><br><span class="line"><span class="title function_">registerPermissions</span>(permissionConfig);</span><br></pre></td></tr></table></figure>
-
-<p>這種寫法會噴出一堆錯誤。</p>
-<h3 id="寫法三：直接-inline-傳入函式"><a href="#寫法三：直接-inline-傳入函式" class="headerlink" title="寫法三：直接 inline 傳入函式"></a>寫法三：直接 inline 傳入函式</h3><p>如果沒有共用必要的參數，我通常會推薦 inline 寫法。當然前提是這個方法的複雜度要夠低，讓人容易理解。這樣也可以省去命名和型別檔案擺放位置的煩惱。</p>
-<figure class="highlight ts"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">const</span> <span class="title function_">registerPermissions</span> = (<span class="params">config: &#123;</span></span><br><span class="line"><span class="params">  routes: &#123;</span></span><br><span class="line"><span class="params">    endpoint: <span class="built_in">string</span>;</span></span><br><span class="line"><span class="params">    roles: <span class="built_in">string</span>[];</span></span><br><span class="line"><span class="params">  &#125;[];</span></span><br><span class="line"><span class="params">&#125;</span>) =&gt; &#123;</span><br><span class="line">  <span class="comment">// 註冊權限邏輯</span></span><br><span class="line">&#125;;</span><br><span class="line"></span><br><span class="line"><span class="title function_">registerPermissions</span>(&#123;</span><br><span class="line">  <span class="attr">routes</span>: [</span><br><span class="line">    &#123;</span><br><span class="line">      <span class="attr">endpoint</span>: <span class="string">&quot;/admin&quot;</span>,</span><br><span class="line">      <span class="attr">roles</span>: [<span class="string">&quot;admin&quot;</span>, <span class="string">&quot;superuser&quot;</span>],</span><br><span class="line">    &#125;,</span><br><span class="line">    &#123;</span><br><span class="line">      <span class="attr">endpoint</span>: <span class="string">&quot;/profile&quot;</span>,</span><br><span class="line">      <span class="attr">roles</span>: <span class="string">&quot;user&quot;</span>, <span class="comment">// ❌ 馬上紅字報錯</span></span><br><span class="line">    &#125;,</span><br><span class="line">  ],</span><br><span class="line">&#125;);</span><br></pre></td></tr></table></figure>
-
-<h2 id="小結：推薦寫法"><a href="#小結：推薦寫法" class="headerlink" title="小結：推薦寫法"></a>小結：推薦寫法</h2><p>最推薦第一種，但實務上我可能會更多的選擇第三種寫法。<br>要有上下文，請團隊作好自已的判斷。</p>
-<p>(fin)</p>
-
-      
-    </div>
-    <footer class="article-footer">
-      <a data-url="https://blog.marsen.me/2025/05/17/2025/typescript_error_handle_ways/" data-id="cuidLMzUag8PDiXKSom397bgA" class="article-share-link">Share</a>
-      
-        <a href="https://blog.marsen.me/2025/05/17/2025/typescript_error_handle_ways/#disqus_thread" class="article-comment-link">留言</a>
       
       
   <ul class="article-tag-list" itemprop="keywords"><li class="article-tag-list-item"><a class="article-tag-list-link" href="/tags/%E5%AD%B8%E7%BF%92%E7%AD%86%E8%A8%98/" rel="tag">學習筆記</a></li></ul>
@@ -1552,7 +1211,7 @@ j=d.createElement(s),dl=l!='dataLayer'?'&l='+l:'';j.async=true;j.src=
 
 
   <nav id="page-nav">
-    <a class="extend prev" rel="prev" href="/">← 上一頁</a><a class="page-number" href="/">1</a><span class="page-number current">2</span><a class="page-number" href="/page/3/">3</a><a class="page-number" href="/page/4/">4</a><span class="space">&hellip;</span><a class="page-number" href="/page/32/">32</a><a class="extend next" rel="next" href="/page/3/">下一頁 →</a>
+    <a class="extend prev" rel="prev" href="/">← 上一頁</a><a class="page-number" href="/">1</a><span class="page-number current">2</span><a class="page-number" href="/page/3/">3</a><a class="page-number" href="/page/4/">4</a><span class="space">&hellip;</span><a class="page-number" href="/page/33/">33</a><a class="extend next" rel="next" href="/page/3/">下一頁 →</a>
   </nav>
 </section>
         
@@ -1563,6 +1222,14 @@ j=d.createElement(s),dl=l!='dataLayer'?'&l='+l:'';j.async=true;j.src=
     <h3 class="widget-title">最新文章</h3>
     <div class="widget">
       <ul>
+        
+          <li>
+            <a href="/2026/02/06/2026/richart_life/">[生活筆記] 2026 台新 Richart Life 切換方案回饋最大化</a>
+          </li>
+        
+          <li>
+            <a href="/2025/12/08/2025/iv_thixxxxxxx2/">[生活筆記] 2025 T社面試心得 - 二面</a>
+          </li>
         
           <li>
             <a href="/2025/11/28/2025/iv_thixxxxxxx/">[生活筆記] 2025 T社面試心得 - 一面</a>
@@ -1576,14 +1243,6 @@ j=d.createElement(s),dl=l!='dataLayer'?'&l='+l:'';j.async=true;j.src=
             <a href="/2025/10/29/2025/sdd_spec_kit/">[學習筆記] SDD 與 Spec Kit - 前言</a>
           </li>
         
-          <li>
-            <a href="/2025/09/17/2025/ai-refactor-rule-apply-dp/"> [實作筆記] 命令式程式碼重構到函數式 Pipe 流水線</a>
-          </li>
-        
-          <li>
-            <a href="/2025/09/11/2025/clean-architecture-avoid-type-hell/"> [實作筆記] Clean Architecture 思考：避免過度設計</a>
-          </li>
-        
       </ul>
     </div>
   </div>
@@ -1593,7 +1252,7 @@ j=d.createElement(s),dl=l!='dataLayer'?'&l='+l:'';j.async=true;j.src=
   <div class="widget-wrap">
     <h3 class="widget-title">彙整</h3>
     <div class="widget">
-      <ul class="archive-list"><li class="archive-list-item"><a class="archive-list-link" href="/archives/2025/11/">十一月 2025</a><span class="archive-list-count">1</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2025/10/">十月 2025</a><span class="archive-list-count">2</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2025/09/">九月 2025</a><span class="archive-list-count">4</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2025/08/">八月 2025</a><span class="archive-list-count">3</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2025/07/">七月 2025</a><span class="archive-list-count">4</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2025/06/">六月 2025</a><span class="archive-list-count">4</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2025/05/">五月 2025</a><span class="archive-list-count">5</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2025/04/">四月 2025</a><span class="archive-list-count">1</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2025/03/">三月 2025</a><span class="archive-list-count">2</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2025/02/">二月 2025</a><span class="archive-list-count">4</span></li><span id='list_archives2' style='display:none'><li class="archive-list-item"><a class="archive-list-link" href="/archives/2025/01/">一月 2025</a><span class="archive-list-count">3</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2024/12/">十二月 2024</a><span class="archive-list-count">3</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2024/11/">十一月 2024</a><span class="archive-list-count">3</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2024/10/">十月 2024</a><span class="archive-list-count">4</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2024/09/">九月 2024</a><span class="archive-list-count">5</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2024/08/">八月 2024</a><span class="archive-list-count">4</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2024/07/">七月 2024</a><span class="archive-list-count">3</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2024/06/">六月 2024</a><span class="archive-list-count">2</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2024/05/">五月 2024</a><span class="archive-list-count">1</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2024/04/">四月 2024</a><span class="archive-list-count">2</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2024/03/">三月 2024</a><span class="archive-list-count">3</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2024/02/">二月 2024</a><span class="archive-list-count">2</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2024/01/">一月 2024</a><span class="archive-list-count">4</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2023/12/">十二月 2023</a><span class="archive-list-count">2</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2023/11/">十一月 2023</a><span class="archive-list-count">3</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2023/10/">十月 2023</a><span class="archive-list-count">2</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2023/09/">九月 2023</a><span class="archive-list-count">3</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2023/08/">八月 2023</a><span class="archive-list-count">2</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2023/07/">七月 2023</a><span class="archive-list-count">6</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2023/06/">六月 2023</a><span class="archive-list-count">6</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2023/05/">五月 2023</a><span class="archive-list-count">1</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2023/04/">四月 2023</a><span class="archive-list-count">9</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2023/03/">三月 2023</a><span class="archive-list-count">4</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2023/02/">二月 2023</a><span class="archive-list-count">2</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2023/01/">一月 2023</a><span class="archive-list-count">2</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2022/12/">十二月 2022</a><span class="archive-list-count">1</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2022/10/">十月 2022</a><span class="archive-list-count">2</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2022/09/">九月 2022</a><span class="archive-list-count">6</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2022/08/">八月 2022</a><span class="archive-list-count">3</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2022/07/">七月 2022</a><span class="archive-list-count">2</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2022/06/">六月 2022</a><span class="archive-list-count">3</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2022/05/">五月 2022</a><span class="archive-list-count">7</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2022/04/">四月 2022</a><span class="archive-list-count">3</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2022/03/">三月 2022</a><span class="archive-list-count">3</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2022/02/">二月 2022</a><span class="archive-list-count">2</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2022/01/">一月 2022</a><span class="archive-list-count">3</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2021/12/">十二月 2021</a><span class="archive-list-count">2</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2021/11/">十一月 2021</a><span class="archive-list-count">2</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2021/10/">十月 2021</a><span class="archive-list-count">2</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2021/09/">九月 2021</a><span class="archive-list-count">1</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2021/08/">八月 2021</a><span class="archive-list-count">2</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2021/07/">七月 2021</a><span class="archive-list-count">4</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2021/06/">六月 2021</a><span class="archive-list-count">1</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2021/05/">五月 2021</a><span class="archive-list-count">2</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2021/04/">四月 2021</a><span class="archive-list-count">3</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2021/03/">三月 2021</a><span class="archive-list-count">3</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2021/02/">二月 2021</a><span class="archive-list-count">1</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2021/01/">一月 2021</a><span class="archive-list-count">7</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2020/12/">十二月 2020</a><span class="archive-list-count">1</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2020/11/">十一月 2020</a><span class="archive-list-count">2</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2020/10/">十月 2020</a><span class="archive-list-count">5</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2020/09/">九月 2020</a><span class="archive-list-count">5</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2020/08/">八月 2020</a><span class="archive-list-count">2</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2020/07/">七月 2020</a><span class="archive-list-count">3</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2020/06/">六月 2020</a><span class="archive-list-count">3</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2020/05/">五月 2020</a><span class="archive-list-count">3</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2020/04/">四月 2020</a><span class="archive-list-count">4</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2020/03/">三月 2020</a><span class="archive-list-count">1</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2020/02/">二月 2020</a><span class="archive-list-count">1</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2020/01/">一月 2020</a><span class="archive-list-count">5</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2019/12/">十二月 2019</a><span class="archive-list-count">1</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2019/11/">十一月 2019</a><span class="archive-list-count">2</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2019/10/">十月 2019</a><span class="archive-list-count">1</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2019/09/">九月 2019</a><span class="archive-list-count">2</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2019/08/">八月 2019</a><span class="archive-list-count">5</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2019/07/">七月 2019</a><span class="archive-list-count">1</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2019/06/">六月 2019</a><span class="archive-list-count">1</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2019/05/">五月 2019</a><span class="archive-list-count">2</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2019/04/">四月 2019</a><span class="archive-list-count">3</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2019/03/">三月 2019</a><span class="archive-list-count">1</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2019/02/">二月 2019</a><span class="archive-list-count">2</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2019/01/">一月 2019</a><span class="archive-list-count">4</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2018/12/">十二月 2018</a><span class="archive-list-count">5</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2018/11/">十一月 2018</a><span class="archive-list-count">7</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2018/10/">十月 2018</a><span class="archive-list-count">6</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2018/09/">九月 2018</a><span class="archive-list-count">3</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2018/08/">八月 2018</a><span class="archive-list-count">2</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2018/07/">七月 2018</a><span class="archive-list-count">6</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2018/06/">六月 2018</a><span class="archive-list-count">2</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2018/05/">五月 2018</a><span class="archive-list-count">1</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2018/04/">四月 2018</a><span class="archive-list-count">5</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2018/03/">三月 2018</a><span class="archive-list-count">5</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2018/02/">二月 2018</a><span class="archive-list-count">1</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2018/01/">一月 2018</a><span class="archive-list-count">5</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2017/12/">十二月 2017</a><span class="archive-list-count">3</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2017/10/">十月 2017</a><span class="archive-list-count">3</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2017/09/">九月 2017</a><span class="archive-list-count">2</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2017/08/">八月 2017</a><span class="archive-list-count">1</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2017/07/">七月 2017</a><span class="archive-list-count">2</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2017/05/">五月 2017</a><span class="archive-list-count">1</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2017/04/">四月 2017</a><span class="archive-list-count">2</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2017/03/">三月 2017</a><span class="archive-list-count">1</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2017/02/">二月 2017</a><span class="archive-list-count">1</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2017/01/">一月 2017</a><span class="archive-list-count">6</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2016/12/">十二月 2016</a><span class="archive-list-count">1</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2016/11/">十一月 2016</a><span class="archive-list-count">2</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2016/10/">十月 2016</a><span class="archive-list-count">4</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2016/09/">九月 2016</a><span class="archive-list-count">1</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2016/08/">八月 2016</a><span class="archive-list-count">6</span></li></span><span id=''></span><span onclick="var d=document.getElementById('list_archives2'); d.style.display===''?d.style='display:none':d.style=''">toggle...</span></ul>
+      <ul class="archive-list"><li class="archive-list-item"><a class="archive-list-link" href="/archives/2026/02/">二月 2026</a><span class="archive-list-count">1</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2025/12/">十二月 2025</a><span class="archive-list-count">1</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2025/11/">十一月 2025</a><span class="archive-list-count">1</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2025/10/">十月 2025</a><span class="archive-list-count">2</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2025/09/">九月 2025</a><span class="archive-list-count">4</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2025/08/">八月 2025</a><span class="archive-list-count">3</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2025/07/">七月 2025</a><span class="archive-list-count">4</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2025/06/">六月 2025</a><span class="archive-list-count">4</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2025/05/">五月 2025</a><span class="archive-list-count">5</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2025/04/">四月 2025</a><span class="archive-list-count">1</span></li><span id='list_archives2' style='display:none'><li class="archive-list-item"><a class="archive-list-link" href="/archives/2025/03/">三月 2025</a><span class="archive-list-count">2</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2025/02/">二月 2025</a><span class="archive-list-count">4</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2025/01/">一月 2025</a><span class="archive-list-count">3</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2024/12/">十二月 2024</a><span class="archive-list-count">3</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2024/11/">十一月 2024</a><span class="archive-list-count">3</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2024/10/">十月 2024</a><span class="archive-list-count">4</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2024/09/">九月 2024</a><span class="archive-list-count">5</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2024/08/">八月 2024</a><span class="archive-list-count">4</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2024/07/">七月 2024</a><span class="archive-list-count">3</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2024/06/">六月 2024</a><span class="archive-list-count">2</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2024/05/">五月 2024</a><span class="archive-list-count">1</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2024/04/">四月 2024</a><span class="archive-list-count">2</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2024/03/">三月 2024</a><span class="archive-list-count">3</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2024/02/">二月 2024</a><span class="archive-list-count">2</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2024/01/">一月 2024</a><span class="archive-list-count">4</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2023/12/">十二月 2023</a><span class="archive-list-count">2</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2023/11/">十一月 2023</a><span class="archive-list-count">3</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2023/10/">十月 2023</a><span class="archive-list-count">2</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2023/09/">九月 2023</a><span class="archive-list-count">3</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2023/08/">八月 2023</a><span class="archive-list-count">2</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2023/07/">七月 2023</a><span class="archive-list-count">6</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2023/06/">六月 2023</a><span class="archive-list-count">6</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2023/05/">五月 2023</a><span class="archive-list-count">1</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2023/04/">四月 2023</a><span class="archive-list-count">9</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2023/03/">三月 2023</a><span class="archive-list-count">4</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2023/02/">二月 2023</a><span class="archive-list-count">2</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2023/01/">一月 2023</a><span class="archive-list-count">2</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2022/12/">十二月 2022</a><span class="archive-list-count">1</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2022/10/">十月 2022</a><span class="archive-list-count">2</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2022/09/">九月 2022</a><span class="archive-list-count">6</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2022/08/">八月 2022</a><span class="archive-list-count">3</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2022/07/">七月 2022</a><span class="archive-list-count">2</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2022/06/">六月 2022</a><span class="archive-list-count">3</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2022/05/">五月 2022</a><span class="archive-list-count">7</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2022/04/">四月 2022</a><span class="archive-list-count">3</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2022/03/">三月 2022</a><span class="archive-list-count">3</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2022/02/">二月 2022</a><span class="archive-list-count">2</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2022/01/">一月 2022</a><span class="archive-list-count">3</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2021/12/">十二月 2021</a><span class="archive-list-count">2</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2021/11/">十一月 2021</a><span class="archive-list-count">2</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2021/10/">十月 2021</a><span class="archive-list-count">2</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2021/09/">九月 2021</a><span class="archive-list-count">1</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2021/08/">八月 2021</a><span class="archive-list-count">2</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2021/07/">七月 2021</a><span class="archive-list-count">4</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2021/06/">六月 2021</a><span class="archive-list-count">1</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2021/05/">五月 2021</a><span class="archive-list-count">2</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2021/04/">四月 2021</a><span class="archive-list-count">3</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2021/03/">三月 2021</a><span class="archive-list-count">3</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2021/02/">二月 2021</a><span class="archive-list-count">1</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2021/01/">一月 2021</a><span class="archive-list-count">7</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2020/12/">十二月 2020</a><span class="archive-list-count">1</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2020/11/">十一月 2020</a><span class="archive-list-count">2</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2020/10/">十月 2020</a><span class="archive-list-count">5</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2020/09/">九月 2020</a><span class="archive-list-count">5</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2020/08/">八月 2020</a><span class="archive-list-count">2</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2020/07/">七月 2020</a><span class="archive-list-count">3</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2020/06/">六月 2020</a><span class="archive-list-count">3</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2020/05/">五月 2020</a><span class="archive-list-count">3</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2020/04/">四月 2020</a><span class="archive-list-count">4</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2020/03/">三月 2020</a><span class="archive-list-count">1</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2020/02/">二月 2020</a><span class="archive-list-count">1</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2020/01/">一月 2020</a><span class="archive-list-count">5</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2019/12/">十二月 2019</a><span class="archive-list-count">1</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2019/11/">十一月 2019</a><span class="archive-list-count">2</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2019/10/">十月 2019</a><span class="archive-list-count">1</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2019/09/">九月 2019</a><span class="archive-list-count">2</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2019/08/">八月 2019</a><span class="archive-list-count">5</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2019/07/">七月 2019</a><span class="archive-list-count">1</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2019/06/">六月 2019</a><span class="archive-list-count">1</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2019/05/">五月 2019</a><span class="archive-list-count">2</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2019/04/">四月 2019</a><span class="archive-list-count">3</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2019/03/">三月 2019</a><span class="archive-list-count">1</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2019/02/">二月 2019</a><span class="archive-list-count">2</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2019/01/">一月 2019</a><span class="archive-list-count">4</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2018/12/">十二月 2018</a><span class="archive-list-count">5</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2018/11/">十一月 2018</a><span class="archive-list-count">7</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2018/10/">十月 2018</a><span class="archive-list-count">6</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2018/09/">九月 2018</a><span class="archive-list-count">3</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2018/08/">八月 2018</a><span class="archive-list-count">2</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2018/07/">七月 2018</a><span class="archive-list-count">6</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2018/06/">六月 2018</a><span class="archive-list-count">2</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2018/05/">五月 2018</a><span class="archive-list-count">1</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2018/04/">四月 2018</a><span class="archive-list-count">5</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2018/03/">三月 2018</a><span class="archive-list-count">5</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2018/02/">二月 2018</a><span class="archive-list-count">1</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2018/01/">一月 2018</a><span class="archive-list-count">5</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2017/12/">十二月 2017</a><span class="archive-list-count">3</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2017/10/">十月 2017</a><span class="archive-list-count">3</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2017/09/">九月 2017</a><span class="archive-list-count">2</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2017/08/">八月 2017</a><span class="archive-list-count">1</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2017/07/">七月 2017</a><span class="archive-list-count">2</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2017/05/">五月 2017</a><span class="archive-list-count">1</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2017/04/">四月 2017</a><span class="archive-list-count">2</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2017/03/">三月 2017</a><span class="archive-list-count">1</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2017/02/">二月 2017</a><span class="archive-list-count">1</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2017/01/">一月 2017</a><span class="archive-list-count">6</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2016/12/">十二月 2016</a><span class="archive-list-count">1</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2016/11/">十一月 2016</a><span class="archive-list-count">2</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2016/10/">十月 2016</a><span class="archive-list-count">4</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2016/09/">九月 2016</a><span class="archive-list-count">1</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2016/08/">八月 2016</a><span class="archive-list-count">6</span></li></span><span id=''></span><span onclick="var d=document.getElementById('list_archives2'); d.style.display===''?d.style='display:none':d.style=''">toggle...</span></ul>
     </div>
   </div>
 
@@ -1652,7 +1311,7 @@ This work is licensed under a
   
   <div class="outer">
     <div id="footer-info" class="inner">
-      &copy; 2025 Marsen L.<br>
+      &copy; 2026 Marsen L.<br>
       Powered by <a href="http://hexo.io/" target="_blank">Hexo</a>
     </div>
   </div>

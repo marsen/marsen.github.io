@@ -103,6 +103,207 @@ j=d.createElement(s),dl=l!='dataLayer'?'&l='+l:'';j.async=true;j.src=
       <div class="outer">
         <section id="main">
   
+    <article id="post-2024/azure_function_python_deploy_with_devops_pipeline" class="article article-type-post" itemscope itemprop="blogPost">
+  <div class="article-meta">
+    <a href="/2024/08/13/2024/azure_function_python_deploy_with_devops_pipeline/" class="article-date">
+  <time datetime="2024-08-13T03:17:42.000Z" itemprop="datePublished">2024-08-13</time>
+</a>
+    
+  </div>
+  <div class="article-inner">
+    
+    
+      <header class="article-header">
+        
+  
+    <h1 itemprop="name">
+      <a class="article-title" href="/2024/08/13/2024/azure_function_python_deploy_with_devops_pipeline/"> [踩雷筆記] Gitlab 整合 Azure DevOps Pipeline 以 python on Azure Functions 為例</a>
+    </h1>
+  
+
+      </header>
+    
+    <div class="article-entry" itemprop="articleBody">
+      
+        <h2 id="前情提要"><a href="#前情提要" class="headerlink" title="前情提要"></a>前情提要</h2><p>我目前主要使用 GitLab 進行版本控制和持續集成(CI&#x2F;CD)，<br>主要整合 Google Cloud Platform (GCP) ，許多專案都運行在 GCP 上。<br>因商務需求最近開始探索第二朵雲 Azure。<br>雖然 Azure DevOps 也有提供 CI／CD 與 Repo 的解決方案;<br>但為了減少邏輯與認知負擔，我希望能將 GitLab 與 Azure DevOps Pipeline 進行整合。<br>具體來說，這次要在 Azure Functions 上部署 Python 應用程式，<br>我想要 RD 往 Gitlab 推送並執行 CI&#x2F;CD 就好，而不用特別因為服務在不同的雲上，而需要推送到不到同 Repo 中 。<br>面對這樣的需求，下面是我找到的解決方案。  </p>
+<h2 id="實作"><a href="#實作" class="headerlink" title="實作"></a>實作</h2><p>以這次的例子來說，我需要控管 Azure 的 Serverless 解決方案「Azure Functions」的程式。<br>但是 Azure DevOps Pipeline 有相當高度的整合 Azure Cloud，只要能將程式推送到 Azure DevOps Repo，<br>部署就會相當簡單，<strong>而無需處理繁鎖的授權問題</strong>。<br>CI／CD 流程大致如下</p>
+<ul>
+<li>建立相對應的權限與憑証並提供給 Gitlab-Runner</li>
+<li>RD 推送新版本程式給 Gitlab，觸發 Gitlab-Runner</li>
+<li>Gitlab-Runner 執行測試、建置等相關作業後，部署到 Azure Functions</li>
+</ul>
+<ol>
+<li><p><strong>設置 Azure DevOps Pipeline</strong>：</p>
+<ol>
+<li>選擇 New pipeline</li>
+<li>Other Git</li>
+<li>設定連線方式 &amp; 選擇分支<ol>
+<li>Connection name (任意命名)</li>
+<li>Repo URL 輸入 Gitlab Repo URL</li>
+<li>User Name (任意命名)</li>
+<li>Password &#x2F; Token Key (Gitlab PAT，需注意效期)</li>
+</ol>
+</li>
+<li>使用「Azure Functions for Python」Template<ul>
+<li>Build extensions</li>
+<li>Use Python 3.10(可以更換合適的版本)</li>
+<li>Install Application Dependencies</li>
+<li>Archive files</li>
+<li>Publish Artifact: drop</li>
+</ul>
+</li>
+<li>追加 Agent job Task<ul>
+<li>搜尋「Azure Functions Deploy」</li>
+<li>填寫<ul>
+<li>Azure Resource Manager connection<ul>
+<li>Manage &gt; Service Connection &gt; New Service Connection &gt; Azure Resource Manager &gt; Service principal(automatic)<ul>
+<li>Service connection name</li>
+<li>Description (optional)</li>
+</ul>
+</li>
+<li>也可以選擇 &gt; Service principal (manual)，需要先加上 App registrations 具體流程如下：<ul>
+<li>在 Azure Portal 上建立一個新的 Azure Registration。</li>
+<li>選擇 Certificates &amp; secrets，建立一組 Certificates &amp; secrets。</li>
+<li>回到 Service principal (manual)<ul>
+<li>Subscription Id</li>
+<li>Subscription Name</li>
+<li>Service Principal Id (App registrations Client secrets 的 Secret ID)</li>
+<li>Service principal key (App registrations Client secrets 的　Value)</li>
+<li>Tenant ID</li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+</li>
+<li>App type (我的情況是選 Function App on Linux)</li>
+<li>Azure Functions App name</li>
+</ul>
+</li>
+</ul>
+</li>
+</ol>
+</li>
+<li><p><strong>配置 GitLab CI&#x2F;CD</strong>：</p>
+<ul>
+<li>在 GitLab 中，建立 <code>.gitlab-ci.yml</code> 如下：</li>
+</ul>
+ <figure class="highlight yml"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br><span class="line">29</span><br><span class="line">30</span><br><span class="line">31</span><br></pre></td><td class="code"><pre><span class="line"><span class="attr">image:</span> <span class="string">debian:stable-slim</span></span><br><span class="line"><span class="attr">variables:</span></span><br><span class="line">  <span class="attr">AZURE_PIPELINE_NAME:</span> <span class="string">&quot;dispatch-worker-deploy-pipeline&quot;</span></span><br><span class="line"></span><br><span class="line"><span class="attr">before_script:</span></span><br><span class="line">  <span class="bullet">-</span> <span class="string">apt-get</span> <span class="string">update</span> <span class="string">&amp;&amp;</span> <span class="string">apt-get</span> <span class="string">install</span> <span class="string">-y</span> <span class="string">curl</span> <span class="string">jq</span></span><br><span class="line"></span><br><span class="line"><span class="attr">stages:</span></span><br><span class="line">  <span class="bullet">-</span> <span class="string">deploy</span></span><br><span class="line"></span><br><span class="line"><span class="attr">trigger_pipeline:</span></span><br><span class="line">  <span class="attr">stage:</span> <span class="string">deploy</span></span><br><span class="line">  <span class="attr">script:</span></span><br><span class="line">    <span class="bullet">-</span> <span class="string">|</span></span><br><span class="line"><span class="string">      json=$(curl -u $AZURE_DEVOPS_USER:$AZURE_DEVOPS_PAT \</span></span><br><span class="line"><span class="string">        -H &quot;Content-Type: application/json&quot; \</span></span><br><span class="line"><span class="string">        &quot;https://dev.azure.com/Aiplux/Inpas/_apis/build/definitions?api-version=6.0&quot;)</span></span><br><span class="line"><span class="string">      id=$(echo $json | jq -r --arg pipeline_name &quot;$AZURE_PIPELINE_NAME&quot; &#x27;.value[] | select(.name==$pipeline_name) | .id&#x27;)</span></span><br><span class="line"><span class="string">      echo -e &quot;\033[1;33mPipeline: $AZURE_PIPELINE_NAME ID is $id\033[0m&quot;</span></span><br><span class="line"><span class="string">      RESPONSE_CODE=$(curl -X POST &quot;https://dev.azure.com/My_Organization/My_Project/_apis/build/builds?api-version=6.0&quot; \</span></span><br><span class="line"><span class="string">        --data &#x27;&#123;&quot;definition&quot;: &#123;&quot;id&quot;: &#x27;$id&#x27;&#125;&#125;&#x27; \</span></span><br><span class="line"><span class="string">        -u $&#123;AZURE_DEVOPS_USER&#125;:$&#123;AZURE_DEVOPS_PAT&#125; \</span></span><br><span class="line"><span class="string">        -H &#x27;Content-Type: application/json&#x27; \</span></span><br><span class="line"><span class="string">        -w &quot;%&#123;http_code&#125;&quot; -o /dev/null -s)</span></span><br><span class="line"><span class="string">      if [ &quot;$RESPONSE_CODE&quot; -ne 200 ]; then</span></span><br><span class="line"><span class="string">        echo -e &quot;\033[1;31mRequest failed with status code $RESPONSE_CODE\033[0m&quot;</span></span><br><span class="line"><span class="string">        exit 1</span></span><br><span class="line"><span class="string">      fi</span></span><br><span class="line"><span class="string"></span></span><br><span class="line"><span class="attr">rules:</span></span><br><span class="line">  <span class="bullet">-</span> <span class="attr">if:</span> <span class="string">&#x27;$CI_COMMIT_BRANCH == &quot;main&quot;&#x27;</span></span><br></pre></td></tr></table></figure>
+
+<p> 可以看到 AZURE_DEVOPS_USER 與 AZURE_DEVOPS_PAT 兩個參數,<br> 可以在登入 Azure DevOps 後，在 User Settings &gt;&gt; Personal Access Tokens 取得,<br> 實務上由管理者提供，但是有時效性，仍然需要定期更新（１年），應該有更簡便的方法才對。</p>
+</li>
+</ol>
+<p>完成以上的設定後，只要推送到 Gitlab Repo 的 main 分支，就會觸發 Azure DevOps Pipeline 部署。</p>
+<h2 id="踩雷"><a href="#踩雷" class="headerlink" title="踩雷"></a>踩雷</h2><p>在整合過程中遇到了一個問題。<br>儘管使用了 Azure Pipeline 提供的官方模板，部署過程依然出現了錯誤。<br>具體而言並沒有明顯的錯誤，但是 Log 會記錄</p>
+<blockquote>
+<p><strong>1 function found</strong><br><strong>0 function loaded</strong></p>
+</blockquote>
+<p>導致 Azure Functions Apps 無法正常工作。</p>
+<h2 id="解法"><a href="#解法" class="headerlink" title="解法"></a>解法</h2><p><a target="_blank" rel="noopener" href="https://github.com/Azure/azure-functions-python-worker/issues/708#issuecomment-765528255">參考</a></p>
+<p>在 Azure Functions for Python 其中一步驟　Install Application Dependencies<br>Template 如下：</p>
+<figure class="highlight shell"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br></pre></td><td class="code"><pre><span class="line">python3.6 -m venv worker_venv</span><br><span class="line">source worker_venv/bin/activate</span><br><span class="line">pip3.6 install setuptools</span><br><span class="line">pip3.6 install -r requirements.txt</span><br></pre></td></tr></table></figure>
+
+<p>需要修改成才能作用，不確定 Azure 會不會提出修正或新的 template</p>
+<figure class="highlight shell"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br></pre></td><td class="code"><pre><span class="line">python3.10 -m venv .python_packages</span><br><span class="line">source .python_packages/bin/activate</span><br><span class="line">pip3.10 install setuptools</span><br><span class="line">pip3.10 install --target=&quot;./.python_packages/lib/site-packages&quot; -r ./requirements.txt</span><br></pre></td></tr></table></figure>
+
+<p>查閱了 Azure 和 GitLab 的官方文檔以及技術社群中的討論，找到了有效的解決方案。<br>通過修改 template，成功解決了部署問題，<br>GitLab 和 Azure DevOps Pipeline 的整合成功。</p>
+<h2 id="參考"><a href="#參考" class="headerlink" title="參考"></a>參考</h2><ul>
+<li><a target="_blank" rel="noopener" href="https://github.com/Azure/azure-functions-python-worker/issues/708#issuecomment-765528255">ModuleNotFoundError when using DevOps Pipeline Task AzureFunctionApp@1</a></li>
+</ul>
+<p>(fin)</p>
+
+      
+    </div>
+    <footer class="article-footer">
+      <a data-url="https://blog.marsen.me/2024/08/13/2024/azure_function_python_deploy_with_devops_pipeline/" data-id="cuid_qKNreNIiMe-dKFr7SK1K" class="article-share-link">Share</a>
+      
+        <a href="https://blog.marsen.me/2024/08/13/2024/azure_function_python_deploy_with_devops_pipeline/#disqus_thread" class="article-comment-link">留言</a>
+      
+      
+    </footer>
+  </div>
+  
+</article>
+
+
+  
+    <article id="post-2024/azure_function_toggle_virtual_machine" class="article article-type-post" itemscope itemprop="blogPost">
+  <div class="article-meta">
+    <a href="/2024/08/12/2024/azure_function_toggle_virtual_machine/" class="article-date">
+  <time datetime="2024-08-12T06:09:10.000Z" itemprop="datePublished">2024-08-12</time>
+</a>
+    
+  </div>
+  <div class="article-inner">
+    
+    
+      <header class="article-header">
+        
+  
+    <h1 itemprop="name">
+      <a class="article-title" href="/2024/08/12/2024/azure_function_toggle_virtual_machine/"> [踩雷筆記] Azure Function 開關虛擬機與錯誤排除</a>
+    </h1>
+  
+
+      </header>
+    
+    <div class="article-entry" itemprop="articleBody">
+      
+        <h2 id="前情提要"><a href="#前情提要" class="headerlink" title="前情提要"></a>前情提要</h2><p>在 Azure Functions 和 Queue 的架構下，我們試圖通過自動化開關虛擬機器來節省成本。　　<br>這是因為 GPU 設備的價格相當高昂，而我們的 AI 服務又離不開這些昂貴的機器。</p>
+<h2 id="實作記錄"><a href="#實作記錄" class="headerlink" title="實作記錄"></a>實作記錄</h2><p>最初的構想非常簡單：通過 Queue 接收特定的任務，然後由 Azure Function 判斷需要哪些資源，<br>如果需要進行 AI 計算，就必須啟動特定的虛擬機器，而在任務完成後，再將機器關閉。<br>這樣的方式不僅能夠節省資源，還能有效控制成本。</p>
+<p>以下是 Python 程式碼的大致實作，主要為虛擬機器的開關控制邏輯：</p>
+<figure class="highlight python"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br><span class="line">29</span><br><span class="line">30</span><br><span class="line">31</span><br><span class="line">32</span><br><span class="line">33</span><br><span class="line">34</span><br><span class="line">35</span><br><span class="line">36</span><br><span class="line">37</span><br><span class="line">38</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">import</span> azure.functions <span class="keyword">as</span> func</span><br><span class="line"><span class="keyword">from</span> azure.identity <span class="keyword">import</span> DefaultAzureCredential</span><br><span class="line"><span class="keyword">from</span> azure.mgmt.compute <span class="keyword">import</span> ComputeManagementClient</span><br><span class="line"><span class="keyword">import</span> logging, os</span><br><span class="line"></span><br><span class="line">app = func.FunctionApp()</span><br><span class="line"></span><br><span class="line"><span class="meta">@app.queue_trigger(<span class="params">arg_name=<span class="string">&quot;args&quot;</span>, queue_name=<span class="string">&quot;vm-queue&quot;</span>, connection=<span class="string">&quot;CONNECTION_STRING&quot;</span></span>) </span></span><br><span class="line"><span class="keyword">def</span> <span class="title function_">main</span>(<span class="params">args: func.QueueMessage</span>):</span><br><span class="line">    logging.info(<span class="string">&#x27;Queue Msg: %s&#x27;</span>, args.get_body().decode(<span class="string">&#x27;utf-8&#x27;</span>))</span><br><span class="line">    </span><br><span class="line">    <span class="keyword">try</span>:</span><br><span class="line">        credential = DefaultAzureCredential()</span><br><span class="line">        subscription_id = os.getenv(<span class="string">&quot;SUBSCRIPTION&quot;</span>)</span><br><span class="line">        resource_group = os.getenv(<span class="string">&quot;RG&quot;</span>)</span><br><span class="line">        vm_name = os.getenv(<span class="string">&quot;VM_NAME&quot;</span>)</span><br><span class="line"></span><br><span class="line">        compute_client = ComputeManagementClient(credential, subscription_id)</span><br><span class="line">        vm = compute_client.virtual_machines.get(resource_group, vm_name, expand=<span class="string">&#x27;instanceView&#x27;</span>)</span><br><span class="line">        vm_status = vm.instance_view.statuses[<span class="number">1</span>].display_status</span><br><span class="line">        logging.info(<span class="string">&#x27;VM 狀態: %s&#x27;</span>, vm_status)</span><br><span class="line">        </span><br><span class="line">        <span class="keyword">if</span> vm_status == <span class="string">&quot;VM running&quot;</span>:</span><br><span class="line">            logging.info(<span class="string">&#x27;正在關閉VM: %s&#x27;</span>, vm_name)</span><br><span class="line">            operation = compute_client.virtual_machines.begin_deallocate(resource_group, vm_name)</span><br><span class="line">            operation.result()</span><br><span class="line">            logging.info(<span class="string">&#x27;%s 已關閉&#x27;</span>, vm_name)</span><br><span class="line">        <span class="keyword">elif</span> vm_status <span class="keyword">in</span> [<span class="string">&quot;VM deallocated&quot;</span>, <span class="string">&quot;VM stopped&quot;</span>]:</span><br><span class="line">            logging.info(<span class="string">&#x27;正在啟動VM: %s&#x27;</span>, vm_name)</span><br><span class="line">            operation = compute_client.virtual_machines.begin_start(resource_group, vm_name)</span><br><span class="line">            operation.result()</span><br><span class="line">            logging.info(<span class="string">&#x27;VM %s 已啟動&#x27;</span>, vm_name)</span><br><span class="line">        <span class="keyword">else</span>:</span><br><span class="line">            logging.info(<span class="string">&#x27;非預期的 VM 狀態: %s&#x27;</span>, vm_status)</span><br><span class="line"></span><br><span class="line">    <span class="keyword">except</span> Exception <span class="keyword">as</span> e:</span><br><span class="line">        logging.error(<span class="string">&#x27;異常錯誤: %s&#x27;</span>, <span class="built_in">str</span>(e))</span><br><span class="line"></span><br></pre></td></tr></table></figure>
+
+<h3 id="異常問題-EnvironmentCredential"><a href="#異常問題-EnvironmentCredential" class="headerlink" title="異常問題:EnvironmentCredential"></a>異常問題:EnvironmentCredential</h3><figure class="highlight shell"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br></pre></td><td class="code"><pre><span class="line">DefaultAzureCredential failed to retrieve a token from the included credentials.</span><br><span class="line">Attempted credentials:</span><br><span class="line"> EnvironmentCredential: EnvironmentCredential authentication unavailable. Environment variables are not fully configured.</span><br><span class="line">Visit https://aka.ms/azsdk/python/identity/environmentcredential/troubleshoot to troubleshoot this issue.</span><br><span class="line"> ManagedIdentityCredential: ManagedIdentityCredential authentication unavailable, no response from the IMDS endpoint.</span><br><span class="line"> SharedTokenCacheCredential: SharedTokenCacheCredential authentication unavailable. No accounts were found in the cache.</span><br><span class="line"> AzureCliCredential: Azure CLI not found on path</span><br><span class="line"> AzurePowerShellCredential: PowerShell is not installed</span><br><span class="line"> AzureDeveloperCliCredential: Azure Developer CLI could not be found. Please visit https://aka.ms/azure-dev for installation instructions and then,once installed, authenticate to your Azure account using &#x27;azd auth login&#x27;.</span><br><span class="line">To mitigate this issue, please refer to the troubleshooting guidelines here at https://aka.ms/azsdk/python/identity/defaultazurecredential/troubleshoot.</span><br></pre></td></tr></table></figure>
+
+<p><strong>這個問題表面上看似由於權限不足引起的，但實際上根本原因是缺乏正確的環境變數配置。</strong><br>要使 Azure Function 能夠正常運作並獲得所需的權限，我們需要在 Function 的環境設置中正確配置相應的環境變數。<br>這些環境變數包括關鍵的憑證和授權信息，它們使得 Azure Function 能夠在執行過程中獲取必要的存取權限，從而能夠正常與 Azure 資源進行交互。<br>如果環境變數配置不當或缺失，Azure Function 將無法獲得所需的授權，從而導致權限不足的錯誤。<br>確保這些環境變數被正確設置和管理，是解決此類問題的關鍵步驟</p>
+<p>配置的方式有三種</p>
+<h4 id="如果要使用-Service-Principal-的-Client-Secret，配置"><a href="#如果要使用-Service-Principal-的-Client-Secret，配置" class="headerlink" title="如果要使用 Service Principal 的 Client Secret，配置"></a>如果要使用 Service Principal 的 Client Secret，配置</h4><ul>
+<li>AZURE_CLIENT_ID</li>
+<li>AZURE_TENANT_ID</li>
+<li>AZURE_CLIENT_SECRET</li>
+</ul>
+<h4 id="如果要使用-Service-Principal-的-Certificate-驗證，配置"><a href="#如果要使用-Service-Principal-的-Certificate-驗證，配置" class="headerlink" title="如果要使用 Service Principal 的　Certificate 驗證，配置"></a>如果要使用 Service Principal 的　Certificate 驗證，配置</h4><ul>
+<li>AZURE_CLIENT_ID</li>
+<li>AZURE_TENANT_ID</li>
+<li>AZURE_CLIENT_CERTIFICATE_PATH</li>
+<li>AZURE_CLIENT_CERTIFICATE_PASSWORD (Optional)</li>
+</ul>
+<h4 id="若要使用密碼進行用戶身份驗證，配置"><a href="#若要使用密碼進行用戶身份驗證，配置" class="headerlink" title="若要使用密碼進行用戶身份驗證，配置"></a>若要使用密碼進行用戶身份驗證，配置</h4><ul>
+<li>AZURE_USERNAME</li>
+<li>AZURE_PASSWORD</li>
+</ul>
+<p>我選擇第一種配置，需要先加上 App registrations<br>具體流程如下：</p>
+<ul>
+<li>在 Azure Portal 上建立一個新的 Azure Registration。  </li>
+<li>選擇 Certificates &amp; secrets，建立一組 Certificates &amp; secrets。  </li>
+<li>到 Azure Function　Apps 設定環境變數 AZURE_CLIENT_ID 與　AZURE_CLIENT_SECRET,  </li>
+<li>Tenant_ID 可以在透過 Azure Portal 找 Tenant Properties 查詢，一樣設定到環境變數。  </li>
+<li>接下來將 Registration 設定為 Virtual Machine 的 Contributor<br>(待確認開關機是不是有更小的權限？ex:Virtual Machine Contributor、Virtual Machine Operator：)</li>
+</ul>
+<p>如此一來在開關機時就能有足夠的權限。</p>
+<h2 id="參考"><a href="#參考" class="headerlink" title="參考"></a>參考</h2><ul>
+<li><a target="_blank" rel="noopener" href="https://aka.ms/azsdk/python/identity/environmentcredential/troubleshoot">https://aka.ms/azsdk/python/identity/environmentcredential/troubleshoot</a></li>
+<li><a target="_blank" rel="noopener" href="https://github.com/Azure/azure-sdk-for-python/blob/main/sdk/identity/azure-identity/TROUBLESHOOTING.md#troubleshoot-environmentcredential-authentication-issues">https://github.com/Azure/azure-sdk-for-python/blob/main/sdk/identity/azure-identity/TROUBLESHOOTING.md#troubleshoot-environmentcredential-authentication-issues</a></li>
+<li><a target="_blank" rel="noopener" href="https://learn.microsoft.com/en-us/azure/azure-functions/functions-overview?pivots=programming-language-csharp">https://learn.microsoft.com/en-us/azure/azure-functions/functions-overview?pivots=programming-language-csharp</a></li>
+</ul>
+<p>(fin)</p>
+
+      
+    </div>
+    <footer class="article-footer">
+      <a data-url="https://blog.marsen.me/2024/08/12/2024/azure_function_toggle_virtual_machine/" data-id="cuidtt3dCfVc5200e3ANxPzAj" class="article-share-link">Share</a>
+      
+        <a href="https://blog.marsen.me/2024/08/12/2024/azure_function_toggle_virtual_machine/#disqus_thread" class="article-comment-link">留言</a>
+      
+      
+    </footer>
+  </div>
+  
+</article>
+
+
+  
     <article id="post-2024/mysql_partial_index_and_soft_delete" class="article article-type-post" itemscope itemprop="blogPost">
   <div class="article-meta">
     <a href="/2024/08/05/2024/mysql_partial_index_and_soft_delete/" class="article-date">
@@ -148,7 +349,7 @@ j=d.createElement(s),dl=l!='dataLayer'?'&l='+l:'';j.async=true;j.src=
       
     </div>
     <footer class="article-footer">
-      <a data-url="https://blog.marsen.me/2024/08/05/2024/mysql_partial_index_and_soft_delete/" data-id="cuid64549BBhfj4H-htlzxll5" class="article-share-link">Share</a>
+      <a data-url="https://blog.marsen.me/2024/08/05/2024/mysql_partial_index_and_soft_delete/" data-id="cuidBN19UPvMe4GG7Z_vIv8iX" class="article-share-link">Share</a>
       
         <a href="https://blog.marsen.me/2024/08/05/2024/mysql_partial_index_and_soft_delete/#disqus_thread" class="article-comment-link">留言</a>
       
@@ -220,7 +421,7 @@ j=d.createElement(s),dl=l!='dataLayer'?'&l='+l:'';j.async=true;j.src=
       
     </div>
     <footer class="article-footer">
-      <a data-url="https://blog.marsen.me/2024/08/01/2024/bash_color/" data-id="cuidT6Yfgj8QDZq07HBLwpCJu" class="article-share-link">Share</a>
+      <a data-url="https://blog.marsen.me/2024/08/01/2024/bash_color/" data-id="cuidgVSLKu0Styvi4iU7VLYdO" class="article-share-link">Share</a>
       
         <a href="https://blog.marsen.me/2024/08/01/2024/bash_color/#disqus_thread" class="article-comment-link">留言</a>
       
@@ -321,7 +522,7 @@ j=d.createElement(s),dl=l!='dataLayer'?'&l='+l:'';j.async=true;j.src=
       
     </div>
     <footer class="article-footer">
-      <a data-url="https://blog.marsen.me/2024/07/30/2024/azure_virtual_machine_for_nvidia_error_records/" data-id="cuidWwGvIz7TV1omcCLHZUwwq" class="article-share-link">Share</a>
+      <a data-url="https://blog.marsen.me/2024/07/30/2024/azure_virtual_machine_for_nvidia_error_records/" data-id="cuidsSr36VW1JAcBgg7qw6K-c" class="article-share-link">Share</a>
       
         <a href="https://blog.marsen.me/2024/07/30/2024/azure_virtual_machine_for_nvidia_error_records/#disqus_thread" class="article-comment-link">留言</a>
       
@@ -407,7 +608,7 @@ j=d.createElement(s),dl=l!='dataLayer'?'&l='+l:'';j.async=true;j.src=
       
     </div>
     <footer class="article-footer">
-      <a data-url="https://blog.marsen.me/2024/07/03/2024/azure_virtual_machine_for_nvidia/" data-id="cuidY5DBti3sMSPQH7P6OnxoE" class="article-share-link">Share</a>
+      <a data-url="https://blog.marsen.me/2024/07/03/2024/azure_virtual_machine_for_nvidia/" data-id="cuidn2ChapPujNQCw9mWNBsBP" class="article-share-link">Share</a>
       
         <a href="https://blog.marsen.me/2024/07/03/2024/azure_virtual_machine_for_nvidia/#disqus_thread" class="article-comment-link">留言</a>
       
@@ -482,7 +683,7 @@ j=d.createElement(s),dl=l!='dataLayer'?'&l='+l:'';j.async=true;j.src=
       
     </div>
     <footer class="article-footer">
-      <a data-url="https://blog.marsen.me/2024/07/01/2024/azure_virtual_machine_snapshot/" data-id="cuid7xhIQp2uQ_hR9ErKg3GbG" class="article-share-link">Share</a>
+      <a data-url="https://blog.marsen.me/2024/07/01/2024/azure_virtual_machine_snapshot/" data-id="cuid9s76HjFq5B5PFCsgYYc2i" class="article-share-link">Share</a>
       
         <a href="https://blog.marsen.me/2024/07/01/2024/azure_virtual_machine_snapshot/#disqus_thread" class="article-comment-link">留言</a>
       
@@ -665,7 +866,7 @@ j=d.createElement(s),dl=l!='dataLayer'?'&l='+l:'';j.async=true;j.src=
       
     </div>
     <footer class="article-footer">
-      <a data-url="https://blog.marsen.me/2024/06/14/2024/my_tools_2024/" data-id="cuid_LzRA844OuteG6c46i3I8" class="article-share-link">Share</a>
+      <a data-url="https://blog.marsen.me/2024/06/14/2024/my_tools_2024/" data-id="cuidHV_6dWa96ZYH2NptMk9My" class="article-share-link">Share</a>
       
         <a href="https://blog.marsen.me/2024/06/14/2024/my_tools_2024/#disqus_thread" class="article-comment-link">留言</a>
       
@@ -735,7 +936,7 @@ j=d.createElement(s),dl=l!='dataLayer'?'&l='+l:'';j.async=true;j.src=
       
     </div>
     <footer class="article-footer">
-      <a data-url="https://blog.marsen.me/2024/06/07/2024/azure_email_communication_service/" data-id="cuidv0mCkZMW3vNTxlZfBwaCI" class="article-share-link">Share</a>
+      <a data-url="https://blog.marsen.me/2024/06/07/2024/azure_email_communication_service/" data-id="cuid8hkuM3HsQ9da3tP6kwVUn" class="article-share-link">Share</a>
       
         <a href="https://blog.marsen.me/2024/06/07/2024/azure_email_communication_service/#disqus_thread" class="article-comment-link">留言</a>
       
@@ -806,7 +1007,7 @@ j=d.createElement(s),dl=l!='dataLayer'?'&l='+l:'';j.async=true;j.src=
       
     </div>
     <footer class="article-footer">
-      <a data-url="https://blog.marsen.me/2024/05/14/2024/gitlab_ci_and_gcs_as_static_site/" data-id="cuid0ixitdGxBKEkO7Dj6k08f" class="article-share-link">Share</a>
+      <a data-url="https://blog.marsen.me/2024/05/14/2024/gitlab_ci_and_gcs_as_static_site/" data-id="cuidJgoxlFhf1y62AvwEoHn8A" class="article-share-link">Share</a>
       
         <a href="https://blog.marsen.me/2024/05/14/2024/gitlab_ci_and_gcs_as_static_site/#disqus_thread" class="article-comment-link">留言</a>
       
@@ -820,200 +1021,10 @@ j=d.createElement(s),dl=l!='dataLayer'?'&l='+l:'';j.async=true;j.src=
 
 
   
-    <article id="post-2024/clear_gitlab-runner" class="article article-type-post" itemscope itemprop="blogPost">
-  <div class="article-meta">
-    <a href="/2024/04/17/2024/clear_gitlab-runner/" class="article-date">
-  <time datetime="2024-04-17T02:25:21.000Z" itemprop="datePublished">2024-04-17</time>
-</a>
-    
-  </div>
-  <div class="article-inner">
-    
-    
-      <header class="article-header">
-        
-  
-    <h1 itemprop="name">
-      <a class="article-title" href="/2024/04/17/2024/clear_gitlab-runner/"> [實作筆記] 清理 CI/CD (Gitlab-runner) </a>
-    </h1>
-  
-
-      </header>
-    
-    <div class="article-entry" itemprop="articleBody">
-      
-        <h2 id="寫在前面"><a href="#寫在前面" class="headerlink" title="寫在前面"></a>寫在前面</h2><p>NM;DR<br>沒有什麼意義，不需要讀這篇</p>
-<h2 id="緣由"><a href="#緣由" class="headerlink" title="緣由"></a>緣由</h2><ul>
-<li>CI&#x2F;CD 執行失敗，檢查錯誤發現是 Gitlab-runner[*1] 主機空間不足。</li>
-</ul>
-<h2 id="處理歷程"><a href="#處理歷程" class="headerlink" title="處理歷程"></a>處理歷程</h2><ul>
-<li>連線 Gitlab-runner 主機</li>
-<li>查詢空間使用狀況，找到佔磁區的資料<blockquote>
-<p>marsen@gr00:~$  <code>sudo du -h --max-depth=1 /</code><br>24K &#x2F;tmp<br>0 &#x2F;sys<br>74M &#x2F;boot<br>… skip …<br>24K &#x2F;root<br>94G &#x2F;var<br>97G &#x2F;</p>
-</blockquote>
-</li>
-<li>用指令作深層的搜尋　<code>sudo du -h --max-depth=3 /var</code></li>
-<li>發現 docker 的問題最大<blockquote>
-<p> 252K &#x2F;var&#x2F;lib&#x2F;docker&#x2F;containers<br>4.0K &#x2F;var&#x2F;lib&#x2F;docker&#x2F;trust<br>4.0K &#x2F;var&#x2F;lib&#x2F;docker&#x2F;runtimes<br>91G &#x2F;var&#x2F;lib&#x2F;docker</p>
-</blockquote>
-</li>
-<li>不選擇清理磁碟，而用 docker 指令檢查 <code>docker images</code></li>
-<li>批次刪除指令　<code>docker images -f &quot;dangling=true&quot; -q | xargs docker rmi</code></li>
-<li>再次檢查<blockquote>
-<p>marsen@gr00:~$  <code>sudo du -h --max-depth=1 /</code><br>24K &#x2F;tmp<br>0 &#x2F;sys<br>74M &#x2F;boot<br>… skip …<br>24K &#x2F;root<br>16G &#x2F;var<br>20G &#x2F;</p>
-</blockquote>
-</li>
-</ul>
-<h2 id="後續"><a href="#後續" class="headerlink" title="後續"></a>後續</h2><ul>
-<li>可能要建立一個排程定期去清理 CI&#x2F;CD 無用的 image<ul>
-<li>可以的話想整入 CI&#x2F;CD 作業中，但在 DinD[*2] 的環境不確定怎麼實作</li>
-</ul>
-</li>
-<li>log 與 cache 也有看到較高的資料成長曲線，未來也要納入評估</li>
-</ul>
-<h3 id="20240829-更新設置定期清理腳本"><a href="#20240829-更新設置定期清理腳本" class="headerlink" title="20240829 更新設置定期清理腳本"></a>20240829 更新設置定期清理腳本</h3><p>建立 cleanup.sh，並將其放置在 root 根目錄下：</p>
-<figure class="highlight bash"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br></pre></td><td class="code"><pre><span class="line">sudo <span class="built_in">cp</span> /path/to/cleanup.sh /root/</span><br><span class="line">sudo <span class="built_in">chmod</span> +x /root/cleanup.sh</span><br></pre></td></tr></table></figure>
-
-<p>cleanup.sh 的內容：</p>
-<figure class="highlight bash"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br></pre></td><td class="code"><pre><span class="line"><span class="meta">#!/bin/bash</span></span><br><span class="line"></span><br><span class="line"><span class="comment"># 清理未使用的 Docker 資源</span></span><br><span class="line">sudo docker system prune -a --force --volumes</span><br><span class="line"></span><br><span class="line"><span class="comment"># 清理未使用的 Docker 卷</span></span><br><span class="line">sudo docker volume prune --force</span><br><span class="line"></span><br><span class="line"><span class="comment"># 縮減系統日誌大小</span></span><br><span class="line">sudo journalctl --vacuum-time=30d</span><br></pre></td></tr></table></figure>
-
-<h4 id="設置排程"><a href="#設置排程" class="headerlink" title="設置排程"></a>設置排程</h4><p>以 root 用戶創建定期排程以每月執行清理腳本：</p>
-<p>打開 cron 編輯器：</p>
-<figure class="highlight bash"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">sudo crontab -e</span><br></pre></td></tr></table></figure>
-
-<p>在 cron 編輯器中添加以下行：</p>
-<figure class="highlight bash"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">0 0 1 * * /root/cleanup.sh &gt; /root/cleanup.log 2&gt;&amp;1</span><br></pre></td></tr></table></figure>
-
-<ul>
-<li>0 0 1 * *：每月的第一天午夜執行。</li>
-<li>&#x2F;root&#x2F;cleanup.sh：執行清理腳本。</li>
-<li><blockquote>
-<p>&#x2F;root&#x2F;cleanup.log 2&gt;&amp;1：將輸出和錯誤重定向到 &#x2F;root&#x2F;cleanup.log。</p>
-</blockquote>
-</li>
-</ul>
-<h4 id="驗證和檢查"><a href="#驗證和檢查" class="headerlink" title="驗證和檢查"></a>驗證和檢查</h4><p>手動運行清理腳本以驗證它是否按預期工作：</p>
-<figure class="highlight bash"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">sudo /root/cleanup.sh</span><br></pre></td></tr></table></figure>
-
-<h4 id="查看-cron-日誌"><a href="#查看-cron-日誌" class="headerlink" title="查看 cron 日誌"></a>查看 cron 日誌</h4><p>檢查 cron 日誌以確保定期任務已成功運行：</p>
-<p>在 Ubuntu&#x2F;Debian 系統上：</p>
-<figure class="highlight bash"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">sudo grep CRON /var/log/syslog</span><br></pre></td></tr></table></figure>
-
-<p>使用 journalctl（如果使用 systemd）：</p>
-<figure class="highlight bash"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">sudo journalctl -u cron</span><br></pre></td></tr></table></figure>
-
-<h2 id="註解"><a href="#註解" class="headerlink" title="註解"></a>註解</h2><ol>
-<li>Gitlab-Runner 是　Gitlab Solution 中執行工作的實體，可以是多台，此案只有單台</li>
-<li>Dind: Docker In Docker,如同字面意思，在 Docker 中跑 Docker，是 Gitlab-runner 的實作方法之一</li>
-</ol>
-<p>(fin)</p>
-
-      
-    </div>
-    <footer class="article-footer">
-      <a data-url="https://blog.marsen.me/2024/04/17/2024/clear_gitlab-runner/" data-id="cuid6vFJj4x3TD3B8WBc53pvJ" class="article-share-link">Share</a>
-      
-        <a href="https://blog.marsen.me/2024/04/17/2024/clear_gitlab-runner/#disqus_thread" class="article-comment-link">留言</a>
-      
-      
-  <ul class="article-tag-list" itemprop="keywords"><li class="article-tag-list-item"><a class="article-tag-list-link" href="/tags/CI-CD/" rel="tag">CI&#x2F;CD</a></li><li class="article-tag-list-item"><a class="article-tag-list-link" href="/tags/%E5%AF%A6%E4%BD%9C%E7%AD%86%E8%A8%98/" rel="tag">實作筆記</a></li></ul>
-
-    </footer>
-  </div>
-  
-</article>
-
-
-  
-    <article id="post-2024/gitlab_ci_and_gcp_cloud_run" class="article article-type-post" itemscope itemprop="blogPost">
-  <div class="article-meta">
-    <a href="/2024/04/17/2024/gitlab_ci_and_gcp_cloud_run/" class="article-date">
-  <time datetime="2024-04-17T02:18:25.000Z" itemprop="datePublished">2024-04-17</time>
-</a>
-    
-  </div>
-  <div class="article-inner">
-    
-    
-      <header class="article-header">
-        
-  
-    <h1 itemprop="name">
-      <a class="article-title" href="/2024/04/17/2024/gitlab_ci_and_gcp_cloud_run/"> [實作筆記] Gitlab CI/CD 與 GCP - Cloud Run 方案選擇過程記錄</a>
-    </h1>
-  
-
-      </header>
-    
-    <div class="article-entry" itemprop="articleBody">
-      
-        <h2 id="前情提介"><a href="#前情提介" class="headerlink" title="前情提介"></a>前情提介</h2><p>在我的實務經驗上，很常與新創團隊合作，而架構選擇常常是第一個問題，<br>最常見的解法是，由技術負責人選擇最熟悉的技術…<br>這樣真的好嗎?<br>比如說，T 社早期由某群工程人員開發，<br>選擇了 Go、Nodejs、C# 等多語言與雲端 GKE(K8S) 作為開發架構，<br>事後不負責任離職後，對持續的運作與維護都造成了困難<br>這件事對我的警鐘是 — <strong>作為管理者，如果不具備識別專業的能力，就只能透過信賴某人或團隊;這是非常脆弱且危險的。</strong></p>
-<h3 id="執行環境的選擇"><a href="#執行環境的選擇" class="headerlink" title="執行環境的選擇"></a>執行環境的選擇</h3><p>作為 Web 開發者，最常用的執行環境由簡入繁如下:</p>
-<h4 id="地端到雲端到"><a href="#地端到雲端到" class="headerlink" title="地端到雲端到"></a>地端到雲端到</h4><ul>
-<li>開發機就是正式機: 通常只是用來展示，開發者最常這樣作</li>
-<li>地端的主機: 沒有技術能力公司，很有可能都是這樣的架構，直接向開發商買主機放機房或是由開發商部署</li>
-<li>地端的虛擬機(VM): 會用較高規格的機器部署多台 VM，可以更有效使用資源</li>
-<li>雲端的虛擬機(VM): 使用上與上面差不多，但是由大廠來維持高可用性，學習門檻低</li>
-<li>雲端的 Server Less: 需要熟悉不同雲的相關產品，算是有點門檻，完成後可以精準控制預算、減少人力成本、透過雲維持高可用性</li>
-<li>雲端的 K8s: 門檻較上面更高，也有相同的優點，但是會有更高的可控性，適合有一定使用規模後，需要細部彈性調整資源的公司。</li>
-<li>再回地端: 如果規模再繼續成長，雲端的成本變得高不可攀時，或控制力下降，在有一定的技術水準情況下，有的公司會選擇回到地端。<a target="_blank" rel="noopener" href="https://37signals.com/podcast/leaving-the-cloud/">參考 37signals 的例子</a></li>
-</ul>
-<h2 id="GCP-Cloud-Run"><a href="#GCP-Cloud-Run" class="headerlink" title="GCP Cloud Run"></a>GCP Cloud Run</h2><p>回歸本文，我選擇了 GCP Cloud Run，這是一種雲端的 Server Less 的解決方案。<br>產品的規模沒有大到需要 K8s，團隊成員的具備足夠的能力，<br>類似的方案還有 Cloud Function，<br>作為一個 Web API Base 的輕量專案，我評估 Cloud Run 更適合<br>Cloud Function 較適合 Event Driven 的片段行為<br>Cloud Run 較適合有點複雜度，但是可以容器化的應用。</p>
-<h3 id="相關作業"><a href="#相關作業" class="headerlink" title="相關作業"></a>相關作業</h3><p>首先準備好我的程式，這是一個透過 Azure 寄信程式，需要在 <code>Azure Registered APP</code> 設定，<br>基本的讀取組態、寫 Log 到雲端與錯誤處理(Error Handle)、相依注入與測試等…<br>其中一個功能需要將 token 存儲在 <code>GCS(gcloud storage)</code> 裡，<br>並透過 <code>Cloud Scheduler</code> 定期更新，所以需要為其提供必要的權限與帳號(GCP Service Account).  </p>
-<p>使用 <code>Cloud Run</code> 前，<code>Docker</code> 也是必要的前置知識，<br>你會需要撰寫 Dockerfile ，並且需要在 GCP 上建立一個 <code>Artifacts Registry</code><br>如此一來，就可以透過 <code>Cloud Build</code> 建立並部署 <code>Cloud Run</code> 了<br>用　<code>GCP Workload Identity Federation</code> 管理 <code>Service Account</code><br>管理的對像有 2 個，CI 的 Service Account 與執行程式的 Cloud Run 的 Service Account.  </p>
-<p>後續有考慮透過 Cloud Run 提供 <code>Swagger</code> 之類的 API 文檔，但現階段先共享 <code>Postman</code> 資訊處理。</p>
-<h4 id="20240427-更新"><a href="#20240427-更新" class="headerlink" title="20240427 更新"></a>20240427 更新</h4><p>我的 CI 腳本如下  </p>
-<figure class="highlight yaml"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br></pre></td><td class="code"><pre><span class="line"><span class="string">export</span> <span class="string">CLOUDSDK_AUTH_ACCESS_TOKEN=&#123;provider</span> <span class="string">by</span> <span class="string">workload</span> <span class="string">identify</span> <span class="string">federation&#125;</span></span><br><span class="line"><span class="string">gcloud</span> <span class="string">builds</span> <span class="string">submit</span> <span class="string">--tag</span> <span class="string">your-registry/your-app:latest</span> <span class="string">.</span></span><br><span class="line"><span class="string">gcloud</span> <span class="string">run</span> <span class="string">services</span> <span class="string">update</span> <span class="string">your-app</span> <span class="string">--image=your-registry/your-app:latest</span> </span><br></pre></td></tr></table></figure>
-
-<p>我的 Gitlab Runner 是透過 GCP 上 A Project 的 VM 建立並註冊的，<br>而我的 Cloud Run 需要部署並運作在 GCP B Project 上，<br>預設執行的身份會是 AProj 的 Compute Engine default service account，以下簡稱 A_CE_Account，<br>而 <code>CLOUDSDK_AUTH_ACCESS_TOKEN</code> 代表的是 B Project 的 Gitlab Runner Service Account，以下簡稱 B_GR_Service_Account，<br>另外在運作 B Project 的 Cloud Run 需要的是 B Project 的 Cloud Run Service Account，以下簡稱　B_CR_Service_Account，  </p>
-<p>Gitlab Runner 在執行時，執行 <code>gcloud auth list</code> 會顯示 <code>A_CE_Account</code>，<br>但是由於有設定 <code>CLOUDSDK_AUTH_ACCESS_TOKEN</code>，所以相關命令的執行身份是　<code>B_GR_Service_Account</code>，<br>這會有足夠的權限執行　<code>gcloud builds submit --tag your-registry/your-app:latest .</code><br>但是沒有權限執行　<code>gcloud run services update your-app --image=your-registry/your-app:latest</code><br>原因是 Cloud Run 的執行身份是 <code>B_GR_Service_Account</code>，<br>為此，我們需要賦予 <code>B_GR_Service_Account</code> 角色 <code>Service Account User</code></p>
-<h2 id="參考關鍵字"><a href="#參考關鍵字" class="headerlink" title="參考關鍵字"></a>參考關鍵字</h2><ul>
-<li><a target="_blank" rel="noopener" href="https://cloud.google.com/run?hl=en">Cloud Run</a></li>
-<li><a target="_blank" rel="noopener" href="https://cloud.google.com/functions">Cloud Function</a></li>
-<li><a target="_blank" rel="noopener" href="https://cloud.google.com/build">Cloud Build</a></li>
-<li><a target="_blank" rel="noopener" href="https://cloud.google.com/storage">Cloud Storage</a></li>
-<li><a target="_blank" rel="noopener" href="https://cloud.google.com/scheduler">Cloud Scheduler</a></li>
-<li><a target="_blank" rel="noopener" href="https://cloud.google.com/iam/docs/workload-identity-federation">Workload Identity Federation</a></li>
-<li><a target="_blank" rel="noopener" href="https://www.docker.com/">Docker</a></li>
-<li><a target="_blank" rel="noopener" href="https://learn.microsoft.com/en-us/security/zero-trust/develop/app-registration">Azure Registered APP</a></li>
-</ul>
-<h2 id="參考"><a href="#參考" class="headerlink" title="參考"></a>參考</h2><ul>
-<li>[實作筆記] Gitlab CI&#x2F;CD 與 GCP 相關文章<ul>
-<li><a href="https://blog.marsen.me/2023/04/13/2023/gitlab_ci_and_gcp_vm/">架構全貌</a></li>
-<li><a href="https://blog.marsen.me/2023/04/14/2023/gitlab_ci_and_gcp_vm_create_server/">建立 Web Server VM</a></li>
-<li><a href="https://blog.marsen.me/2023/04/14/2023/gitlab_ci_and_gcp_vm_cretae_runner/">建立 Gitlab Runner VM</a></li>
-<li><a href="https://blog.marsen.me/2023/04/14/2023/gitlab_ci_and_gcp_vm_firewall/">防火牆設定</a></li>
-<li><a href="https://blog.marsen.me/2023/04/24/2023/gitlab_ci_and_gcp_vm_account/">Linux User 與資料夾權限</a></li>
-<li><a href="https://blog.marsen.me/2023/05/29/2023/gitlab_ci_and_gcp_vm_secret_config/">機敏資料的處理</a></li>
-<li><a href="https://blog.marsen.me/2023/11/16/2023/gitlab_ci_error_handle/">錯誤處理</a></li>
-<li><a href="https://blog.marsen.me/2024/03/13/2024/gitlab_ci_and_gcp_workload_federation/">Workload Identity Federation</a></li>
-<li><a href="https://blog.marsen.me/2024/04/17/2024/gitlab_ci_and_gcp_cloud_run/">Cloud Run</a></li>
-</ul>
-</li>
-</ul>
-<p>(fin)</p>
-
-      
-    </div>
-    <footer class="article-footer">
-      <a data-url="https://blog.marsen.me/2024/04/17/2024/gitlab_ci_and_gcp_cloud_run/" data-id="cuidS2g5m65s1ebWyAcAZ6miF" class="article-share-link">Share</a>
-      
-        <a href="https://blog.marsen.me/2024/04/17/2024/gitlab_ci_and_gcp_cloud_run/#disqus_thread" class="article-comment-link">留言</a>
-      
-      
-  <ul class="article-tag-list" itemprop="keywords"><li class="article-tag-list-item"><a class="article-tag-list-link" href="/tags/CI-CD/" rel="tag">CI&#x2F;CD</a></li><li class="article-tag-list-item"><a class="article-tag-list-link" href="/tags/%E5%AF%A6%E4%BD%9C%E7%AD%86%E8%A8%98/" rel="tag">實作筆記</a></li></ul>
-
-    </footer>
-  </div>
-  
-</article>
-
-
-  
 
 
   <nav id="page-nav">
-    <a class="extend prev" rel="prev" href="/page/5/">← 上一頁</a><a class="page-number" href="/">1</a><span class="space">&hellip;</span><a class="page-number" href="/page/4/">4</a><a class="page-number" href="/page/5/">5</a><span class="page-number current">6</span><a class="page-number" href="/page/7/">7</a><a class="page-number" href="/page/8/">8</a><span class="space">&hellip;</span><a class="page-number" href="/page/32/">32</a><a class="extend next" rel="next" href="/page/7/">下一頁 →</a>
+    <a class="extend prev" rel="prev" href="/page/5/">← 上一頁</a><a class="page-number" href="/">1</a><span class="space">&hellip;</span><a class="page-number" href="/page/4/">4</a><a class="page-number" href="/page/5/">5</a><span class="page-number current">6</span><a class="page-number" href="/page/7/">7</a><a class="page-number" href="/page/8/">8</a><span class="space">&hellip;</span><a class="page-number" href="/page/33/">33</a><a class="extend next" rel="next" href="/page/7/">下一頁 →</a>
   </nav>
 </section>
         
@@ -1024,6 +1035,14 @@ j=d.createElement(s),dl=l!='dataLayer'?'&l='+l:'';j.async=true;j.src=
     <h3 class="widget-title">最新文章</h3>
     <div class="widget">
       <ul>
+        
+          <li>
+            <a href="/2026/02/06/2026/richart_life/">[生活筆記] 2026 台新 Richart Life 切換方案回饋最大化</a>
+          </li>
+        
+          <li>
+            <a href="/2025/12/08/2025/iv_thixxxxxxx2/">[生活筆記] 2025 T社面試心得 - 二面</a>
+          </li>
         
           <li>
             <a href="/2025/11/28/2025/iv_thixxxxxxx/">[生活筆記] 2025 T社面試心得 - 一面</a>
@@ -1037,14 +1056,6 @@ j=d.createElement(s),dl=l!='dataLayer'?'&l='+l:'';j.async=true;j.src=
             <a href="/2025/10/29/2025/sdd_spec_kit/">[學習筆記] SDD 與 Spec Kit - 前言</a>
           </li>
         
-          <li>
-            <a href="/2025/09/17/2025/ai-refactor-rule-apply-dp/"> [實作筆記] 命令式程式碼重構到函數式 Pipe 流水線</a>
-          </li>
-        
-          <li>
-            <a href="/2025/09/11/2025/clean-architecture-avoid-type-hell/"> [實作筆記] Clean Architecture 思考：避免過度設計</a>
-          </li>
-        
       </ul>
     </div>
   </div>
@@ -1054,7 +1065,7 @@ j=d.createElement(s),dl=l!='dataLayer'?'&l='+l:'';j.async=true;j.src=
   <div class="widget-wrap">
     <h3 class="widget-title">彙整</h3>
     <div class="widget">
-      <ul class="archive-list"><li class="archive-list-item"><a class="archive-list-link" href="/archives/2025/11/">十一月 2025</a><span class="archive-list-count">1</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2025/10/">十月 2025</a><span class="archive-list-count">2</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2025/09/">九月 2025</a><span class="archive-list-count">4</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2025/08/">八月 2025</a><span class="archive-list-count">3</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2025/07/">七月 2025</a><span class="archive-list-count">4</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2025/06/">六月 2025</a><span class="archive-list-count">4</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2025/05/">五月 2025</a><span class="archive-list-count">5</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2025/04/">四月 2025</a><span class="archive-list-count">1</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2025/03/">三月 2025</a><span class="archive-list-count">2</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2025/02/">二月 2025</a><span class="archive-list-count">4</span></li><span id='list_archives2' style='display:none'><li class="archive-list-item"><a class="archive-list-link" href="/archives/2025/01/">一月 2025</a><span class="archive-list-count">3</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2024/12/">十二月 2024</a><span class="archive-list-count">3</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2024/11/">十一月 2024</a><span class="archive-list-count">3</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2024/10/">十月 2024</a><span class="archive-list-count">4</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2024/09/">九月 2024</a><span class="archive-list-count">5</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2024/08/">八月 2024</a><span class="archive-list-count">4</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2024/07/">七月 2024</a><span class="archive-list-count">3</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2024/06/">六月 2024</a><span class="archive-list-count">2</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2024/05/">五月 2024</a><span class="archive-list-count">1</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2024/04/">四月 2024</a><span class="archive-list-count">2</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2024/03/">三月 2024</a><span class="archive-list-count">3</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2024/02/">二月 2024</a><span class="archive-list-count">2</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2024/01/">一月 2024</a><span class="archive-list-count">4</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2023/12/">十二月 2023</a><span class="archive-list-count">2</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2023/11/">十一月 2023</a><span class="archive-list-count">3</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2023/10/">十月 2023</a><span class="archive-list-count">2</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2023/09/">九月 2023</a><span class="archive-list-count">3</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2023/08/">八月 2023</a><span class="archive-list-count">2</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2023/07/">七月 2023</a><span class="archive-list-count">6</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2023/06/">六月 2023</a><span class="archive-list-count">6</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2023/05/">五月 2023</a><span class="archive-list-count">1</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2023/04/">四月 2023</a><span class="archive-list-count">9</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2023/03/">三月 2023</a><span class="archive-list-count">4</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2023/02/">二月 2023</a><span class="archive-list-count">2</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2023/01/">一月 2023</a><span class="archive-list-count">2</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2022/12/">十二月 2022</a><span class="archive-list-count">1</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2022/10/">十月 2022</a><span class="archive-list-count">2</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2022/09/">九月 2022</a><span class="archive-list-count">6</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2022/08/">八月 2022</a><span class="archive-list-count">3</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2022/07/">七月 2022</a><span class="archive-list-count">2</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2022/06/">六月 2022</a><span class="archive-list-count">3</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2022/05/">五月 2022</a><span class="archive-list-count">7</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2022/04/">四月 2022</a><span class="archive-list-count">3</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2022/03/">三月 2022</a><span class="archive-list-count">3</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2022/02/">二月 2022</a><span class="archive-list-count">2</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2022/01/">一月 2022</a><span class="archive-list-count">3</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2021/12/">十二月 2021</a><span class="archive-list-count">2</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2021/11/">十一月 2021</a><span class="archive-list-count">2</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2021/10/">十月 2021</a><span class="archive-list-count">2</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2021/09/">九月 2021</a><span class="archive-list-count">1</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2021/08/">八月 2021</a><span class="archive-list-count">2</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2021/07/">七月 2021</a><span class="archive-list-count">4</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2021/06/">六月 2021</a><span class="archive-list-count">1</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2021/05/">五月 2021</a><span class="archive-list-count">2</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2021/04/">四月 2021</a><span class="archive-list-count">3</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2021/03/">三月 2021</a><span class="archive-list-count">3</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2021/02/">二月 2021</a><span class="archive-list-count">1</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2021/01/">一月 2021</a><span class="archive-list-count">7</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2020/12/">十二月 2020</a><span class="archive-list-count">1</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2020/11/">十一月 2020</a><span class="archive-list-count">2</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2020/10/">十月 2020</a><span class="archive-list-count">5</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2020/09/">九月 2020</a><span class="archive-list-count">5</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2020/08/">八月 2020</a><span class="archive-list-count">2</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2020/07/">七月 2020</a><span class="archive-list-count">3</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2020/06/">六月 2020</a><span class="archive-list-count">3</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2020/05/">五月 2020</a><span class="archive-list-count">3</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2020/04/">四月 2020</a><span class="archive-list-count">4</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2020/03/">三月 2020</a><span class="archive-list-count">1</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2020/02/">二月 2020</a><span class="archive-list-count">1</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2020/01/">一月 2020</a><span class="archive-list-count">5</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2019/12/">十二月 2019</a><span class="archive-list-count">1</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2019/11/">十一月 2019</a><span class="archive-list-count">2</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2019/10/">十月 2019</a><span class="archive-list-count">1</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2019/09/">九月 2019</a><span class="archive-list-count">2</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2019/08/">八月 2019</a><span class="archive-list-count">5</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2019/07/">七月 2019</a><span class="archive-list-count">1</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2019/06/">六月 2019</a><span class="archive-list-count">1</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2019/05/">五月 2019</a><span class="archive-list-count">2</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2019/04/">四月 2019</a><span class="archive-list-count">3</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2019/03/">三月 2019</a><span class="archive-list-count">1</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2019/02/">二月 2019</a><span class="archive-list-count">2</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2019/01/">一月 2019</a><span class="archive-list-count">4</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2018/12/">十二月 2018</a><span class="archive-list-count">5</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2018/11/">十一月 2018</a><span class="archive-list-count">7</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2018/10/">十月 2018</a><span class="archive-list-count">6</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2018/09/">九月 2018</a><span class="archive-list-count">3</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2018/08/">八月 2018</a><span class="archive-list-count">2</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2018/07/">七月 2018</a><span class="archive-list-count">6</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2018/06/">六月 2018</a><span class="archive-list-count">2</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2018/05/">五月 2018</a><span class="archive-list-count">1</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2018/04/">四月 2018</a><span class="archive-list-count">5</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2018/03/">三月 2018</a><span class="archive-list-count">5</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2018/02/">二月 2018</a><span class="archive-list-count">1</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2018/01/">一月 2018</a><span class="archive-list-count">5</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2017/12/">十二月 2017</a><span class="archive-list-count">3</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2017/10/">十月 2017</a><span class="archive-list-count">3</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2017/09/">九月 2017</a><span class="archive-list-count">2</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2017/08/">八月 2017</a><span class="archive-list-count">1</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2017/07/">七月 2017</a><span class="archive-list-count">2</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2017/05/">五月 2017</a><span class="archive-list-count">1</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2017/04/">四月 2017</a><span class="archive-list-count">2</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2017/03/">三月 2017</a><span class="archive-list-count">1</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2017/02/">二月 2017</a><span class="archive-list-count">1</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2017/01/">一月 2017</a><span class="archive-list-count">6</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2016/12/">十二月 2016</a><span class="archive-list-count">1</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2016/11/">十一月 2016</a><span class="archive-list-count">2</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2016/10/">十月 2016</a><span class="archive-list-count">4</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2016/09/">九月 2016</a><span class="archive-list-count">1</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2016/08/">八月 2016</a><span class="archive-list-count">6</span></li></span><span id=''></span><span onclick="var d=document.getElementById('list_archives2'); d.style.display===''?d.style='display:none':d.style=''">toggle...</span></ul>
+      <ul class="archive-list"><li class="archive-list-item"><a class="archive-list-link" href="/archives/2026/02/">二月 2026</a><span class="archive-list-count">1</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2025/12/">十二月 2025</a><span class="archive-list-count">1</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2025/11/">十一月 2025</a><span class="archive-list-count">1</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2025/10/">十月 2025</a><span class="archive-list-count">2</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2025/09/">九月 2025</a><span class="archive-list-count">4</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2025/08/">八月 2025</a><span class="archive-list-count">3</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2025/07/">七月 2025</a><span class="archive-list-count">4</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2025/06/">六月 2025</a><span class="archive-list-count">4</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2025/05/">五月 2025</a><span class="archive-list-count">5</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2025/04/">四月 2025</a><span class="archive-list-count">1</span></li><span id='list_archives2' style='display:none'><li class="archive-list-item"><a class="archive-list-link" href="/archives/2025/03/">三月 2025</a><span class="archive-list-count">2</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2025/02/">二月 2025</a><span class="archive-list-count">4</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2025/01/">一月 2025</a><span class="archive-list-count">3</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2024/12/">十二月 2024</a><span class="archive-list-count">3</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2024/11/">十一月 2024</a><span class="archive-list-count">3</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2024/10/">十月 2024</a><span class="archive-list-count">4</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2024/09/">九月 2024</a><span class="archive-list-count">5</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2024/08/">八月 2024</a><span class="archive-list-count">4</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2024/07/">七月 2024</a><span class="archive-list-count">3</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2024/06/">六月 2024</a><span class="archive-list-count">2</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2024/05/">五月 2024</a><span class="archive-list-count">1</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2024/04/">四月 2024</a><span class="archive-list-count">2</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2024/03/">三月 2024</a><span class="archive-list-count">3</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2024/02/">二月 2024</a><span class="archive-list-count">2</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2024/01/">一月 2024</a><span class="archive-list-count">4</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2023/12/">十二月 2023</a><span class="archive-list-count">2</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2023/11/">十一月 2023</a><span class="archive-list-count">3</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2023/10/">十月 2023</a><span class="archive-list-count">2</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2023/09/">九月 2023</a><span class="archive-list-count">3</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2023/08/">八月 2023</a><span class="archive-list-count">2</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2023/07/">七月 2023</a><span class="archive-list-count">6</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2023/06/">六月 2023</a><span class="archive-list-count">6</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2023/05/">五月 2023</a><span class="archive-list-count">1</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2023/04/">四月 2023</a><span class="archive-list-count">9</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2023/03/">三月 2023</a><span class="archive-list-count">4</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2023/02/">二月 2023</a><span class="archive-list-count">2</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2023/01/">一月 2023</a><span class="archive-list-count">2</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2022/12/">十二月 2022</a><span class="archive-list-count">1</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2022/10/">十月 2022</a><span class="archive-list-count">2</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2022/09/">九月 2022</a><span class="archive-list-count">6</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2022/08/">八月 2022</a><span class="archive-list-count">3</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2022/07/">七月 2022</a><span class="archive-list-count">2</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2022/06/">六月 2022</a><span class="archive-list-count">3</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2022/05/">五月 2022</a><span class="archive-list-count">7</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2022/04/">四月 2022</a><span class="archive-list-count">3</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2022/03/">三月 2022</a><span class="archive-list-count">3</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2022/02/">二月 2022</a><span class="archive-list-count">2</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2022/01/">一月 2022</a><span class="archive-list-count">3</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2021/12/">十二月 2021</a><span class="archive-list-count">2</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2021/11/">十一月 2021</a><span class="archive-list-count">2</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2021/10/">十月 2021</a><span class="archive-list-count">2</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2021/09/">九月 2021</a><span class="archive-list-count">1</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2021/08/">八月 2021</a><span class="archive-list-count">2</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2021/07/">七月 2021</a><span class="archive-list-count">4</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2021/06/">六月 2021</a><span class="archive-list-count">1</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2021/05/">五月 2021</a><span class="archive-list-count">2</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2021/04/">四月 2021</a><span class="archive-list-count">3</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2021/03/">三月 2021</a><span class="archive-list-count">3</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2021/02/">二月 2021</a><span class="archive-list-count">1</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2021/01/">一月 2021</a><span class="archive-list-count">7</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2020/12/">十二月 2020</a><span class="archive-list-count">1</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2020/11/">十一月 2020</a><span class="archive-list-count">2</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2020/10/">十月 2020</a><span class="archive-list-count">5</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2020/09/">九月 2020</a><span class="archive-list-count">5</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2020/08/">八月 2020</a><span class="archive-list-count">2</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2020/07/">七月 2020</a><span class="archive-list-count">3</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2020/06/">六月 2020</a><span class="archive-list-count">3</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2020/05/">五月 2020</a><span class="archive-list-count">3</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2020/04/">四月 2020</a><span class="archive-list-count">4</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2020/03/">三月 2020</a><span class="archive-list-count">1</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2020/02/">二月 2020</a><span class="archive-list-count">1</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2020/01/">一月 2020</a><span class="archive-list-count">5</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2019/12/">十二月 2019</a><span class="archive-list-count">1</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2019/11/">十一月 2019</a><span class="archive-list-count">2</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2019/10/">十月 2019</a><span class="archive-list-count">1</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2019/09/">九月 2019</a><span class="archive-list-count">2</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2019/08/">八月 2019</a><span class="archive-list-count">5</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2019/07/">七月 2019</a><span class="archive-list-count">1</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2019/06/">六月 2019</a><span class="archive-list-count">1</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2019/05/">五月 2019</a><span class="archive-list-count">2</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2019/04/">四月 2019</a><span class="archive-list-count">3</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2019/03/">三月 2019</a><span class="archive-list-count">1</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2019/02/">二月 2019</a><span class="archive-list-count">2</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2019/01/">一月 2019</a><span class="archive-list-count">4</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2018/12/">十二月 2018</a><span class="archive-list-count">5</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2018/11/">十一月 2018</a><span class="archive-list-count">7</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2018/10/">十月 2018</a><span class="archive-list-count">6</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2018/09/">九月 2018</a><span class="archive-list-count">3</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2018/08/">八月 2018</a><span class="archive-list-count">2</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2018/07/">七月 2018</a><span class="archive-list-count">6</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2018/06/">六月 2018</a><span class="archive-list-count">2</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2018/05/">五月 2018</a><span class="archive-list-count">1</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2018/04/">四月 2018</a><span class="archive-list-count">5</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2018/03/">三月 2018</a><span class="archive-list-count">5</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2018/02/">二月 2018</a><span class="archive-list-count">1</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2018/01/">一月 2018</a><span class="archive-list-count">5</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2017/12/">十二月 2017</a><span class="archive-list-count">3</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2017/10/">十月 2017</a><span class="archive-list-count">3</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2017/09/">九月 2017</a><span class="archive-list-count">2</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2017/08/">八月 2017</a><span class="archive-list-count">1</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2017/07/">七月 2017</a><span class="archive-list-count">2</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2017/05/">五月 2017</a><span class="archive-list-count">1</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2017/04/">四月 2017</a><span class="archive-list-count">2</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2017/03/">三月 2017</a><span class="archive-list-count">1</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2017/02/">二月 2017</a><span class="archive-list-count">1</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2017/01/">一月 2017</a><span class="archive-list-count">6</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2016/12/">十二月 2016</a><span class="archive-list-count">1</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2016/11/">十一月 2016</a><span class="archive-list-count">2</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2016/10/">十月 2016</a><span class="archive-list-count">4</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2016/09/">九月 2016</a><span class="archive-list-count">1</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2016/08/">八月 2016</a><span class="archive-list-count">6</span></li></span><span id=''></span><span onclick="var d=document.getElementById('list_archives2'); d.style.display===''?d.style='display:none':d.style=''">toggle...</span></ul>
     </div>
   </div>
 
@@ -1113,7 +1124,7 @@ This work is licensed under a
   
   <div class="outer">
     <div id="footer-info" class="inner">
-      &copy; 2025 Marsen L.<br>
+      &copy; 2026 Marsen L.<br>
       Powered by <a href="http://hexo.io/" target="_blank">Hexo</a>
     </div>
   </div>
