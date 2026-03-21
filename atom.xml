@@ -12,7 +12,25 @@
   <rights>All rights reserved 2026, Marsen L.</rights>
   <subtitle>waiting to load</subtitle>
   <title>Marsen's Blog</title>
-  <updated>2026-03-20T05:49:55.330Z</updated>
+  <updated>2026-03-21T16:49:21.102Z</updated>
+  <entry>
+    <author>
+      <name>Marsen L.</name>
+      <email>admin@marsen.me</email>
+    </author>
+    <category term="實作筆記" scheme="https://blog.marsen.me/tags/%E5%AF%A6%E4%BD%9C%E7%AD%86%E8%A8%98/"/>
+    <content>
+      <![CDATA[<h2 id="前情提要"><a href="#前情提要" class="headerlink" title="前情提要"></a>前情提要</h2><p>在本機開發 LINE Bot，撞上了第一道牆：LINE Messaging API 的 Webhook 只接受 HTTPS endpoint，<br><code>localhost</code> 根本不在它的認知裡。</p><p>第一反應是用 Quick Tunnel，指令一行就能跑：</p><figure class="highlight bash"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">cloudflared tunnel --url http://localhost:3000</span><br></pre></td></tr></table></figure><p>跑起來，去 LINE Console 貼上 URL，Verify 成功。<br>隔天重開，URL 換了，再去貼一次。<br>第三次之後決定換個做法。</p><hr><h2 id="其他常見做法與沒選的原因"><a href="#其他常見做法與沒選的原因" class="headerlink" title="其他常見做法與沒選的原因"></a>其他常見做法與沒選的原因</h2><table><thead><tr><th>方案</th><th>為什麼沒選</th></tr></thead><tbody><tr><td><strong>ngrok</strong></td><td>免費版 URL 每次重啟都變，跟 Quick Tunnel 一樣的問題</td></tr><tr><td><strong>localtunnel</strong></td><td>開源，URL 可指定但不保證穩定，偶有被佔用的情況</td></tr><tr><td><strong>smee.io</strong></td><td>Webhook 轉發專用，需要額外的 client 程式，多一層複雜度</td></tr><tr><td><strong>VS Code Dev Tunnels</strong></td><td>綁定 VS Code，換編輯器就失效</td></tr><tr><td><strong>Tailscale Funnel</strong></td><td>要先建 Tailscale 網路，對沒在用的人成本高</td></tr><tr><td><strong>直接部署到雲端</strong></td><td>URL 穩定，但每次改 code 都要重部署，開發迭代太慢</td></tr><tr><td><strong>Cloudflare Quick Tunnel</strong></td><td>URL 每次重啟都換，手動更新 Webhook 很煩</td></tr></tbody></table><p>選 <strong>Cloudflare Named Tunnel</strong> 的原因：</p><ul><li>URL 固定（綁自己的 domain），設定一次就好</li><li>已有 Cloudflare 管理 domain，沒有額外成本</li><li>搭配 launchd 開機自啟，幾乎感覺不到它的存在</li></ul><hr><h2 id="前置條件"><a href="#前置條件" class="headerlink" title="前置條件"></a>前置條件</h2><ul><li>已有 Cloudflare 帳號</li><li>要使用的 domain 已托管在 Cloudflare（NS 已指向 Cloudflare）</li><li>本機 LINE Bot 已可正常啟動並監聽某個 port</li></ul><hr><h2 id="為什麼選-Named-Tunnel，不用-Quick-Tunnel"><a href="#為什麼選-Named-Tunnel，不用-Quick-Tunnel" class="headerlink" title="為什麼選 Named Tunnel，不用 Quick Tunnel"></a>為什麼選 Named Tunnel，不用 Quick Tunnel</h2><p>Quick Tunnel 每次啟動 URL 都會變，要一直去 LINE Console 更新 Webhook URL，很麻煩。</p><p>Named Tunnel 設定一次，URL 固定（綁自己的 domain），之後只管跑就好。</p><hr><h2 id="設定步驟"><a href="#設定步驟" class="headerlink" title="設定步驟"></a>設定步驟</h2><p>本文以 tunnel 名稱 <code>mybot</code>、domain <code>mybot.example.com</code>、本機 port <code>3000</code> 為例。</p><h3 id="1-安裝-cloudflared"><a href="#1-安裝-cloudflared" class="headerlink" title="1. 安裝 cloudflared"></a>1. 安裝 cloudflared</h3><figure class="highlight bash"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">brew install cloudflare/cloudflare/cloudflared</span><br></pre></td></tr></table></figure><h3 id="2-登入"><a href="#2-登入" class="headerlink" title="2. 登入"></a>2. 登入</h3><figure class="highlight bash"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">cloudflared tunnel login</span><br></pre></td></tr></table></figure><p>瀏覽器會開啟授權頁面，選擇要綁定的 domain。</p><h3 id="3-建立-Named-Tunnel"><a href="#3-建立-Named-Tunnel" class="headerlink" title="3. 建立 Named Tunnel"></a>3. 建立 Named Tunnel</h3><figure class="highlight bash"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">cloudflared tunnel create mybot</span><br></pre></td></tr></table></figure><p>會產生一組 tunnel ID 跟 credentials 檔，路徑類似 <code>~/.cloudflared/&lt;tunnel-id&gt;.json</code>。</p><h3 id="4-設定-config"><a href="#4-設定-config" class="headerlink" title="4. 設定 config"></a>4. 設定 config</h3><p>寫入 <code>~/.cloudflared/config.yml</code>：</p><figure class="highlight yaml"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br></pre></td><td class="code"><pre><span class="line"><span class="attr">tunnel:</span> <span class="string">&lt;tunnel-id&gt;</span></span><br><span class="line"><span class="attr">credentials-file:</span> <span class="string">/Users/&lt;user&gt;/.cloudflared/&lt;tunnel-id&gt;.json</span></span><br><span class="line"></span><br><span class="line"><span class="attr">ingress:</span></span><br><span class="line">  <span class="bullet">-</span> <span class="attr">hostname:</span> <span class="string">mybot.example.com</span></span><br><span class="line">    <span class="attr">service:</span> <span class="string">http://localhost:3000</span></span><br><span class="line">  <span class="bullet">-</span> <span class="attr">service:</span> <span class="string">http_status:404</span></span><br></pre></td></tr></table></figure><p><code>&lt;tunnel-id&gt;</code> 從 Step 3 的輸出取得，或執行 <code>cloudflared tunnel list</code> 查看。</p><h3 id="5-設定-DNS"><a href="#5-設定-DNS" class="headerlink" title="5. 設定 DNS"></a>5. 設定 DNS</h3><figure class="highlight bash"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">cloudflared tunnel route dns mybot mybot.example.com</span><br></pre></td></tr></table></figure><p>Cloudflare DNS 會自動新增一筆 CNAME 指向 tunnel，不用手動加。</p><h3 id="6-跑起來"><a href="#6-跑起來" class="headerlink" title="6. 跑起來"></a>6. 跑起來</h3><figure class="highlight bash"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">cloudflared tunnel run mybot</span><br></pre></td></tr></table></figure><p>這樣 <code>https://mybot.example.com</code> 的流量就會轉進 <code>localhost:3000</code>。</p><hr><h2 id="LINE-Console-設定"><a href="#LINE-Console-設定" class="headerlink" title="LINE Console 設定"></a>LINE Console 設定</h2><p><strong>注意：Verify 前要確認 bot 已在本機跑起來，</strong> LINE 會實際打一個請求過來，bot 沒跑就會 Verify 失敗。</p><p>LINE Developers Console → Messaging API → Webhook URL 填：</p><figure class="highlight text"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">https://mybot.example.com/webhook</span><br></pre></td></tr></table></figure><p>勾選「Use webhook」→ 點「Verify」，回傳 200 就完成了。</p><hr><h2 id="Port-選擇"><a href="#Port-選擇" class="headerlink" title="Port 選擇"></a>Port 選擇</h2><p>LINE 打來的 Webhook 是外部流量，建議選高號碼 port（49152–65535），<br>比常見的 3000、8080 不容易被掃描到。<br>在 <code>config.yml</code> 的 <code>service</code> 欄位對應好本機 port 即可。</p><hr><h2 id="小結"><a href="#小結" class="headerlink" title="小結"></a>小結</h2><p>Cloudflare Named Tunnel 解決了「本機服務需要公開 HTTPS endpoint」的問題，<br>對 LINE Bot 開發來說特別實用——URL 固定，不用每次重啟都更新 Webhook 設定。<br>搭配 launchd 讓 cloudflared 開機自動啟動，幾乎可以忘記它的存在。</p><p>(fin)</p>]]>
+    </content>
+    <id>https://blog.marsen.me/2026/03/18/2026/line-bot-bridge-claude-code/</id>
+    <link href="https://blog.marsen.me/2026/03/18/2026/line-bot-bridge-claude-code/"/>
+    <published>2026-03-18T22:11:45.000Z</published>
+    <summary>
+      <![CDATA[<h2 id="前情提要"><a href="#前情提要" class="headerlink" title="前情提要"></a>前情提要</h2><p>在本機開發 LINE Bot，撞上了第一道牆：LINE Messaging API 的 Webhook 只接受 HTTPS]]>
+    </summary>
+    <title>[實作筆記] 用 Cloudflare Tunnel 讓 LINE Bot Webhook 打到本機</title>
+    <updated>2026-03-21T16:49:21.102Z</updated>
+  </entry>
   <entry>
     <author>
       <name>Marsen L.</name>
@@ -30,7 +48,7 @@
 <figure class="highlight]]>
     </summary>
     <title>[實作筆記] Ghostty 打字出現 [O[27u 亂碼的原因與修正</title>
-    <updated>2026-03-20T05:49:55.330Z</updated>
+    <updated>2026-03-21T16:49:21.102Z</updated>
   </entry>
   <entry>
     <author>
@@ -49,7 +67,7 @@
 <h]]>
     </summary>
     <title>[工具筆記] Terminal 工具怎麼選？Ghostty、iTerm2 與其他選手比較</title>
-    <updated>2026-03-20T05:49:55.330Z</updated>
+    <updated>2026-03-21T16:49:21.102Z</updated>
   </entry>
   <entry>
     <author>
@@ -68,7 +86,7 @@
 <figure cl]]>
     </summary>
     <title>[實作筆記] Next.js Hydration 與隨機性：從問題到正確架構</title>
-    <updated>2026-03-20T05:49:55.330Z</updated>
+    <updated>2026-03-21T16:49:21.102Z</updated>
   </entry>
   <entry>
     <author>
@@ -85,7 +103,7 @@
       <![CDATA[<h2 id="前情提要"><a href="#前情提要" class="headerlink" title="前情提要"></a>前情提要</h2><p>自從 2025 年 9 月台新把 @GoGo 卡、FlyGo 卡、玫瑰 Giving 卡、太陽&#x2F;玫瑰卡這些信用卡整]]>
     </summary>
     <title>[生活筆記] 2026 台新 Richart Life 切換方案回饋最大化</title>
-    <updated>2026-03-20T05:49:55.330Z</updated>
+    <updated>2026-03-21T16:49:21.102Z</updated>
   </entry>
   <entry>
     <author>
@@ -102,7 +120,7 @@
       <![CDATA[<h2 id="前情提要"><a href="#前情提要" class="headerlink" title="前情提要"></a>前情提要</h2><p>延續<a href="https://blog.marsen.me/2025/11/28/2025/iv_thixxxxxx]]>
     </summary>
     <title>[生活筆記] 2025 T社面試心得 - 二面</title>
-    <updated>2026-03-20T05:49:55.329Z</updated>
+    <updated>2026-03-21T16:49:21.102Z</updated>
   </entry>
   <entry>
     <author>
@@ -120,7 +138,7 @@
 <p>一面是 Pyth]]>
     </summary>
     <title>[生活筆記] 2025 T社面試心得 - 一面</title>
-    <updated>2026-03-20T05:49:55.329Z</updated>
+    <updated>2026-03-21T16:49:21.101Z</updated>
   </entry>
   <entry>
     <author>
@@ -139,7 +157,7 @@
 <h2 id="當軟體開發還是一門工程學"><a href="#當軟體開發還是一門工程學" class="headerlink" title="當軟體開發還是一門工程學"></a>當軟體開發還是一門工程學</h2><p>1970 年代，當軟體開發還是一門]]>
     </summary>
     <title>[SDD 與 Spec Kit]傳統瀑布式開發（1975-2000）</title>
-    <updated>2026-03-20T05:49:55.329Z</updated>
+    <updated>2026-03-21T16:49:21.102Z</updated>
   </entry>
   <entry>
     <author>
@@ -159,7 +177,7 @@
 <p>What is Spec-Driven Developm]]>
     </summary>
     <title>[學習筆記] SDD 與 Spec Kit - 前言</title>
-    <updated>2026-03-20T05:49:55.329Z</updated>
+    <updated>2026-03-21T16:49:21.102Z</updated>
   </entry>
   <entry>
     <author>
@@ -178,7 +196,7 @@
 <p>這些異味提示著我們需要重構，你可以先挑戰看一下有沒有辦]]>
     </summary>
     <title>[實作筆記] 命令式程式碼重構到函數式 Pipe 流水線</title>
-    <updated>2026-03-20T05:49:55.328Z</updated>
+    <updated>2026-03-21T16:49:21.100Z</updated>
   </entry>
   <entry>
     <author>
@@ -198,7 +216,7 @@
 <]]>
     </summary>
     <title>[實作筆記] Clean Architecture 思考：避免過度設計</title>
-    <updated>2026-03-20T05:49:55.328Z</updated>
+    <updated>2026-03-21T16:49:21.101Z</updated>
   </entry>
   <entry>
     <author>
@@ -216,7 +234,7 @@
       <![CDATA[<h2 id="前情提要"><a href="#前情提要" class="headerlink" title="前情提要"></a>前情提要</h2><p>專案需要使用 PaddleOCR 進行文字辨識，但原始模型檔案需要從 PaddlePaddle 框架轉換成 ONNX 格式才]]>
     </summary>
     <title>[實作筆記] PaddleOCR ONNX 模型發布到 Hugging Face Hub</title>
-    <updated>2026-03-20T05:49:55.328Z</updated>
+    <updated>2026-03-21T16:49:21.100Z</updated>
   </entry>
   <entry>
     <author>
@@ -235,7 +253,7 @@
 <p>在這個專案中，我們遇到了幾個]]>
     </summary>
     <title>[實作筆記] 建立私有 Python Package Registry - 以 ONNX Runtime 為例</title>
-    <updated>2026-03-20T05:49:55.329Z</updated>
+    <updated>2026-03-21T16:49:21.101Z</updated>
   </entry>
   <entry>
     <author>
@@ -253,7 +271,7 @@
       <![CDATA[<h2 id="前情提要"><a href="#前情提要" class="headerlink" title="前情提要"></a>前情提要</h2><p>四年前「<a href="https://blog.marsen.me/2020/10/22/2020/google_dom]]>
     </summary>
     <title>[實作筆記] 怎麼建立一個網站？(四) - 自訂網域 EMail 收寄信(使用 Cloudflare 與 Brevo)</title>
-    <updated>2026-03-20T05:49:55.328Z</updated>
+    <updated>2026-03-21T16:49:21.101Z</updated>
   </entry>
   <entry>
     <author>
@@ -272,7 +290,7 @@
 <p>檔案上傳功能中，檔案編碼修復應該放在 Middlewa]]>
     </summary>
     <title>[架構筆記] Clean Architecture 分層職責的反思</title>
-    <updated>2026-03-20T05:49:55.328Z</updated>
+    <updated>2026-03-21T16:49:21.101Z</updated>
   </entry>
   <entry>
     <author>
@@ -291,7 +309,7 @@
 <figure class="highlight typesc]]>
     </summary>
     <title>[學習筆記] Node.js 檔案操作 mkdir 的正確姿勢</title>
-    <updated>2026-03-20T05:49:55.329Z</updated>
+    <updated>2026-03-21T16:49:21.102Z</updated>
   </entry>
   <entry>
     <author>
@@ -309,7 +327,7 @@
       <![CDATA[<h2 id="前情提要"><a href="#前情提要" class="headerlink" title="前情提要"></a>前情提要</h2><p>最近購買 Claude Code，在此同時也有試用 Github Copilot &#x2F; Gitlab Duo &#x]]>
     </summary>
     <title>[實作筆記] AI Agent 實作 Web Search API：從設計到部署的完整記錄</title>
-    <updated>2026-03-20T05:49:55.328Z</updated>
+    <updated>2026-03-21T16:49:21.101Z</updated>
   </entry>
   <entry>
     <author>
@@ -326,7 +344,7 @@
       <![CDATA[<h2 id="前情提要"><a href="#前情提要" class="headerlink" title="前情提要"></a>前情提要</h2><p>最近拿到一個地端資源 <a href="https://www.lannerinc.com/products/edge-ai]]>
     </summary>
     <title>[實作筆記] EAI 機器瀏覽器安裝問題與解決方案</title>
-    <updated>2026-03-20T05:49:55.328Z</updated>
+    <updated>2026-03-21T16:49:21.100Z</updated>
   </entry>
   <entry>
     <author>
@@ -343,7 +361,7 @@
       <![CDATA[<h2 id="前言"><a href="#前言" class="headerlink" title="前言"></a>前言</h2><p>在 Express.js 認證系統中，常見的做法是在每個需要驗證的路由中直接解析 JWT token。<br>但有一個更好的實作方式：使用中]]>
     </summary>
     <title>[學習筆記] Express.js middleware auth 的業界標準(res.locals)</title>
-    <updated>2026-03-20T05:49:55.328Z</updated>
+    <updated>2026-03-21T16:49:21.101Z</updated>
   </entry>
   <entry>
     <author>
@@ -361,23 +379,6 @@
       <![CDATA[<h2 id="前情提要"><a href="#前情提要" class="headerlink" title="前情提要"></a>前情提要</h2><p>GitHub Action <code>marsen/hexo-action@v1.0.11</code> 之前運行正常，但]]>
     </summary>
     <title>[踩雷筆記] GitHub Action ssh-keyscan not found 問題修復</title>
-    <updated>2026-03-20T05:49:55.329Z</updated>
-  </entry>
-  <entry>
-    <author>
-      <name>Marsen L.</name>
-      <email>admin@marsen.me</email>
-    </author>
-    <content>
-      <![CDATA[<h2 id="前情提要"><a href="#前情提要" class="headerlink" title="前情提要"></a>前情提要</h2><p>最近在搞 AI 模型的本地部署，並試著將 Ollama 容器化。<br>經過一段時間的調研和實測，想記錄一下目前的進度和對幾個主流方案的看法。</p><h3 id="目標"><a href="#目標" class="headerlink" title="目標"></a>目標</h3><ul><li>找到穩定的 Ollama 容器化方案</li><li>評估各種新興工具的可用性</li><li>為未來的產品開發做技術預研</li></ul><h3 id="Ollama-簡介"><a href="#Ollama-簡介" class="headerlink" title="Ollama 簡介"></a>Ollama 簡介</h3><p>Ollama 是一個開源工具，讓你在本地電腦上輕鬆運行大型語言模型（如 Llama、CodeLlama、Mistral 等）。<br>安裝簡單，一行指令就能下載和運行各種 AI 模型，無需複雜設定。支援 macOS、Linux 和 Windows。</p><figure class="highlight bash"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment">#  安裝後直接用</span></span><br><span class="line">ollama run llama3.2</span><br></pre></td></tr></table></figure><p>類似 Docker 的概念，但專門為 AI 模型設計。<br>還提供 REST API：</p><figure class="highlight bash"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment"># 啟動後自動開啟 API server (預設 port 11434)</span></span><br><span class="line">curl http://localhost:11434/api/generate \</span><br><span class="line">  -d <span class="string">&#x27;&#123;&quot;model&quot;: &quot;llama3.2&quot;, &quot;prompt&quot;: &quot;Hello&quot;&#125;&#x27;</span></span><br></pre></td></tr></table></figure><p>沒有 Ollama 的話，你需要：</p><ul><li>手動下載模型檔案（通常好幾 GB）</li><li>處理不同模型格式（GGUF、GGML 等）</li><li>設定 GPU 加速環境</li><li>寫代碼載入模型到記憶體</li><li>處理 tokenization 和 inference</li><li>自己包 API server</li></ul><p>Ollama 把這些都幫你搞定了。</p><h2 id="選擇"><a href="#選擇" class="headerlink" title="選擇"></a>選擇</h2><h3 id="目前採用：Ollama-Container-指令初始化"><a href="#目前採用：Ollama-Container-指令初始化" class="headerlink" title="目前採用：Ollama Container + 指令初始化"></a>目前採用：Ollama Container + 指令初始化</h3><p>經過評估，選擇 ollama container 方案最穩定且彈性也最高，</p><p>只要需要透過指令的方法來就可以來取模型。</p><p>基本用法：</p><figure class="highlight bash"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment"># 啟動 ollama container</span></span><br><span class="line">docker run -d --name ollama -p 11434:11434 ollama/ollama</span><br><span class="line"></span><br><span class="line"><span class="comment"># 下載模型</span></span><br><span class="line">docker <span class="built_in">exec</span> -it ollama ollama pull llama3.2</span><br></pre></td></tr></table></figure><h3 id="Docker-Model-Runner：值得關注但暫不採用"><a href="#Docker-Model-Runner：值得關注但暫不採用" class="headerlink" title="Docker Model Runner：值得關注但暫不採用"></a>Docker Model Runner：值得關注但暫不採用</h3><p>DMR 在 2025 年 3月隨 Docker Desktop 4.40 推出 Beta 版，</p><p>看起來很有潛力，但目前不打算用在產品上。</p><p>主因如下</p><ul><li>平台支援階段性：最初只支援 Apple Silicon (M1-M4)，5月的 Docker Desktop 4.41 才加入 Windows NVIDIA GPU 支援</li><li>實驗階段：工具變化快速，預期會持續改進，對產品開發風險較高</li><li>Linux 支援：目前在 Linux (包含 WSL2) 上支援 Docker CE，但整體生態還在發展中</li></ul><p>會持續觀察，最新的 Docker Desktop 4.42 甚至支援了 Windows Qualcomm 晶片，發展很快。</p><h3 id="Podman-AI-Lab：概念不錯但有使用限制"><a href="#Podman-AI-Lab：概念不錯但有使用限制" class="headerlink" title="Podman AI Lab：概念不錯但有使用限制"></a>Podman AI Lab：概念不錯但有使用限制</h3><p>Podman AI Lab 提供一份精選的開源 AI 模型清單，概念上跟 DMR 類似，但實際使用上有些考量。</p><p>現況 支援 GGUF、PyTorch、TensorFlow 等常見格式</p><p>提供精選的 recipe 目錄，幫助導航 AI 使用案例和模型</p><p>最近與 RamaLama 整合，簡化本地 AI 模型執行</p><p>但採用精選模型清單的策略，可能不包含所有想要的模型</p><p>相對於 Ollama 的廣泛模型支援，選擇較為有限</p><p>不過隨著 RamaLama 能從任何來源簡化 AI 模型的本地服務，未來可能會更靈活。</p><h2 id="一些要注意的小問題"><a href="#一些要注意的小問題" class="headerlink" title="一些要注意的小問題"></a>一些要注意的小問題</h2><h3 id="Ollama-Container-常見坑"><a href="#Ollama-Container-常見坑" class="headerlink" title="Ollama Container 常見坑"></a>Ollama Container 常見坑</h3><ol><li><strong>GPU 支援</strong>：記得加 <code>--gpus all</code> 或用 docker-compose 設定</li><li><strong>模型路徑</strong>：預設在 <code>/root/.ollama</code>，要持久化記得 mount volume</li><li><strong>網路設定</strong>：如果在 k8s 環境，注意 service 的 port 設定</li></ol><h3 id="Docker-Model-Runner-評估心得"><a href="#Docker-Model-Runner-評估心得" class="headerlink" title="Docker Model Runner 評估心得"></a>Docker Model Runner 評估心得</h3><ul><li>目前主要在 macOS Apple Silicon 上比較穩定</li><li>Linux 支援還在完善中</li><li>Windows 支援是最近才加的，需要更多實測</li></ul><h2 id="技術選型思考"><a href="#技術選型思考" class="headerlink" title="技術選型思考"></a>技術選型思考</h2><p>這次調研讓我想到幾個點：</p><ol><li><strong>穩定性 &gt; 新功能</strong>：對產品開發來說，穩定性永遠是第一考量</li><li><strong>生態完整性</strong>：單一工具再好，生態不完善就是硬傷</li><li><strong>維護成本</strong>：新技術通常需要更多維護工作</li></ol><h2 id="下一步"><a href="#下一步" class="headerlink" title="下一步"></a>下一步</h2><p>短期計畫：</p><ol><li>把 Ollama container 的初始化流程自動化</li><li>持續追蹤 DMR 發展</li><li>建立技術方案評估標準</li></ol><p>中期目標：</p><ul><li>等 DMR 穩定後再評估導入</li><li>研究其他容器化方案</li><li>整理最佳實踐文件</li></ul><h2 id="小結"><a href="#小結" class="headerlink" title="小結"></a>小結</h2><p>AI 基礎設施變化很快，容器化技術也在演進。目前沒有完美方案，但這個調研過程很有價值。</p><p>技術選擇是動態平衡的過程，要在穩定性、功能性、維護成本間找平衡點。</p><p>會持續關注這領域的發展，有新發現再分享。</p><p>(fin)</p>]]>
-    </content>
-    <id>https://blog.marsen.me/2025/06/22/2025/ai-ollama-containerized/</id>
-    <link href="https://blog.marsen.me/2025/06/22/2025/ai-ollama-containerized/"/>
-    <published>2025-06-22T15:36:35.000Z</published>
-    <summary>
-      <![CDATA[<h2 id="前情提要"><a href="#前情提要" class="headerlink" title="前情提要"></a>前情提要</h2><p>最近在搞 AI 模型的本地部署，並試著將 Ollama 容器化。<br>經過一段時間的調研和實測，想記錄一下目前的進度和對幾]]>
-    </summary>
-    <title>[實作筆記] Ollama 容器化調研筆記</title>
-    <updated>2026-03-20T05:49:55.328Z</updated>
+    <updated>2026-03-21T16:49:21.101Z</updated>
   </entry>
 </feed>
