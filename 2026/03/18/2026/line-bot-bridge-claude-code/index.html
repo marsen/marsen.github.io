@@ -35,15 +35,15 @@ j=d.createElement(s),dl=l!='dataLayer'?'&l='+l:'';j.async=true;j.src=
   
   <title>[實作筆記] 用 Cloudflare Tunnel 讓 LINE Bot Webhook 打到本機 | Marsen&#39;s Blog</title>
   <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
-  <meta name="description" content="前情提要在本機開發 LINE Bot，撞上了第一道牆：LINE Messaging API 的 Webhook 只接受 HTTPS endpoint，localhost 根本不在它的認知裡。 第一反應是用 Quick Tunnel，指令一行就能跑： 1cloudflared tunnel --url http:&#x2F;&#x2F;localhost:3000  跑起來，去 LINE Console 貼上 URL，">
+  <meta name="description" content="前情提要在本機開發時需要 Webhook 來接受第三方的回呼， 例如「LINE Bot 的 Messaging API 」 通常需要真實的 HTTPS endpoint 的 Callback Url， 第一反應是用 ngrok，指令一行就能跑： 但是每次重開 URL 都會換不一樣，需要再去設定一次。 所以我決定換個做法。 選 Cloudflare Named Tunnel 的原因：  URL 固定">
 <meta property="og:type" content="article">
 <meta property="og:title" content="[實作筆記] 用 Cloudflare Tunnel 讓 LINE Bot Webhook 打到本機">
 <meta property="og:url" content="https://blog.marsen.me/2026/03/18/2026/line-bot-bridge-claude-code/index.html">
 <meta property="og:site_name" content="Marsen&#39;s Blog">
-<meta property="og:description" content="前情提要在本機開發 LINE Bot，撞上了第一道牆：LINE Messaging API 的 Webhook 只接受 HTTPS endpoint，localhost 根本不在它的認知裡。 第一反應是用 Quick Tunnel，指令一行就能跑： 1cloudflared tunnel --url http:&#x2F;&#x2F;localhost:3000  跑起來，去 LINE Console 貼上 URL，">
+<meta property="og:description" content="前情提要在本機開發時需要 Webhook 來接受第三方的回呼， 例如「LINE Bot 的 Messaging API 」 通常需要真實的 HTTPS endpoint 的 Callback Url， 第一反應是用 ngrok，指令一行就能跑： 但是每次重開 URL 都會換不一樣，需要再去設定一次。 所以我決定換個做法。 選 Cloudflare Named Tunnel 的原因：  URL 固定">
 <meta property="og:locale" content="zh_TW">
 <meta property="article:published_time" content="2026-03-18T22:11:45.000Z">
-<meta property="article:modified_time" content="2026-03-21T17:57:21.644Z">
+<meta property="article:modified_time" content="2026-03-24T01:57:58.514Z">
 <meta property="article:author" content="Marsen L.">
 <meta property="article:tag" content="實作筆記">
 <meta name="twitter:card" content="summary">
@@ -128,55 +128,19 @@ j=d.createElement(s),dl=l!='dataLayer'?'&l='+l:'';j.async=true;j.src=
     
     <div class="article-entry" itemprop="articleBody">
       
-        <h2 id="前情提要"><a href="#前情提要" class="headerlink" title="前情提要"></a>前情提要</h2><p>在本機開發 LINE Bot，撞上了第一道牆：LINE Messaging API 的 Webhook 只接受 HTTPS endpoint，<br><code>localhost</code> 根本不在它的認知裡。</p>
-<p>第一反應是用 Quick Tunnel，指令一行就能跑：</p>
-<figure class="highlight bash"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">cloudflared tunnel --url http://localhost:3000</span><br></pre></td></tr></table></figure>
-
-<p>跑起來，去 LINE Console 貼上 URL，Verify 成功。<br>隔天重開，URL 換了，再去貼一次。<br>第三次之後決定換個做法。</p>
-<hr>
-<h2 id="其他常見做法與沒選的原因"><a href="#其他常見做法與沒選的原因" class="headerlink" title="其他常見做法與沒選的原因"></a>其他常見做法與沒選的原因</h2><table>
-<thead>
-<tr>
-<th>方案</th>
-<th>為什麼沒選</th>
-</tr>
-</thead>
-<tbody><tr>
-<td><strong>ngrok</strong></td>
-<td>免費版 URL 每次重啟都變，跟 Quick Tunnel 一樣的問題</td>
-</tr>
-<tr>
-<td><strong>localtunnel</strong></td>
-<td>開源，URL 可指定但不保證穩定，偶有被佔用的情況</td>
-</tr>
-<tr>
-<td><strong>smee.io</strong></td>
-<td>Webhook 轉發專用，需要額外的 client 程式，多一層複雜度</td>
-</tr>
-<tr>
-<td><strong>VS Code Dev Tunnels</strong></td>
-<td>綁定 VS Code，換編輯器就失效</td>
-</tr>
-<tr>
-<td><strong>Tailscale Funnel</strong></td>
-<td>要先建 Tailscale 網路，對沒在用的人成本高</td>
-</tr>
-<tr>
-<td><strong>直接部署到雲端</strong></td>
-<td>URL 穩定，但每次改 code 都要重部署，開發迭代太慢</td>
-</tr>
-<tr>
-<td><strong>Cloudflare Quick Tunnel</strong></td>
-<td>URL 每次重啟都換，手動更新 Webhook 很煩</td>
-</tr>
-</tbody></table>
+        <h2 id="前情提要"><a href="#前情提要" class="headerlink" title="前情提要"></a>前情提要</h2><p>在本機開發時需要 Webhook 來接受第三方的回呼，</p>
+<p>例如「LINE Bot 的 Messaging API 」 通常需要真實的 HTTPS endpoint 的 Callback Url，</p>
+<p>第一反應是用 ngrok，指令一行就能跑：</p>
+<p>但是每次重開 URL 都會換不一樣，需要再去設定一次。</p>
+<p>所以我決定換個做法。</p>
 <p>選 <strong>Cloudflare Named Tunnel</strong> 的原因：</p>
 <ul>
 <li>URL 固定（綁自己的 domain），設定一次就好</li>
 <li>已有 Cloudflare 管理 domain，沒有額外成本</li>
 <li>搭配 launchd 開機自啟，幾乎感覺不到它的存在</li>
 </ul>
-<hr>
+<p>前兩項是必要前置條件，剛好我都有，沒有的小朋友可能需要設定一下</p>
+<p>或是找其它解法，文末有提供一些別的方法給你參考</p>
 <h2 id="前置條件"><a href="#前置條件" class="headerlink" title="前置條件"></a>前置條件</h2><ul>
 <li>已有 Cloudflare 帳號</li>
 <li>要使用的 domain 已托管在 Cloudflare（NS 已指向 Cloudflare）</li>
@@ -214,13 +178,49 @@ j=d.createElement(s),dl=l!='dataLayer'?'&l='+l:'';j.async=true;j.src=
 <hr>
 <h2 id="Port-選擇"><a href="#Port-選擇" class="headerlink" title="Port 選擇"></a>Port 選擇</h2><p>LINE 打來的 Webhook 是外部流量，建議選高號碼 port（49152–65535），<br>比常見的 3000、8080 不容易被掃描到。<br>在 <code>config.yml</code> 的 <code>service</code> 欄位對應好本機 port 即可。</p>
 <hr>
+<h2 id="其他常見做法與沒選的原因"><a href="#其他常見做法與沒選的原因" class="headerlink" title="其他常見做法與沒選的原因"></a>其他常見做法與沒選的原因</h2><table>
+<thead>
+<tr>
+<th>方案</th>
+<th>為什麼沒選</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><strong>ngrok</strong></td>
+<td>免費版 URL 每次重啟都變，跟 Quick Tunnel 一樣的問題</td>
+</tr>
+<tr>
+<td><strong>localtunnel</strong></td>
+<td>開源，URL 可指定但不保證穩定，偶有被佔用的情況</td>
+</tr>
+<tr>
+<td><strong>smee.io</strong></td>
+<td>Webhook 轉發專用，需要額外的 client 程式，多一層複雜度</td>
+</tr>
+<tr>
+<td><strong>VS Code Dev Tunnels</strong></td>
+<td>綁定 VS Code，換編輯器就失效</td>
+</tr>
+<tr>
+<td><strong>Tailscale Funnel</strong></td>
+<td>要先建 Tailscale 網路，對沒在用的人成本高</td>
+</tr>
+<tr>
+<td><strong>直接部署到雲端</strong></td>
+<td>URL 穩定，但每次改 code 都要重部署，開發迭代太慢</td>
+</tr>
+<tr>
+<td><strong>Cloudflare Quick Tunnel</strong></td>
+<td>URL 每次重啟都換，手動更新 Webhook 很煩</td>
+</tr>
+</tbody></table>
 <h2 id="小結"><a href="#小結" class="headerlink" title="小結"></a>小結</h2><p>Cloudflare Named Tunnel 解決了「本機服務需要公開 HTTPS endpoint」的問題，<br>對 LINE Bot 開發來說特別實用——URL 固定，不用每次重啟都更新 Webhook 設定。<br>搭配 launchd 讓 cloudflared 開機自動啟動，幾乎可以忘記它的存在。</p>
 <p>(fin)</p>
 
       
     </div>
     <footer class="article-footer">
-      <a data-url="https://blog.marsen.me/2026/03/18/2026/line-bot-bridge-claude-code/" data-id="cuidP8kuJc4v0kV3VJ_-XBdba" class="article-share-link">Share</a>
+      <a data-url="https://blog.marsen.me/2026/03/18/2026/line-bot-bridge-claude-code/" data-id="cuidj6r08lGhyhhaKa9HeuBFL" class="article-share-link">Share</a>
       
         <a href="https://blog.marsen.me/2026/03/18/2026/line-bot-bridge-claude-code/#disqus_thread" class="article-comment-link">留言</a>
       

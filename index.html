@@ -125,55 +125,19 @@ j=d.createElement(s),dl=l!='dataLayer'?'&l='+l:'';j.async=true;j.src=
     
     <div class="article-entry" itemprop="articleBody">
       
-        <h2 id="前情提要"><a href="#前情提要" class="headerlink" title="前情提要"></a>前情提要</h2><p>在本機開發 LINE Bot，撞上了第一道牆：LINE Messaging API 的 Webhook 只接受 HTTPS endpoint，<br><code>localhost</code> 根本不在它的認知裡。</p>
-<p>第一反應是用 Quick Tunnel，指令一行就能跑：</p>
-<figure class="highlight bash"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">cloudflared tunnel --url http://localhost:3000</span><br></pre></td></tr></table></figure>
-
-<p>跑起來，去 LINE Console 貼上 URL，Verify 成功。<br>隔天重開，URL 換了，再去貼一次。<br>第三次之後決定換個做法。</p>
-<hr>
-<h2 id="其他常見做法與沒選的原因"><a href="#其他常見做法與沒選的原因" class="headerlink" title="其他常見做法與沒選的原因"></a>其他常見做法與沒選的原因</h2><table>
-<thead>
-<tr>
-<th>方案</th>
-<th>為什麼沒選</th>
-</tr>
-</thead>
-<tbody><tr>
-<td><strong>ngrok</strong></td>
-<td>免費版 URL 每次重啟都變，跟 Quick Tunnel 一樣的問題</td>
-</tr>
-<tr>
-<td><strong>localtunnel</strong></td>
-<td>開源，URL 可指定但不保證穩定，偶有被佔用的情況</td>
-</tr>
-<tr>
-<td><strong>smee.io</strong></td>
-<td>Webhook 轉發專用，需要額外的 client 程式，多一層複雜度</td>
-</tr>
-<tr>
-<td><strong>VS Code Dev Tunnels</strong></td>
-<td>綁定 VS Code，換編輯器就失效</td>
-</tr>
-<tr>
-<td><strong>Tailscale Funnel</strong></td>
-<td>要先建 Tailscale 網路，對沒在用的人成本高</td>
-</tr>
-<tr>
-<td><strong>直接部署到雲端</strong></td>
-<td>URL 穩定，但每次改 code 都要重部署，開發迭代太慢</td>
-</tr>
-<tr>
-<td><strong>Cloudflare Quick Tunnel</strong></td>
-<td>URL 每次重啟都換，手動更新 Webhook 很煩</td>
-</tr>
-</tbody></table>
+        <h2 id="前情提要"><a href="#前情提要" class="headerlink" title="前情提要"></a>前情提要</h2><p>在本機開發時需要 Webhook 來接受第三方的回呼，</p>
+<p>例如「LINE Bot 的 Messaging API 」 通常需要真實的 HTTPS endpoint 的 Callback Url，</p>
+<p>第一反應是用 ngrok，指令一行就能跑：</p>
+<p>但是每次重開 URL 都會換不一樣，需要再去設定一次。</p>
+<p>所以我決定換個做法。</p>
 <p>選 <strong>Cloudflare Named Tunnel</strong> 的原因：</p>
 <ul>
 <li>URL 固定（綁自己的 domain），設定一次就好</li>
 <li>已有 Cloudflare 管理 domain，沒有額外成本</li>
 <li>搭配 launchd 開機自啟，幾乎感覺不到它的存在</li>
 </ul>
-<hr>
+<p>前兩項是必要前置條件，剛好我都有，沒有的小朋友可能需要設定一下</p>
+<p>或是找其它解法，文末有提供一些別的方法給你參考</p>
 <h2 id="前置條件"><a href="#前置條件" class="headerlink" title="前置條件"></a>前置條件</h2><ul>
 <li>已有 Cloudflare 帳號</li>
 <li>要使用的 domain 已托管在 Cloudflare（NS 已指向 Cloudflare）</li>
@@ -211,13 +175,49 @@ j=d.createElement(s),dl=l!='dataLayer'?'&l='+l:'';j.async=true;j.src=
 <hr>
 <h2 id="Port-選擇"><a href="#Port-選擇" class="headerlink" title="Port 選擇"></a>Port 選擇</h2><p>LINE 打來的 Webhook 是外部流量，建議選高號碼 port（49152–65535），<br>比常見的 3000、8080 不容易被掃描到。<br>在 <code>config.yml</code> 的 <code>service</code> 欄位對應好本機 port 即可。</p>
 <hr>
+<h2 id="其他常見做法與沒選的原因"><a href="#其他常見做法與沒選的原因" class="headerlink" title="其他常見做法與沒選的原因"></a>其他常見做法與沒選的原因</h2><table>
+<thead>
+<tr>
+<th>方案</th>
+<th>為什麼沒選</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><strong>ngrok</strong></td>
+<td>免費版 URL 每次重啟都變，跟 Quick Tunnel 一樣的問題</td>
+</tr>
+<tr>
+<td><strong>localtunnel</strong></td>
+<td>開源，URL 可指定但不保證穩定，偶有被佔用的情況</td>
+</tr>
+<tr>
+<td><strong>smee.io</strong></td>
+<td>Webhook 轉發專用，需要額外的 client 程式，多一層複雜度</td>
+</tr>
+<tr>
+<td><strong>VS Code Dev Tunnels</strong></td>
+<td>綁定 VS Code，換編輯器就失效</td>
+</tr>
+<tr>
+<td><strong>Tailscale Funnel</strong></td>
+<td>要先建 Tailscale 網路，對沒在用的人成本高</td>
+</tr>
+<tr>
+<td><strong>直接部署到雲端</strong></td>
+<td>URL 穩定，但每次改 code 都要重部署，開發迭代太慢</td>
+</tr>
+<tr>
+<td><strong>Cloudflare Quick Tunnel</strong></td>
+<td>URL 每次重啟都換，手動更新 Webhook 很煩</td>
+</tr>
+</tbody></table>
 <h2 id="小結"><a href="#小結" class="headerlink" title="小結"></a>小結</h2><p>Cloudflare Named Tunnel 解決了「本機服務需要公開 HTTPS endpoint」的問題，<br>對 LINE Bot 開發來說特別實用——URL 固定，不用每次重啟都更新 Webhook 設定。<br>搭配 launchd 讓 cloudflared 開機自動啟動，幾乎可以忘記它的存在。</p>
 <p>(fin)</p>
 
       
     </div>
     <footer class="article-footer">
-      <a data-url="https://blog.marsen.me/2026/03/18/2026/line-bot-bridge-claude-code/" data-id="cuidP8kuJc4v0kV3VJ_-XBdba" class="article-share-link">Share</a>
+      <a data-url="https://blog.marsen.me/2026/03/18/2026/line-bot-bridge-claude-code/" data-id="cuidj6r08lGhyhhaKa9HeuBFL" class="article-share-link">Share</a>
       
         <a href="https://blog.marsen.me/2026/03/18/2026/line-bot-bridge-claude-code/#disqus_thread" class="article-comment-link">留言</a>
       
@@ -285,7 +285,7 @@ j=d.createElement(s),dl=l!='dataLayer'?'&l='+l:'';j.async=true;j.src=
       
     </div>
     <footer class="article-footer">
-      <a data-url="https://blog.marsen.me/2026/03/11/2026/ghostty-kitty-keyboard-protocol/" data-id="cuidAjdi2m3xBf9mv3qS1gRXX" class="article-share-link">Share</a>
+      <a data-url="https://blog.marsen.me/2026/03/11/2026/ghostty-kitty-keyboard-protocol/" data-id="cuidVLzD3qkaMJBm-MLNmqZ7h" class="article-share-link">Share</a>
       
         <a href="https://blog.marsen.me/2026/03/11/2026/ghostty-kitty-keyboard-protocol/#disqus_thread" class="article-comment-link">留言</a>
       
@@ -461,7 +461,7 @@ j=d.createElement(s),dl=l!='dataLayer'?'&l='+l:'';j.async=true;j.src=
       
     </div>
     <footer class="article-footer">
-      <a data-url="https://blog.marsen.me/2026/03/10/2026/terminal-comparison/" data-id="cuid0gUm8xwpPRrvIv8NzDu3L" class="article-share-link">Share</a>
+      <a data-url="https://blog.marsen.me/2026/03/10/2026/terminal-comparison/" data-id="cuidDrOTPr3wmTXeirDNpboFO" class="article-share-link">Share</a>
       
         <a href="https://blog.marsen.me/2026/03/10/2026/terminal-comparison/#disqus_thread" class="article-comment-link">留言</a>
       
@@ -562,7 +562,7 @@ j=d.createElement(s),dl=l!='dataLayer'?'&l='+l:'';j.async=true;j.src=
       
     </div>
     <footer class="article-footer">
-      <a data-url="https://blog.marsen.me/2026/02/17/2026/nextjs-hydration-math-random/" data-id="cuidBafh1OzqslxUiY1ZxQjFv" class="article-share-link">Share</a>
+      <a data-url="https://blog.marsen.me/2026/02/17/2026/nextjs-hydration-math-random/" data-id="cuid5b_A6DdQuAyM8oTbIBeHA" class="article-share-link">Share</a>
       
         <a href="https://blog.marsen.me/2026/02/17/2026/nextjs-hydration-math-random/#disqus_thread" class="article-comment-link">留言</a>
       
@@ -697,7 +697,7 @@ j=d.createElement(s),dl=l!='dataLayer'?'&l='+l:'';j.async=true;j.src=
       
     </div>
     <footer class="article-footer">
-      <a data-url="https://blog.marsen.me/2026/02/06/2026/richart_life/" data-id="cuid3cx1Hwo5jZRPq5fJ94WEd" class="article-share-link">Share</a>
+      <a data-url="https://blog.marsen.me/2026/02/06/2026/richart_life/" data-id="cuidDEdVkyc2uaO9UpZjN-4Rc" class="article-share-link">Share</a>
       
         <a href="https://blog.marsen.me/2026/02/06/2026/richart_life/#disqus_thread" class="article-comment-link">留言</a>
       
@@ -857,7 +857,7 @@ j=d.createElement(s),dl=l!='dataLayer'?'&l='+l:'';j.async=true;j.src=
       
     </div>
     <footer class="article-footer">
-      <a data-url="https://blog.marsen.me/2025/12/08/2025/iv_thixxxxxxx2/" data-id="cuidNcFtQCOON7ihvFkClw7Y9" class="article-share-link">Share</a>
+      <a data-url="https://blog.marsen.me/2025/12/08/2025/iv_thixxxxxxx2/" data-id="cuidkZRGTousLBE-rYcC3IxMK" class="article-share-link">Share</a>
       
         <a href="https://blog.marsen.me/2025/12/08/2025/iv_thixxxxxxx2/#disqus_thread" class="article-comment-link">留言</a>
       
@@ -979,7 +979,7 @@ j=d.createElement(s),dl=l!='dataLayer'?'&l='+l:'';j.async=true;j.src=
       
     </div>
     <footer class="article-footer">
-      <a data-url="https://blog.marsen.me/2025/11/28/2025/iv_thixxxxxxx/" data-id="cuidLRddscys2l8U5XUF2Ovia" class="article-share-link">Share</a>
+      <a data-url="https://blog.marsen.me/2025/11/28/2025/iv_thixxxxxxx/" data-id="cuidVD-NqHwGfeOicrGX4R2RP" class="article-share-link">Share</a>
       
         <a href="https://blog.marsen.me/2025/11/28/2025/iv_thixxxxxxx/#disqus_thread" class="article-comment-link">留言</a>
       
@@ -1097,7 +1097,7 @@ j=d.createElement(s),dl=l!='dataLayer'?'&l='+l:'';j.async=true;j.src=
       
     </div>
     <footer class="article-footer">
-      <a data-url="https://blog.marsen.me/2025/10/30/2025/sdd_spec_kit_water_fall/" data-id="cuidI9CoGmylzrzJwCnN0_w4V" class="article-share-link">Share</a>
+      <a data-url="https://blog.marsen.me/2025/10/30/2025/sdd_spec_kit_water_fall/" data-id="cuidBUX-4f2YCZoV2rQ9mAAzG" class="article-share-link">Share</a>
       
         <a href="https://blog.marsen.me/2025/10/30/2025/sdd_spec_kit_water_fall/#disqus_thread" class="article-comment-link">留言</a>
       
@@ -1256,7 +1256,7 @@ j=d.createElement(s),dl=l!='dataLayer'?'&l='+l:'';j.async=true;j.src=
       
     </div>
     <footer class="article-footer">
-      <a data-url="https://blog.marsen.me/2025/10/29/2025/sdd_spec_kit/" data-id="cuidLqbBEXAgNZGhHr1h44Riu" class="article-share-link">Share</a>
+      <a data-url="https://blog.marsen.me/2025/10/29/2025/sdd_spec_kit/" data-id="cuidHHcwq_qoqcGDsqtvT18Hi" class="article-share-link">Share</a>
       
         <a href="https://blog.marsen.me/2025/10/29/2025/sdd_spec_kit/#disqus_thread" class="article-comment-link">留言</a>
       
@@ -1370,7 +1370,7 @@ j=d.createElement(s),dl=l!='dataLayer'?'&l='+l:'';j.async=true;j.src=
       
     </div>
     <footer class="article-footer">
-      <a data-url="https://blog.marsen.me/2025/09/17/2025/ai-refactor-rule-apply-dp/" data-id="cuidY9_V4Jre-pp4Z9hKzzv_M" class="article-share-link">Share</a>
+      <a data-url="https://blog.marsen.me/2025/09/17/2025/ai-refactor-rule-apply-dp/" data-id="cuide1XX61Ve5jTk9J5W_I4P2" class="article-share-link">Share</a>
       
         <a href="https://blog.marsen.me/2025/09/17/2025/ai-refactor-rule-apply-dp/#disqus_thread" class="article-comment-link">留言</a>
       
