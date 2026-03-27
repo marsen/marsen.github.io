@@ -12,7 +12,25 @@
   <rights>All rights reserved 2026, Marsen L.</rights>
   <subtitle>waiting to load</subtitle>
   <title>Marsen's Blog</title>
-  <updated>2026-03-25T22:37:48.951Z</updated>
+  <updated>2026-03-27T10:08:30.776Z</updated>
+  <entry>
+    <author>
+      <name>Marsen L.</name>
+      <email>admin@marsen.me</email>
+    </author>
+    <category term="實作筆記" scheme="https://blog.marsen.me/tags/%E5%AF%A6%E4%BD%9C%E7%AD%86%E8%A8%98/"/>
+    <content>
+      <![CDATA[<h2 id="前情提要"><a href="#前情提要" class="headerlink" title="前情提要"></a>前情提要</h2><p>在做韓文注音學習工具時，需要偵測瀏覽器是否支援 <code>speechSynthesis</code>，然後顯示提示訊息。</p><figure class="highlight ts"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">const</span> [speechSupported, setSpeechSupported] = <span class="title function_">useState</span>(<span class="literal">true</span>);</span><br><span class="line"></span><br><span class="line"><span class="title function_">useEffect</span>(<span class="function">() =&gt;</span> &#123;</span><br><span class="line">  <span class="title function_">setSpeechSupported</span>(<span class="string">&quot;speechSynthesis&quot;</span> <span class="keyword">in</span> <span class="variable language_">window</span>);</span><br><span class="line">&#125;, []);</span><br></pre></td></tr></table></figure><p>寫完 CI 報錯：</p><figure class="highlight text"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">react-hooks/set-state-in-effect: Avoid calling setState() directly within an effect</span><br></pre></td></tr></table></figure><p>第一反應是加 <code>eslint-disable</code>，但這樣太逃避。研究了一下，發現這個問題有更正確的解法。</p><hr><h2 id="為什麼不能直接讀-window"><a href="#為什麼不能直接讀-window" class="headerlink" title="為什麼不能直接讀 window"></a>為什麼不能直接讀 <code>window</code></h2><p>Next.js 的頁面先在 <strong>Server</strong> render 一次，再到 <strong>Client</strong> hydration。</p><p>Server 端沒有 <code>window</code>，所以這樣寫會直接炸：</p><figure class="highlight ts"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment">// ❌ Server 端沒有 window</span></span><br><span class="line"><span class="keyword">const</span> supported = <span class="string">&quot;speechSynthesis&quot;</span> <span class="keyword">in</span> <span class="variable language_">window</span>;</span><br></pre></td></tr></table></figure><p><code>useEffect</code> 只在瀏覽器執行，所以在裡面讀 <code>window</code> 是安全的——這就是第一版寫法的出發點。</p><hr><h2 id="useEffect-setState-的問題"><a href="#useEffect-setState-的問題" class="headerlink" title="useEffect + setState 的問題"></a>useEffect + setState 的問題</h2><figure class="highlight ts"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">const</span> [speechSupported, setSpeechSupported] = <span class="title function_">useState</span>(<span class="literal">true</span>);</span><br><span class="line"></span><br><span class="line"><span class="title function_">useEffect</span>(<span class="function">() =&gt;</span> &#123;</span><br><span class="line">  <span class="title function_">setSpeechSupported</span>(<span class="string">&quot;speechSynthesis&quot;</span> <span class="keyword">in</span> <span class="variable language_">window</span>); <span class="comment">// ← lint 報這裡</span></span><br><span class="line">&#125;, []);</span><br></pre></td></tr></table></figure><p>這個寫法會造成兩次 render：</p><figure class="highlight text"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br></pre></td><td class="code"><pre><span class="line">第一次 render：speechSupported = true（初始值）</span><br><span class="line">useEffect 執行：setSpeechSupported(真實值)</span><br><span class="line">第二次 render：speechSupported = 真實值</span><br></pre></td></tr></table></figure><p>ESLint 規則的意思是：「你在 <code>useEffect</code> 裡面直接 <code>setState</code>，造成 cascading render，能不能用更好的方式？」</p><p>它不是說這樣會壞掉，而是說有更乾淨的做法。</p><hr><h2 id="三種解法"><a href="#三種解法" class="headerlink" title="三種解法"></a>三種解法</h2><h3 id="解法一：eslint-disable（不推薦）"><a href="#解法一：eslint-disable（不推薦）" class="headerlink" title="解法一：eslint-disable（不推薦）"></a>解法一：eslint-disable（不推薦）</h3><figure class="highlight ts"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br></pre></td><td class="code"><pre><span class="line"><span class="title function_">useEffect</span>(<span class="function">() =&gt;</span> &#123;</span><br><span class="line">  <span class="comment">// eslint-disable-next-line react-hooks/set-state-in-effect</span></span><br><span class="line">  <span class="title function_">setSpeechSupported</span>(<span class="string">&quot;speechSynthesis&quot;</span> <span class="keyword">in</span> <span class="variable language_">window</span>);</span><br><span class="line">&#125;, []);</span><br></pre></td></tr></table></figure><p>問題沒有解決，只是把警告蓋掉。</p><hr><h3 id="解法二：useState-lazy-initializer"><a href="#解法二：useState-lazy-initializer" class="headerlink" title="解法二：useState lazy initializer"></a>解法二：useState lazy initializer</h3><figure class="highlight ts"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">const</span> [speechSupported] = <span class="title function_">useState</span>(</span><br><span class="line">  <span class="keyword">typeof</span> <span class="variable language_">window</span> !== <span class="string">&quot;undefined&quot;</span> ? <span class="string">&quot;speechSynthesis&quot;</span> <span class="keyword">in</span> <span class="variable language_">window</span> : <span class="literal">true</span></span><br><span class="line">);</span><br></pre></td></tr></table></figure><p>Server 端 <code>typeof window === &quot;undefined&quot;</code> 為 <code>true</code>，所以初始值是 <code>true</code>。<br>Hydration 時 React <strong>不重新執行</strong> lazy initializer，直接沿用，所以不會 mismatch。</p><p>缺點：如果使用者的瀏覽器真的不支援 <code>speechSynthesis</code>，這個值永遠是 <code>true</code>，訊息永遠顯示不了。只適合「假設支援、不在乎誤判」的場景。</p><hr><h3 id="解法三：useSyncExternalStore（推薦）"><a href="#解法三：useSyncExternalStore（推薦）" class="headerlink" title="解法三：useSyncExternalStore（推薦）"></a>解法三：useSyncExternalStore（推薦）</h3><p>React 18 為 Server&#x2F;Client 差異設計了這個 hook：</p><figure class="highlight ts"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">import</span> &#123; useSyncExternalStore &#125; <span class="keyword">from</span> <span class="string">&quot;react&quot;</span>;</span><br><span class="line"></span><br><span class="line"><span class="keyword">const</span> speechSupported = <span class="title function_">useSyncExternalStore</span>(</span><br><span class="line">  <span class="function">() =&gt;</span> <span class="function">() =&gt;</span> &#123;&#125;,                       <span class="comment">// subscribe（不訂閱任何東西，no-op）</span></span><br><span class="line">  <span class="function">() =&gt;</span> <span class="string">&quot;speechSynthesis&quot;</span> <span class="keyword">in</span> <span class="variable language_">window</span>,    <span class="comment">// Client 端的值</span></span><br><span class="line">  <span class="function">() =&gt;</span> <span class="literal">true</span>,                           <span class="comment">// Server 端的值</span></span><br><span class="line">);</span><br></pre></td></tr></table></figure><p>三個參數分別對應：</p><table><thead><tr><th>參數</th><th>意義</th></tr></thead><tbody><tr><td><code>subscribe</code></td><td>訂閱外部資料變更，不需要就給 no-op</td></tr><tr><td><code>getSnapshot</code></td><td>瀏覽器端回傳什麼值</td></tr><tr><td><code>getServerSnapshot</code></td><td>伺服器端回傳什麼值</td></tr></tbody></table><p><strong>流程：</strong></p><figure class="highlight text"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br></pre></td><td class="code"><pre><span class="line">Server render → 呼叫 getServerSnapshot → 回傳 true</span><br><span class="line">Client hydration → 呼叫 getSnapshot → 回傳真實值</span><br><span class="line">若兩者不同 → React 知道這是 client-only 差異，自動補一次 render，不報 hydration error</span><br></pre></td></tr></table></figure><p>不需要 <code>useState</code>，不需要 <code>useEffect</code>，ESLint 不報錯，能正確偵測「真的不支援」的瀏覽器。</p><hr><h2 id="三種解法比較"><a href="#三種解法比較" class="headerlink" title="三種解法比較"></a>三種解法比較</h2><table><thead><tr><th></th><th><code>useEffect</code> + <code>setState</code></th><th><code>useState</code> lazy</th><th><code>useSyncExternalStore</code></th></tr></thead><tbody><tr><td>Server 安全</td><td>✅</td><td>✅</td><td>✅</td></tr><tr><td>Hydration 安全</td><td>✅</td><td>✅</td><td>✅</td></tr><tr><td>多餘 render</td><td>❌ 有</td><td>✅ 無</td><td>✅ React 自動處理</td></tr><tr><td>ESLint 通過</td><td>❌</td><td>✅</td><td>✅</td></tr><tr><td>能偵測真的不支援</td><td>✅</td><td>❌</td><td>✅</td></tr></tbody></table><hr><h2 id="小結"><a href="#小結" class="headerlink" title="小結"></a>小結</h2><p><code>useSyncExternalStore</code> 名字聽起來像是給 Redux 這種外部 store 用的，但它的第三個參數 <code>getServerSnapshot</code> 就是為了 SSR&#x2F;Client 差異設計的——哪怕你根本沒有要訂閱任何東西。</p><p>遇到「要讀 <code>window</code> 但又要 SSR 安全」的情境，先考慮這個 hook，不要直接跳到 <code>useEffect</code> + <code>setState</code>。</p><p>(fin)</p>]]>
+    </content>
+    <id>https://blog.marsen.me/2026/03/27/2026/ssr-safe-client-detection/</id>
+    <link href="https://blog.marsen.me/2026/03/27/2026/ssr-safe-client-detection/"/>
+    <published>2026-03-27T10:52:58.000Z</published>
+    <summary>
+      <![CDATA[<h2 id="前情提要"><a href="#前情提要" class="headerlink" title="前情提要"></a>前情提要</h2><p>在做韓文注音學習工具時，需要偵測瀏覽器是否支援 <code>speechSynthesis</code>，然後顯示提示訊息。]]>
+    </summary>
+    <title>[實作筆記] 在 Next.js 安全讀取 window：從 useEffect 到 useSyncExternalStore</title>
+    <updated>2026-03-27T10:08:30.776Z</updated>
+  </entry>
   <entry>
     <author>
       <name>Marsen L.</name>
@@ -30,7 +48,7 @@
 <p>例如「LINE Bot 的 Messaging API]]>
     </summary>
     <title>[實作筆記] 用 Cloudflare Tunnel 讓 LINE Bot Webhook 打到本機</title>
-    <updated>2026-03-25T22:37:48.951Z</updated>
+    <updated>2026-03-27T10:08:30.776Z</updated>
   </entry>
   <entry>
     <author>
@@ -49,7 +67,7 @@
 <figure class="highlight]]>
     </summary>
     <title>[實作筆記] Ghostty 打字出現 [O[27u 亂碼的原因與修正</title>
-    <updated>2026-03-25T22:37:48.949Z</updated>
+    <updated>2026-03-27T10:08:30.775Z</updated>
   </entry>
   <entry>
     <author>
@@ -68,7 +86,7 @@
 <h]]>
     </summary>
     <title>[工具筆記] Terminal 工具怎麼選？Ghostty、iTerm2 與其他選手比較</title>
-    <updated>2026-03-25T22:37:48.951Z</updated>
+    <updated>2026-03-27T10:08:30.776Z</updated>
   </entry>
   <entry>
     <author>
@@ -87,7 +105,7 @@
 <figure cl]]>
     </summary>
     <title>[實作筆記] Next.js Hydration 與隨機性：從問題到正確架構</title>
-    <updated>2026-03-25T22:37:48.951Z</updated>
+    <updated>2026-03-27T10:08:30.776Z</updated>
   </entry>
   <entry>
     <author>
@@ -104,7 +122,7 @@
       <![CDATA[<h2 id="前情提要"><a href="#前情提要" class="headerlink" title="前情提要"></a>前情提要</h2><p>自從 2025 年 9 月台新把 @GoGo 卡、FlyGo 卡、玫瑰 Giving 卡、太陽&#x2F;玫瑰卡這些信用卡整]]>
     </summary>
     <title>[生活筆記] 2026 台新 Richart Life 切換方案回饋最大化</title>
-    <updated>2026-03-25T22:37:48.951Z</updated>
+    <updated>2026-03-27T10:08:30.776Z</updated>
   </entry>
   <entry>
     <author>
@@ -121,7 +139,7 @@
       <![CDATA[<h2 id="前情提要"><a href="#前情提要" class="headerlink" title="前情提要"></a>前情提要</h2><p>延續<a href="https://blog.marsen.me/2025/11/28/2025/iv_thixxxxxx]]>
     </summary>
     <title>[生活筆記] 2025 T社面試心得 - 二面</title>
-    <updated>2026-03-25T22:37:48.949Z</updated>
+    <updated>2026-03-27T10:08:30.774Z</updated>
   </entry>
   <entry>
     <author>
@@ -139,7 +157,7 @@
 <p>一面是 Pyth]]>
     </summary>
     <title>[生活筆記] 2025 T社面試心得 - 一面</title>
-    <updated>2026-03-25T22:37:48.949Z</updated>
+    <updated>2026-03-27T10:08:30.774Z</updated>
   </entry>
   <entry>
     <author>
@@ -158,7 +176,7 @@
 <h2 id="當軟體開發還是一門工程學"><a href="#當軟體開發還是一門工程學" class="headerlink" title="當軟體開發還是一門工程學"></a>當軟體開發還是一門工程學</h2><p>1970 年代，當軟體開發還是一門]]>
     </summary>
     <title>[SDD 與 Spec Kit]傳統瀑布式開發（1975-2000）</title>
-    <updated>2026-03-25T22:37:48.949Z</updated>
+    <updated>2026-03-27T10:08:30.774Z</updated>
   </entry>
   <entry>
     <author>
@@ -178,7 +196,7 @@
 <p>What is Spec-Driven Developm]]>
     </summary>
     <title>[學習筆記] SDD 與 Spec Kit - 前言</title>
-    <updated>2026-03-25T22:37:48.949Z</updated>
+    <updated>2026-03-27T10:08:30.774Z</updated>
   </entry>
   <entry>
     <author>
@@ -197,7 +215,7 @@
 <p>這些異味提示著我們需要重構，你可以先挑戰看一下有沒有辦]]>
     </summary>
     <title>[實作筆記] 命令式程式碼重構到函數式 Pipe 流水線</title>
-    <updated>2026-03-25T22:37:48.948Z</updated>
+    <updated>2026-03-27T10:08:30.774Z</updated>
   </entry>
   <entry>
     <author>
@@ -217,7 +235,7 @@
 <]]>
     </summary>
     <title>[實作筆記] Clean Architecture 思考：避免過度設計</title>
-    <updated>2026-03-25T22:37:48.948Z</updated>
+    <updated>2026-03-27T10:08:30.774Z</updated>
   </entry>
   <entry>
     <author>
@@ -235,7 +253,7 @@
       <![CDATA[<h2 id="前情提要"><a href="#前情提要" class="headerlink" title="前情提要"></a>前情提要</h2><p>專案需要使用 PaddleOCR 進行文字辨識，但原始模型檔案需要從 PaddlePaddle 框架轉換成 ONNX 格式才]]>
     </summary>
     <title>[實作筆記] PaddleOCR ONNX 模型發布到 Hugging Face Hub</title>
-    <updated>2026-03-25T22:37:48.948Z</updated>
+    <updated>2026-03-27T10:08:30.774Z</updated>
   </entry>
   <entry>
     <author>
@@ -254,7 +272,7 @@
 <p>在這個專案中，我們遇到了幾個]]>
     </summary>
     <title>[實作筆記] 建立私有 Python Package Registry - 以 ONNX Runtime 為例</title>
-    <updated>2026-03-25T22:37:48.948Z</updated>
+    <updated>2026-03-27T10:08:30.774Z</updated>
   </entry>
   <entry>
     <author>
@@ -272,7 +290,7 @@
       <![CDATA[<h2 id="前情提要"><a href="#前情提要" class="headerlink" title="前情提要"></a>前情提要</h2><p>四年前「<a href="https://blog.marsen.me/2020/10/22/2020/google_dom]]>
     </summary>
     <title>[實作筆記] 怎麼建立一個網站？(四) - 自訂網域 EMail 收寄信(使用 Cloudflare 與 Brevo)</title>
-    <updated>2026-03-25T22:37:48.948Z</updated>
+    <updated>2026-03-27T10:08:30.774Z</updated>
   </entry>
   <entry>
     <author>
@@ -291,7 +309,7 @@
 <p>檔案上傳功能中，檔案編碼修復應該放在 Middlewa]]>
     </summary>
     <title>[架構筆記] Clean Architecture 分層職責的反思</title>
-    <updated>2026-03-25T22:37:48.948Z</updated>
+    <updated>2026-03-27T10:08:30.774Z</updated>
   </entry>
   <entry>
     <author>
@@ -310,7 +328,7 @@
 <figure class="highlight typesc]]>
     </summary>
     <title>[學習筆記] Node.js 檔案操作 mkdir 的正確姿勢</title>
-    <updated>2026-03-25T22:37:48.949Z</updated>
+    <updated>2026-03-27T10:08:30.774Z</updated>
   </entry>
   <entry>
     <author>
@@ -328,7 +346,7 @@
       <![CDATA[<h2 id="前情提要"><a href="#前情提要" class="headerlink" title="前情提要"></a>前情提要</h2><p>最近購買 Claude Code，在此同時也有試用 Github Copilot &#x2F; Gitlab Duo &#x]]>
     </summary>
     <title>[實作筆記] AI Agent 實作 Web Search API：從設計到部署的完整記錄</title>
-    <updated>2026-03-25T22:37:48.948Z</updated>
+    <updated>2026-03-27T10:08:30.774Z</updated>
   </entry>
   <entry>
     <author>
@@ -345,7 +363,7 @@
       <![CDATA[<h2 id="前情提要"><a href="#前情提要" class="headerlink" title="前情提要"></a>前情提要</h2><p>最近拿到一個地端資源 <a href="https://www.lannerinc.com/products/edge-ai]]>
     </summary>
     <title>[實作筆記] EAI 機器瀏覽器安裝問題與解決方案</title>
-    <updated>2026-03-25T22:37:48.948Z</updated>
+    <updated>2026-03-27T10:08:30.774Z</updated>
   </entry>
   <entry>
     <author>
@@ -362,24 +380,6 @@
       <![CDATA[<h2 id="前言"><a href="#前言" class="headerlink" title="前言"></a>前言</h2><p>在 Express.js 認證系統中，常見的做法是在每個需要驗證的路由中直接解析 JWT token。<br>但有一個更好的實作方式：使用中]]>
     </summary>
     <title>[學習筆記] Express.js middleware auth 的業界標準(res.locals)</title>
-    <updated>2026-03-25T22:37:48.948Z</updated>
-  </entry>
-  <entry>
-    <author>
-      <name>Marsen L.</name>
-      <email>admin@marsen.me</email>
-    </author>
-    <category term="踩雷筆記" scheme="https://blog.marsen.me/tags/%E8%B8%A9%E9%9B%B7%E7%AD%86%E8%A8%98/"/>
-    <content>
-      <![CDATA[<h2 id="前情提要"><a href="#前情提要" class="headerlink" title="前情提要"></a>前情提要</h2><p>GitHub Action <code>marsen/hexo-action@v1.0.11</code> 之前運行正常，但最近開始失敗，錯誤訊息：</p><figure class="highlight text"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">/usr/app/entrypoint.sh: 9: /usr/app/entrypoint.sh: ssh-keyscan: not found</span><br></pre></td></tr></table></figure><h2 id="問題分析"><a href="#問題分析" class="headerlink" title="問題分析"></a>問題分析</h2><h3 id="初步檢查"><a href="#初步檢查" class="headerlink" title="初步檢查"></a>初步檢查</h3><p>檢查 entrypoint.sh 第9行：</p><figure class="highlight bash"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">ssh-keyscan -t rsa github.com &gt;&gt; /root/.ssh/known_hosts</span><br></pre></td></tr></table></figure><p>檢查 Dockerfile 套件安裝：</p><figure class="highlight dockerfile"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">FROM</span> node:<span class="number">20</span>-buster-slim</span><br><span class="line"><span class="keyword">RUN</span><span class="language-bash"> apt-get install -y git openssh-client</span></span><br></pre></td></tr></table></figure><p>明明有安裝 <code>openssh-client</code>，為什麼找不到 <code>ssh-keyscan</code>？</p><h3 id="根本原因"><a href="#根本原因" class="headerlink" title="根本原因"></a>根本原因</h3><p><strong>Debian Buster 生命週期結束</strong></p><ul><li><code>node:20-buster-slim</code> 基於 Debian 10 (Buster)</li><li>Debian 10 於 2024年8月達到 End of Life</li><li>套件庫不再維護，套件結構可能變化</li></ul><p><strong>OpenSSH 套件重組</strong></p><ul><li>2024年 OpenSSH 多個版本發布 (9.7, 9.9)</li><li><code>ssh-keyscan</code> 可能從 <code>openssh-client</code> 移到其他套件</li></ul><p><strong>Docker 映像自動更新</strong></p><ul><li>Docker Hub 會自動重建映像</li><li>新版本移除不必要工具以減少攻擊面</li></ul><h2 id="解決方案"><a href="#解決方案" class="headerlink" title="解決方案"></a>解決方案</h2><h3 id="快速修復（不推薦）"><a href="#快速修復（不推薦）" class="headerlink" title="快速修復（不推薦）"></a>快速修復（不推薦）</h3><figure class="highlight dockerfile"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">RUN</span><span class="language-bash"> apt-get install -y git openssh-client openssh-server</span></span><br></pre></td></tr></table></figure><p>雖然可行，但安裝 SSH 伺服器會增加攻擊面。</p><h3 id="正確解法"><a href="#正確解法" class="headerlink" title="正確解法"></a>正確解法</h3><p>升級基底映像到支援版本：</p><figure class="highlight dockerfile"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment"># 從過期版本</span></span><br><span class="line"><span class="keyword">FROM</span> node:<span class="number">20</span>-buster-slim</span><br><span class="line"></span><br><span class="line"><span class="comment"># 升級到安全版本  </span></span><br><span class="line"><span class="keyword">FROM</span> node:<span class="number">20</span>-bookworm-slim</span><br></pre></td></tr></table></figure><p>完整的 Dockerfile 修改：</p><figure class="highlight dockerfile"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">FROM</span> node:<span class="number">20</span>-bookworm-slim</span><br><span class="line"></span><br><span class="line"><span class="keyword">LABEL</span><span class="language-bash"> version=<span class="string">&quot;1.0.12&quot;</span></span></span><br><span class="line"><span class="keyword">LABEL</span><span class="language-bash"> repository=<span class="string">&quot;https://github.com/marsen/hexo-action&quot;</span></span></span><br><span class="line"><span class="keyword">LABEL</span><span class="language-bash"> homepage=<span class="string">&quot;https://blog.marsen.me&quot;</span></span></span><br><span class="line"><span class="keyword">LABEL</span><span class="language-bash"> maintainer=<span class="string">&quot;marsen.lin &lt;admin@marsen.me&gt;&quot;</span></span></span><br><span class="line"></span><br><span class="line"><span class="keyword">WORKDIR</span><span class="language-bash"> /usr/app</span></span><br><span class="line"></span><br><span class="line"><span class="keyword">COPY</span><span class="language-bash"> entrypoint.sh /usr/app/entrypoint.sh</span></span><br><span class="line"><span class="keyword">COPY</span><span class="language-bash"> sync_deploy_history.js /usr/app/sync_deploy_history.js</span></span><br><span class="line"></span><br><span class="line"><span class="comment"># 安全且最佳化的套件安裝</span></span><br><span class="line"><span class="keyword">RUN</span><span class="language-bash"> apt-get update &gt; /dev/null &amp;&amp; \</span></span><br><span class="line"><span class="language-bash">    apt-get install -y git openssh-client &gt; /dev/null &amp;&amp; \</span></span><br><span class="line"><span class="language-bash">    apt-get clean &amp;&amp; \</span></span><br><span class="line"><span class="language-bash">    <span class="built_in">rm</span> -rf /var/lib/apt/lists/* &amp;&amp; \</span></span><br><span class="line"><span class="language-bash">    <span class="built_in">chmod</span> +x /usr/app/entrypoint.sh</span></span><br><span class="line"></span><br><span class="line"><span class="keyword">ENTRYPOINT</span><span class="language-bash"> [<span class="string">&quot;/usr/app/entrypoint.sh&quot;</span>]</span></span><br></pre></td></tr></table></figure><h2 id="關鍵改進"><a href="#關鍵改進" class="headerlink" title="關鍵改進"></a>關鍵改進</h2><ol><li><p><strong>基底映像升級</strong>：buster-slim → bookworm-slim</p><ul><li>Debian 12 取代已 EOL 的 Debian 10</li><li>更好的安全性和長期支援</li></ul></li><li><p><strong>最小權限原則</strong>：只安裝 openssh-client</p><ul><li>包含所需的 ssh-keyscan 工具</li><li>不安裝 SSH 伺服器，減少攻擊面</li></ul></li><li><p><strong>Docker 最佳實踐</strong>：</p><ul><li>清理 apt 快取減少映像大小</li><li>使用 &amp;&amp; 合併 RUN 指令減少層數</li></ul></li></ol><h2 id="預防措施"><a href="#預防措施" class="headerlink" title="預防措施"></a>預防措施</h2><ul><li>使用具體版本標籤而非 latest</li><li>定期檢查基底映像的生命週期</li><li>建立自動化測試驗證依賴可用性</li></ul><h2 id="小結"><a href="#小結" class="headerlink" title="小結"></a>小結</h2><p>這次問題的核心是基底映像過期導致的連鎖反應。在容器化開發中，外部依賴的變化往往會影響既有系統。解決方案不是快速修復，而是從根本上升級到安全的長期支援版本。</p><p>除錯關鍵思路：分析「為什麼之前可以，現在不行」，往往能找到外部環境變化的線索。</p><p>(fin)</p>]]>
-    </content>
-    <id>https://blog.marsen.me/2025/07/22/2025/ithub-action-ssh-keyscan-not-found-fix/</id>
-    <link href="https://blog.marsen.me/2025/07/22/2025/ithub-action-ssh-keyscan-not-found-fix/"/>
-    <published>2025-07-22T05:42:30.000Z</published>
-    <summary>
-      <![CDATA[<h2 id="前情提要"><a href="#前情提要" class="headerlink" title="前情提要"></a>前情提要</h2><p>GitHub Action <code>marsen/hexo-action@v1.0.11</code> 之前運行正常，但]]>
-    </summary>
-    <title>[踩雷筆記] GitHub Action ssh-keyscan not found 問題修復</title>
-    <updated>2026-03-25T22:37:48.948Z</updated>
+    <updated>2026-03-27T10:08:30.774Z</updated>
   </entry>
 </feed>
