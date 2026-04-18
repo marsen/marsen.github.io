@@ -43,7 +43,7 @@ j=d.createElement(s),dl=l!='dataLayer'?'&l='+l:'';j.async=true;j.src=
 <meta property="og:description" content="前情提要最近想整合 AI 與自已的職能，建立一些小工具。 第一個想法是資料搜集器，可以自由擴充的個人內容自動化平台。 核心概念「捕捉資料」、「整理資料」、「發送報告」拆成三種抽象概念元件， 隨時可以組合或替換。 1234567Sources（捕捉資料）  →  Processors（整理）  →  Sinks（發送）─────────────────     ─────────────────">
 <meta property="og:locale" content="zh_TW">
 <meta property="article:published_time" content="2026-04-17T03:37:12.000Z">
-<meta property="article:modified_time" content="2026-04-17T11:03:01.206Z">
+<meta property="article:modified_time" content="2026-04-18T05:26:35.020Z">
 <meta property="article:author" content="Marsen L.">
 <meta property="article:tag" content="實作筆記">
 <meta name="twitter:card" content="summary">
@@ -183,17 +183,22 @@ j=d.createElement(s),dl=l!='dataLayer'?'&l='+l:'';j.async=true;j.src=
 <figure class="highlight bash"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br></pre></td><td class="code"><pre><span class="line">gcloud auth login</span><br><span class="line">gcloud config <span class="built_in">set</span> project YOUR_PROJECT_ID</span><br></pre></td></tr></table></figure>
 
 <p>建立 VM：</p>
-<figure class="highlight bash"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br></pre></td><td class="code"><pre><span class="line">gcloud compute instances create n8n-server \</span><br><span class="line">  --zone=us-east1-b \</span><br><span class="line">  --machine-type=e2-micro \</span><br><span class="line">  --image-family=debian-12 \</span><br><span class="line">  --image-project=debian-cloud \</span><br><span class="line">  --boot-disk-size=30GB \</span><br><span class="line">  --boot-disk-type=pd-standard \</span><br><span class="line">  --tags=http-server,https-server</span><br></pre></td></tr></table></figure>
+<figure class="highlight bash"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br></pre></td><td class="code"><pre><span class="line">gcloud compute instances create ai-butler-vm00 \</span><br><span class="line">  --zone=us-east1-b \</span><br><span class="line">  --machine-type=e2-micro \</span><br><span class="line">  --image-family=debian-12 \</span><br><span class="line">  --image-project=debian-cloud \</span><br><span class="line">  --boot-disk-size=30GB \</span><br><span class="line">  --boot-disk-type=pd-standard \</span><br><span class="line">  --tags=http-server,https-server</span><br></pre></td></tr></table></figure>
 
+<p>VM 名稱可以自己取，這裡用 <code>ai-butler-vm00</code>：</p>
+<ul>
+<li><code>ai-butler</code>：這台機器的定位是 AI 自動化後台（管家）</li>
+<li><code>vm00</code>：第一台，之後擴充可以叫 <code>vm01</code></li>
+</ul>
 <hr>
 <h2 id="步驟二：設定-SSH（OS-Login）"><a href="#步驟二：設定-SSH（OS-Login）" class="headerlink" title="步驟二：設定 SSH（OS Login）"></a>步驟二：設定 SSH（OS Login）</h2><p>預設的 SSH key 方式要管理本機的 key 檔案，換機器或多人共用都麻煩。</p>
 <p>我個人比較喜歡　OS Login 改用 Google 帳號做身份驗證，key 綁在帳號上，不依賴本機檔案。</p>
 <p>實際上還是有 ssh key 只是不用特別在意它。</p>
 <p>開啟 OS Login：</p>
-<figure class="highlight bash"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br></pre></td><td class="code"><pre><span class="line">gcloud compute instances add-metadata n8n-server \</span><br><span class="line">  --metadata enable-oslogin=TRUE \</span><br><span class="line">  --zone=us-east1-b \</span><br><span class="line">  --project=YOUR_PROJECT_ID</span><br></pre></td></tr></table></figure>
+<figure class="highlight bash"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br></pre></td><td class="code"><pre><span class="line">gcloud compute instances add-metadata ai-butler-vm00 \</span><br><span class="line">  --metadata enable-oslogin=TRUE \</span><br><span class="line">  --zone=us-east1-b \</span><br><span class="line">  --project=YOUR_PROJECT_ID</span><br></pre></td></tr></table></figure>
 
 <p>之後連線就直接，不需要帶任何 key 參數：</p>
-<figure class="highlight bash"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">gcloud compute ssh n8n-server --zone=us-east1-b --project=YOUR_PROJECT_ID</span><br></pre></td></tr></table></figure>
+<figure class="highlight bash"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">gcloud compute ssh ai-butler-vm00 --zone=us-east1-b --project=YOUR_PROJECT_ID</span><br></pre></td></tr></table></figure>
 
 <p>第一次連會問你要不要建立 SSH key，輸入 <code>y</code> 就好，之後不用再動。</p>
 <hr>
@@ -252,7 +257,7 @@ j=d.createElement(s),dl=l!='dataLayer'?'&l='+l:'';j.async=true;j.src=
       
     </div>
     <footer class="article-footer">
-      <a data-url="https://blog.marsen.me/2026/04/17/2026/gcp-free-tier-n8n/" data-id="cuid4PXMMPp20xeFWhuPRwLar" class="article-share-link">Share</a>
+      <a data-url="https://blog.marsen.me/2026/04/17/2026/gcp-free-tier-n8n/" data-id="cuid0An6rBZxptQZgWgnyiLpF" class="article-share-link">Share</a>
       
         <a href="https://blog.marsen.me/2026/04/17/2026/gcp-free-tier-n8n/#disqus_thread" class="article-comment-link">留言</a>
       
