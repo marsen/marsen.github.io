@@ -12,7 +12,26 @@
   <rights>All rights reserved 2026, Marsen L.</rights>
   <subtitle>waiting to load</subtitle>
   <title>Marsen's Blog</title>
-  <updated>2026-04-20T08:09:42.000Z</updated>
+  <updated>2026-04-22T07:15:03.941Z</updated>
+  <entry>
+    <author>
+      <name>Marsen L.</name>
+      <email>admin@marsen.me</email>
+    </author>
+    <category term="實作筆記" scheme="https://blog.marsen.me/tags/%E5%AF%A6%E4%BD%9C%E7%AD%86%E8%A8%98/"/>
+    <content>
+      <![CDATA[<h2 id="前情提要"><a href="#前情提要" class="headerlink" title="前情提要"></a>前情提要</h2><p>上一篇定好了「取、讀、寫」三層架構，這篇開始實作第一層：取。</p><p>目標是從四個 AI 新聞來源拉資料，輸出統一格式，交給讀層處理。</p><hr><h2 id="資料來源選擇"><a href="#資料來源選擇" class="headerlink" title="資料來源選擇"></a>資料來源選擇</h2><p>驗證過四個 RSS 來源都可用：</p><table><thead><tr><th>來源</th><th>URL</th><th>說明</th></tr></thead><tbody><tr><td>OpenAI</td><td><code>https://openai.com/news/rss.xml</code></td><td>官方，第一手產品更新</td></tr><tr><td>Google Blog AI</td><td><code>https://blog.google/innovation-and-ai/technology/ai/rss/</code></td><td>官方，涵蓋 Gemini 等產品</td></tr><tr><td>The Verge AI</td><td><code>https://www.theverge.com/rss/ai-artificial-intelligence/index.xml</code></td><td>綜合媒體，覆蓋廣</td></tr><tr><td>HackerNews</td><td><code>https://hnrss.org/newest?q=AI&amp;points=50</code></td><td>社群篩選，工程師視角</td></tr></tbody></table><blockquote><p><strong>Anthropic 目前無官方 RSS</strong>，是個缺口，之後另找方案補上。</p></blockquote><p>CLI 驗證方式：</p><figure class="highlight bash"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">curl -s -o /dev/null -w <span class="string">&quot;%&#123;http_code&#125; %&#123;url_effective&#125;\n&quot;</span> &lt;RSS_URL&gt;</span><br></pre></td></tr></table></figure><hr><h2 id="n8n-節點選擇"><a href="#n8n-節點選擇" class="headerlink" title="n8n 節點選擇"></a>n8n 節點選擇</h2><p>取層用兩個節點組合：</p><ul><li><strong>Schedule Trigger</strong>：控制執行時機（每週一次）</li><li><strong>RSS Read</strong>：拉取完整 feed 內容</li></ul><p>為什麼不用 <strong>RSS Feed Trigger</strong>？</p><p>RSS Feed Trigger 會記住上次讀到哪，只推送新增項目。概念上正確，但它是 Trigger 節點，不適合被主流程呼叫（sub-workflow 架構）。</p><p>改用 <strong>RSS Read + Filter 節點過濾日期</strong>：</p><figure class="highlight text"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">Schedule Trigger → RSS Read → Filter（只保留近 7 天文章）</span><br></pre></td></tr></table></figure><p>這樣取層不需要管狀態，邏輯乾淨，日期範圍由 Filter 節點統一控制。</p><hr><h2 id="實作步驟"><a href="#實作步驟" class="headerlink" title="實作步驟"></a>實作步驟</h2><h3 id="步驟一：建立-Workflow"><a href="#步驟一：建立-Workflow" class="headerlink" title="步驟一：建立 Workflow"></a>步驟一：建立 Workflow</h3><p>新增 Workflow，命名 <code>[取] The Verge AI</code>。</p><p>觸發節點選 <strong>Schedule Trigger</strong>，預設每天午夜執行即可（之後調整為週報頻率）。</p><h3 id="步驟二：加入-RSS-Read-節點"><a href="#步驟二：加入-RSS-Read-節點" class="headerlink" title="步驟二：加入 RSS Read 節點"></a>步驟二：加入 RSS Read 節點</h3><p>在 Schedule Trigger 後加 <strong>RSS Read</strong> 節點，填入 URL：</p><figure class="highlight text"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">https://www.theverge.com/rss/ai-artificial-intelligence/index.xml</span><br></pre></td></tr></table></figure><h3 id="步驟三：Filter-節點過濾日期"><a href="#步驟三：Filter-節點過濾日期" class="headerlink" title="步驟三：Filter 節點過濾日期"></a>步驟三：Filter 節點過濾日期</h3><p>在 RSS Read 後加 <strong>Filter</strong> 節點，條件：</p><figure class="highlight text"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">isoDate → is after → &#123;&#123; $now.minus(&#123;days: 7&#125;).toISO() &#125;&#125;</span><br></pre></td></tr></table></figure><h3 id="步驟四：Edit-Fields-節點標準化輸出"><a href="#步驟四：Edit-Fields-節點標準化輸出" class="headerlink" title="步驟四：Edit Fields 節點標準化輸出"></a>步驟四：Edit Fields 節點標準化輸出</h3><p>在 Filter 後加 <strong>Edit Fields（Set）</strong> 節點，對應欄位：</p><table><thead><tr><th>Name</th><th>Value</th></tr></thead><tbody><tr><td><code>title</code></td><td><code>&#123;&#123; $json.title &#125;&#125;</code></td></tr><tr><td><code>url</code></td><td><code>&#123;&#123; $json.link &#125;&#125;</code></td></tr><tr><td><code>content</code></td><td><code>&#123;&#123; $json.contentSnippet &#125;&#125;</code></td></tr><tr><td><code>published_at</code></td><td><code>&#123;&#123; $json.isoDate &#125;&#125;</code></td></tr><tr><td><code>source</code></td><td><code>The Verge AI</code></td></tr></tbody></table><p>執行成功，每筆輸出格式如下：</p><figure class="highlight json"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br></pre></td><td class="code"><pre><span class="line"><span class="punctuation">&#123;</span></span><br><span class="line">  <span class="attr">&quot;title&quot;</span><span class="punctuation">:</span> <span class="string">&quot;Cloud development platform Vercel was hacked&quot;</span><span class="punctuation">,</span></span><br><span class="line">  <span class="attr">&quot;url&quot;</span><span class="punctuation">:</span> <span class="string">&quot;https://www.theverge.com/tech/914723/vercel-hacked&quot;</span><span class="punctuation">,</span></span><br><span class="line">  <span class="attr">&quot;content&quot;</span><span class="punctuation">:</span> <span class="string">&quot;Vercel, a major development platform...&quot;</span><span class="punctuation">,</span></span><br><span class="line">  <span class="attr">&quot;published_at&quot;</span><span class="punctuation">:</span> <span class="string">&quot;2026-04-19T19:54:52.000Z&quot;</span><span class="punctuation">,</span></span><br><span class="line">  <span class="attr">&quot;source&quot;</span><span class="punctuation">:</span> <span class="string">&quot;The Verge AI&quot;</span></span><br><span class="line"><span class="punctuation">&#125;</span></span><br></pre></td></tr></table></figure><hr><h2 id="API-Credential-的資安決策"><a href="#API-Credential-的資安決策" class="headerlink" title="API Credential 的資安決策"></a>API Credential 的資安決策</h2><p>設定 Google Gemini credential 時，有一個值得討論的選項：<strong>Allowed HTTP Request Domains</strong>。</p><p>n8n 官方說明：</p><blockquote><p>Control which domains this credential can be used with in HTTP Request nodes</p></blockquote><p>這個設定限制的是<strong>被呼叫端</strong>（destination）——也就是「這組 key 只能被送往哪些 domain」，不是「誰能在 n8n 裡使用這組 key」。</p><p><strong>能防護的範圍</strong>：</p><ul><li>攻擊者透過 HTTP Request 節點把 key 帶著打到外部惡意 server</li></ul><p><strong>防護不到的範圍</strong>：</p><ul><li>n8n 原生節點（如 Google Gemini Chat Model）</li><li>直接存取 n8n 資料庫</li><li>從 n8n UI 讀取 credential</li></ul><p><strong>決策</strong>：填 <code>generativelanguage.googleapis.com</code>，遵守最小權限原則。但主要防線是 Cloudflare Access（限制誰能登入 n8n），這個設定是額外的縱深防禦，不能過度依賴。</p><p>核心原則：<strong>理解每層保護的邊界，不要以為設了就完全安全。</strong></p><hr><h2 id="參考"><a href="#參考" class="headerlink" title="參考"></a>參考</h2><ul><li><a href="/2026/gcp-free-tier-n8n/">個人自動化平台(一) n8n &amp; GCP VM</a></li><li><a href="/2026/gcp-n8n-cloudflared/">個人自動化平台(二) Cloudflare Access &amp; Cloudflare Tunnel</a></li><li><a href="/2026/automation-pipeline-fetch-read-write/">個人自動化平台(三) 取、讀、寫：三層可插拔管道設計</a></li><li><a href="/2026/gcp-n8n-rebuild/">個人自動化平台(番外) 拆掉重建 GCP VM &amp; Cloudflared Tunnel &amp; Cloudflare Access</a></li></ul><h2 id="讀層：Aggregate-Basic-LLM-Chain"><a href="#讀層：Aggregate-Basic-LLM-Chain" class="headerlink" title="讀層：Aggregate + Basic LLM Chain"></a>讀層：Aggregate + Basic LLM Chain</h2><p>取層跑通後，接讀層。</p><h3 id="為什麼要先-Aggregate？"><a href="#為什麼要先-Aggregate？" class="headerlink" title="為什麼要先 Aggregate？"></a>為什麼要先 Aggregate？</h3><p>RSS Read 輸出 10 筆獨立資料，Basic LLM Chain 預設對每筆各送一次請求。10 筆 &#x3D; 10 次 API call，超過免費版 5 RPM 限制。</p><p>正確做法：先用 <strong>Aggregate</strong> 節點把 10 筆合成一筆，再送一次請求給 AI，請它整理成一份週報。這也更符合「週報」的本意——要的是一份完整報告，不是 10 篇獨立摘要。</p><figure class="highlight text"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">Edit Fields → Aggregate（All Item Data）→ Basic LLM Chain（Google Gemini）</span><br></pre></td></tr></table></figure><h3 id="Prompt-設計"><a href="#Prompt-設計" class="headerlink" title="Prompt 設計"></a>Prompt 設計</h3><figure class="highlight text"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br></pre></td><td class="code"><pre><span class="line">週報日期：&#123;&#123; $now.toFormat(&#x27;yyyy年MM月dd日&#x27;) &#125;&#125;</span><br><span class="line"></span><br><span class="line">以下是本週 AI 新聞，請用繁體中文整理成一份週報。</span><br><span class="line">每則新聞說明「是什麼」和「為什麼重要」，條列呈現。</span><br><span class="line"></span><br><span class="line">&#123;&#123; $json.data.map(i =&gt; `【$&#123;i.source&#125;】$&#123;i.title&#125;\n$&#123;i.content&#125;`).join(&#x27;\n\n&#x27;) &#125;&#125;</span><br></pre></td></tr></table></figure><p>執行結果：日期正確，內容有條理，每篇清楚說明「是什麼」和「為什麼重要」。</p><h3 id="踩坑：Rate-Limit"><a href="#踩坑：Rate-Limit" class="headerlink" title="踩坑：Rate Limit"></a>踩坑：Rate Limit</h3><p>第一次直接把 10 筆送給 LLM，遇到 <code>429 Too Many Requests</code>：</p><figure class="highlight text"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">quota exceeded: limit 5 requests/minute (gemini-2.5-flash free tier)</span><br></pre></td></tr></table></figure><p>解法：加 Aggregate 節點合併成一筆，從 10 次請求降為 1 次，問題消失。</p><h2 id="小結"><a href="#小結" class="headerlink" title="小結"></a>小結</h2><p>（待補）</p><p>(fin)</p>]]>
+    </content>
+    <id>https://blog.marsen.me/2026/04/20/2026/n8n-ai-weekly-fetch-layer/</id>
+    <link href="https://blog.marsen.me/2026/04/20/2026/n8n-ai-weekly-fetch-layer/"/>
+    <published>2026-04-20T10:15:17.000Z</published>
+    <summary>
+      <![CDATA[<h2 id="前情提要"><a href="#前情提要" class="headerlink" title="前情提要"></a>前情提要</h2><p>上一篇定好了「取、讀、寫」三層架構，這篇開始實作第一層：取。</p>
+<p>目標是從四個 AI 新聞來源拉資料，輸出統一格式]]>
+    </summary>
+    <title>[實作筆記] 個人自動化平台(四) n8n 實作：取層，RSS 資料來源</title>
+    <updated>2026-04-22T07:15:03.941Z</updated>
+  </entry>
   <entry>
     <author>
       <name>Marsen L.</name>
@@ -30,7 +49,7 @@
 <p>這篇不急著]]>
     </summary>
     <title>[實作筆記] 個人自動化平台(三) 取、讀、寫：三層可插拔管道設計</title>
-    <updated>2026-04-20T08:09:42.000Z</updated>
+    <updated>2026-04-22T07:15:03.940Z</updated>
   </entry>
   <entry>
     <author>
@@ -50,7 +69,7 @@
     <title>
       <![CDATA[[實作筆記] 個人自動化平台(番外) 拆掉重建 GCP VM & Cloudflared Tunnel & Cloudflare Access]]>
     </title>
-    <updated>2026-04-20T08:09:42.000Z</updated>
+    <updated>2026-04-22T07:15:03.941Z</updated>
   </entry>
   <entry>
     <author>
@@ -71,7 +90,7 @@
     <title>
       <![CDATA[個人自動化平台(二) Cloudflare Access & Cloudflare Tunnel]]>
     </title>
-    <updated>2026-04-20T08:09:42.000Z</updated>
+    <updated>2026-04-22T07:15:03.941Z</updated>
   </entry>
   <entry>
     <author>
@@ -92,7 +111,7 @@
     <title>
       <![CDATA[[實作筆記] 個人自動化平台(一) n8n & GCP VM]]>
     </title>
-    <updated>2026-04-20T08:09:42.000Z</updated>
+    <updated>2026-04-22T07:15:03.941Z</updated>
   </entry>
   <entry>
     <author>
@@ -111,7 +130,7 @@
 <p>「系統性剝削」讓財富自動從勞動者流向資產持有者，普通人很難透過努力翻]]>
     </summary>
     <title>[生活筆記] 系統思考打工人生</title>
-    <updated>2026-04-20T08:09:42.000Z</updated>
+    <updated>2026-04-22T07:15:03.941Z</updated>
   </entry>
   <entry>
     <author>
@@ -129,7 +148,7 @@
       <![CDATA[<h2 id="前情提要"><a href="#前情提要" class="headerlink" title="前情提要"></a>前情提要</h2><p>在做韓文注音學習工具時，需要偵測瀏覽器是否支援 <code>speechSynthesis</code>，然後顯示提示訊息。]]>
     </summary>
     <title>[實作筆記] 在 Next.js 安全讀取 window：從 useEffect 到 useSyncExternalStore</title>
-    <updated>2026-04-20T08:09:42.000Z</updated>
+    <updated>2026-04-22T07:15:03.941Z</updated>
   </entry>
   <entry>
     <author>
@@ -148,7 +167,7 @@
 <p>例如「LINE Bot 的 Messaging API]]>
     </summary>
     <title>[實作筆記] 用 Cloudflare Tunnel 讓 LINE Bot Webhook 打到本機</title>
-    <updated>2026-04-20T08:09:42.000Z</updated>
+    <updated>2026-04-22T07:15:03.941Z</updated>
   </entry>
   <entry>
     <author>
@@ -167,7 +186,7 @@
 <figure class="highlight]]>
     </summary>
     <title>[實作筆記] Ghostty 打字出現 [O[27u 亂碼的原因與修正</title>
-    <updated>2026-04-20T08:09:42.000Z</updated>
+    <updated>2026-04-22T07:15:03.941Z</updated>
   </entry>
   <entry>
     <author>
@@ -186,7 +205,7 @@
 <h]]>
     </summary>
     <title>[工具筆記] Terminal 工具怎麼選？Ghostty、iTerm2 與其他選手比較</title>
-    <updated>2026-04-20T08:09:42.002Z</updated>
+    <updated>2026-04-22T07:15:03.941Z</updated>
   </entry>
   <entry>
     <author>
@@ -205,7 +224,7 @@
 <figure cl]]>
     </summary>
     <title>[實作筆記] Next.js Hydration 與隨機性：從問題到正確架構</title>
-    <updated>2026-04-20T08:09:42.000Z</updated>
+    <updated>2026-04-22T07:15:03.941Z</updated>
   </entry>
   <entry>
     <author>
@@ -222,7 +241,7 @@
       <![CDATA[<h2 id="前情提要"><a href="#前情提要" class="headerlink" title="前情提要"></a>前情提要</h2><p>自從 2025 年 9 月台新把 @GoGo 卡、FlyGo 卡、玫瑰 Giving 卡、太陽&#x2F;玫瑰卡這些信用卡整]]>
     </summary>
     <title>[生活筆記] 2026 台新 Richart Life 切換方案回饋最大化</title>
-    <updated>2026-04-20T08:09:42.000Z</updated>
+    <updated>2026-04-22T07:15:03.941Z</updated>
   </entry>
   <entry>
     <author>
@@ -239,7 +258,7 @@
       <![CDATA[<h2 id="前情提要"><a href="#前情提要" class="headerlink" title="前情提要"></a>前情提要</h2><p>延續<a href="https://blog.marsen.me/2025/11/28/2025/iv_thixxxxxx]]>
     </summary>
     <title>[生活筆記] 2025 T社面試心得 - 二面</title>
-    <updated>2026-04-20T08:09:41.999Z</updated>
+    <updated>2026-04-22T07:15:03.940Z</updated>
   </entry>
   <entry>
     <author>
@@ -257,7 +276,7 @@
 <p>一面是 Pyth]]>
     </summary>
     <title>[生活筆記] 2025 T社面試心得 - 一面</title>
-    <updated>2026-04-20T08:09:41.999Z</updated>
+    <updated>2026-04-22T07:15:03.940Z</updated>
   </entry>
   <entry>
     <author>
@@ -276,7 +295,7 @@
 <h2 id="當軟體開發還是一門工程學"><a href="#當軟體開發還是一門工程學" class="headerlink" title="當軟體開發還是一門工程學"></a>當軟體開發還是一門工程學</h2><p>1970 年代，當軟體開發還是一門]]>
     </summary>
     <title>[SDD 與 Spec Kit]傳統瀑布式開發（1975-2000）</title>
-    <updated>2026-04-20T08:09:41.999Z</updated>
+    <updated>2026-04-22T07:15:03.940Z</updated>
   </entry>
   <entry>
     <author>
@@ -296,7 +315,7 @@
 <p>What is Spec-Driven Developm]]>
     </summary>
     <title>[學習筆記] SDD 與 Spec Kit - 前言</title>
-    <updated>2026-04-20T08:09:41.999Z</updated>
+    <updated>2026-04-22T07:15:03.940Z</updated>
   </entry>
   <entry>
     <author>
@@ -315,7 +334,7 @@
 <p>這些異味提示著我們需要重構，你可以先挑戰看一下有沒有辦]]>
     </summary>
     <title>[實作筆記] 命令式程式碼重構到函數式 Pipe 流水線</title>
-    <updated>2026-04-20T08:09:41.998Z</updated>
+    <updated>2026-04-22T07:15:03.939Z</updated>
   </entry>
   <entry>
     <author>
@@ -335,7 +354,7 @@
 <]]>
     </summary>
     <title>[實作筆記] Clean Architecture 思考：避免過度設計</title>
-    <updated>2026-04-20T08:09:41.998Z</updated>
+    <updated>2026-04-22T07:15:03.939Z</updated>
   </entry>
   <entry>
     <author>
@@ -353,7 +372,7 @@
       <![CDATA[<h2 id="前情提要"><a href="#前情提要" class="headerlink" title="前情提要"></a>前情提要</h2><p>專案需要使用 PaddleOCR 進行文字辨識，但原始模型檔案需要從 PaddlePaddle 框架轉換成 ONNX 格式才]]>
     </summary>
     <title>[實作筆記] PaddleOCR ONNX 模型發布到 Hugging Face Hub</title>
-    <updated>2026-04-20T08:09:41.998Z</updated>
+    <updated>2026-04-22T07:15:03.939Z</updated>
   </entry>
   <entry>
     <author>
@@ -372,24 +391,6 @@
 <p>在這個專案中，我們遇到了幾個]]>
     </summary>
     <title>[實作筆記] 建立私有 Python Package Registry - 以 ONNX Runtime 為例</title>
-    <updated>2026-04-20T08:09:41.999Z</updated>
-  </entry>
-  <entry>
-    <author>
-      <name>Marsen L.</name>
-      <email>admin@marsen.me</email>
-    </author>
-    <category term="實作筆記" scheme="https://blog.marsen.me/tags/%E5%AF%A6%E4%BD%9C%E7%AD%86%E8%A8%98/"/>
-    <content>
-      <![CDATA[<h2 id="前情提要"><a href="#前情提要" class="headerlink" title="前情提要"></a>前情提要</h2><p>四年前「<a href="https://blog.marsen.me/2020/10/22/2020/google_domain_forward_mail/">怎麼建立一個網站？(四) - 自訂網域 EMail</a>」已過時了，<br>當時透過 Google Domain 設定了自己的網域信箱，那種擁有 <code>admin@marsen.me</code> 的專業度真的是滿到溢出來。</p><p>但是，現實總是殘酷的。</p><p>2023 年 Google Domain 宣布停止營運，我選擇轉移到了 Cloudflare。</p><p>更悲劇的是，Gmail 的應用程式密碼也在安全性考量下越來越不被推薦使用。</p><p>Google 對 Gmail SMTP 的使用限制越來越嚴格。</p><p>在開啟 2FA 的情況下，只能使用應用程式密碼，但是 Google 本身也不推薦這樣使用密碼。</p><h2 id="問題分析"><a href="#問題分析" class="headerlink" title="問題分析"></a>問題分析</h2><p>現有問題：</p><ul><li>Google Domain 停止服務，Cloudflare 雖然接管了域名，但沒有提供類似的信箱轉發服務</li><li>Gmail 無法繼續使用 Email Forwarding 的密碼方式不再被推薦使用，我也沒有查到替代方案</li></ul><p>需求：</p><ul><li>能夠使用 <code>admin@marsen.me</code> 收信，已完成(在 Cloudflare 設定 Email Forwarding)</li><li>能夠以 <code>admin@marsen.me</code> 寄信，而且不會被標記為可疑郵件</li><li>免費或便宜的解決方案</li><li>設定要簡單快速</li></ul><h2 id="技術選擇的思考"><a href="#技術選擇的思考" class="headerlink" title="技術選擇的思考"></a>技術選擇的思考</h2><p>經過一番調研，我把目標鎖定在幾個主流的 SMTP 服務：</p><ol><li><strong>Brevo (原 Sendinblue)</strong>：免費額度每天 300 封信，付費方案 $25&#x2F;月</li><li><strong>Mailjet</strong>：免費額度每天 200 封信，付費方案 $17&#x2F;月</li><li><strong>SendGrid</strong>：免費額度每天 100 封信</li><li><strong>Amazon SES</strong>：按量計費，超便宜但設定複雜</li></ol><p>綜合考量下，我選擇 <strong>Brevo</strong> 的理由：</p><ul><li><strong>價格最划算</strong>：免費額度最高（300封&#x2F;天），對個人使用綽綽有餘</li><li><strong>功能完整</strong>：不只是 SMTP，還有完整的郵件行銷功能</li><li><strong>設定超快</strong>：API 整合簡單，文件齊全</li><li><strong>信譽良好</strong>：歐洲公司，GDPR 合規，信件到達率高</li></ul><p>備案是 Mailjet，但既然 Brevo 實際使用很順利，我就沒有去試了。</p><h2 id="實作過程"><a href="#實作過程" class="headerlink" title="實作過程"></a>實作過程</h2><h3 id="Step-1-註冊-Brevo-帳號"><a href="#Step-1-註冊-Brevo-帳號" class="headerlink" title="Step 1: 註冊 Brevo 帳號"></a>Step 1: 註冊 Brevo 帳號</h3><p>前往 <a href="https://brevo.com/">Brevo 官網</a> 註冊免費帳號，過程很簡單，不需要信用卡。</p><p>可以用 Google 帳號註冊，但是填寫一些資料，總體來說並不冗長繁瑣。</p><h3 id="Step-2-設定-Sending-Domain"><a href="#Step-2-設定-Sending-Domain" class="headerlink" title="Step 2: 設定 Sending Domain"></a>Step 2: 設定 Sending Domain</h3><p>登入後台，進入「Senders &amp; IP」→「Domains」，添加你的域名（如 <code>marsen.me</code>）。</p><p>Brevo 會要求你在 DNS 域名設定中添加幾筆記錄(我是使用 Cloudflare)來驗證域名擁有權：</p><p>設定過程也很傻瓜點擊跟著操作就會引導你登入 Cloudflare 的後台，不保証其他域名商有這麼方便，</p><p>會在 Cloudflare DNS 管理中添加：2 筆 CNAME 與 2 筆 TXT 記錄，應該是讓 Brevo 驗証網域所有權的。</p><p>DNS 生效後，Brevo 就會驗證通過。</p><h3 id="Step-3-設定收信"><a href="#Step-3-設定收信" class="headerlink" title="Step 3: 設定收信"></a>Step 3: 設定收信</h3><p>設定 Email Forwarding 這部分我直接在 Cloudflare 設定：</p><p>「Email」→「Email Routing」→「Routes」</p><p>添加轉發規則：</p><p>從：<code>admin@marsen.me</code> 到我的 gmail</p><p>這樣就能收到寄往自訂域名的信了。</p><h3 id="Step-4-設定-Gmail-使用-Brevo-SMTP"><a href="#Step-4-設定-Gmail-使用-Brevo-SMTP" class="headerlink" title="Step 4: 設定 Gmail 使用 Brevo SMTP"></a>Step 4: 設定 Gmail 使用 Brevo SMTP</h3><p>進入 Gmail 設定 &gt; 帳戶和匯入 &gt; 新增另一個電子郵件地址：</p><ul><li>名稱：Marsen</li><li>電子郵件地址：<code>admin@marsen.me</code></li><li>SMTP 伺服器：<code>smtp-relay.brevo.com</code></li><li>通訊埠：587</li><li>使用者名稱：你的 Brevo 帳號 email</li><li>密碼：去 Brevo 後台「Account Settings」→「SMTP &amp; API」生成的 SMTP Key</li><li>設定完成後，Gmail 會寄驗證信，確認後收到的信才不會有警告。</li></ul><h2 id="實測結果"><a href="#實測結果" class="headerlink" title="實測結果"></a>實測結果</h2><p>設定完成實測：</p><ul><li>✅ 收信正常：寄到 <code>admin@marsen.me</code> 的信都能在 Gmail 收到</li><li>✅ 寄信正常：從 Gmail 可以選擇用 <code>admin@marsen.me</code> 寄信</li><li>✅ 信譽良好：收件者不會看到「未驗證」警告</li></ul><p>整個設定過程不到 20 分鐘。</p><h2 id="一些要注意的小問題"><a href="#一些要注意的小問題" class="headerlink" title="一些要注意的小問題"></a>一些要注意的小問題</h2><p><strong>DNS 生效時間</strong><br>SPF、DKIM 記錄可能需要幾個小時才會完全生效，不要急著測試。</p><p>但是我實測約幾分鐘就生效了。</p><p><strong>SMTP Key 不是密碼</strong><br>Brevo 的 SMTP Key 是專門給 API 和 SMTP 用的，不是你登入密碼。</p><p><strong>免費額度限制</strong><br>每天 300 封信對我個人使用很夠，但如果你要大量寄信，記得升級付費方案。</p><h2 id="參考"><a href="#參考" class="headerlink" title="參考"></a>參考</h2><ul><li><a href="https://brevo.com/">Brevo 官方網站</a></li><li><a href="https://support.google.com/accounts/answer/185833">重要事項：我們不建議使用應用程式密碼</a></li><li><a href="https://blog.marsen.me/2020/10/22/2020/google_domain_forward_mail/">怎麼建立一個網站？(四) - 自訂網域 EMail</a> (2020年舊文)</li></ul><h2 id="系列文章"><a href="#系列文章" class="headerlink" title="系列文章"></a>系列文章</h2><ul><li><a href="https://blog.marsen.me/2016/08/21/2016/setting_DNS_with_google/">怎麼建立一個網站？(一)</a></li><li><a href="https://blog.marsen.me/2016/08/28/2016/how_to_use_github_page/">怎麼建立一個網站？(二)</a></li><li><a href="https://blog.marsen.me/2016/09/04/2016/http2_by_cloudflare/">怎麼建立一個網站？(三)</a></li><li><del><a href="https://blog.marsen.me/2020/10/22/2020/google_domain_forward_mail/">怎麼建立一個網站？(四)</a></del></li><li><a href="https://blog.marsen.me/2025/08/27/2025/brevo_smtp/">怎麼建立一個網站？(四)</a></li><li><a href="https://blog.marsen.me/2021/04/06/2021/create_404/">怎麼建立一個網站？(五)</a></li></ul><p>(fin)</p>]]>
-    </content>
-    <id>https://blog.marsen.me/2025/08/27/2025/brevo_smtp/</id>
-    <link href="https://blog.marsen.me/2025/08/27/2025/brevo_smtp/"/>
-    <published>2025-08-27T14:19:02.000Z</published>
-    <summary>
-      <![CDATA[<h2 id="前情提要"><a href="#前情提要" class="headerlink" title="前情提要"></a>前情提要</h2><p>四年前「<a href="https://blog.marsen.me/2020/10/22/2020/google_dom]]>
-    </summary>
-    <title>[實作筆記] 怎麼建立一個網站？(四) - 自訂網域 EMail 收寄信(使用 Cloudflare 與 Brevo)</title>
-    <updated>2026-04-20T08:09:41.998Z</updated>
+    <updated>2026-04-22T07:15:03.939Z</updated>
   </entry>
 </feed>
