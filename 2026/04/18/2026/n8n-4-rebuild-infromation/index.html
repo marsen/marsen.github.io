@@ -33,17 +33,17 @@ j=d.createElement(s),dl=l!='dataLayer'?'&l='+l:'';j.async=true;j.src=
 
   <meta charset="utf-8">
   
-  <title>[實作筆記] 個人自動化平台(三) 取、讀、寫：三層可插拔管道設計 | Marsen&#39;s Blog</title>
+  <title>[實作筆記] 個人自動化平台(番外) 拆掉重建 GCP VM &amp; Cloudflared Tunnel &amp; Cloudflare Access  | Marsen&#39;s Blog</title>
   <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
-  <meta name="description" content="前情提要前兩篇把 GCP VM + n8n + cloudflared tunnel 都設好了，環境就緒。 這篇不急著動手，先把架構想清楚。 目標是一個可以自由擴充的個人內容自動化平台：新增資料來源、換 AI 模型、改輸出管道，都不需要重寫整個流程。  核心設計：三層分離把整個管道拆成三層，每層只負責一件事： 1取（Fetch）   →   讀（Process）   →   寫（Sink）   取">
+  <meta name="description" content="前情提要前兩篇把 GCP 免費 VM + n8n + cloudflared tunnel + Cloudflare Access 都設好了。 但整個過程是邊做邊踩坑，步驟不一定是最乾淨的順序。這篇把環境完整清理掉，再照前兩篇的步驟重建一次，驗證文章可以重現。  清理步驟清理順序：從外到內，先 Cloudflare 再 GCP。 步驟一：刪除 Cloudflare Access Applicati">
 <meta property="og:type" content="article">
-<meta property="og:title" content="[實作筆記] 個人自動化平台(三) 取、讀、寫：三層可插拔管道設計">
-<meta property="og:url" content="https://blog.marsen.me/2026/04/20/2026/automation-pipeline-fetch-read-write/index.html">
+<meta property="og:title" content="[實作筆記] 個人自動化平台(番外) 拆掉重建 GCP VM &amp; Cloudflared Tunnel &amp; Cloudflare Access ">
+<meta property="og:url" content="https://blog.marsen.me/2026/04/18/2026/n8n-4-rebuild-infromation/index.html">
 <meta property="og:site_name" content="Marsen&#39;s Blog">
-<meta property="og:description" content="前情提要前兩篇把 GCP VM + n8n + cloudflared tunnel 都設好了，環境就緒。 這篇不急著動手，先把架構想清楚。 目標是一個可以自由擴充的個人內容自動化平台：新增資料來源、換 AI 模型、改輸出管道，都不需要重寫整個流程。  核心設計：三層分離把整個管道拆成三層，每層只負責一件事： 1取（Fetch）   →   讀（Process）   →   寫（Sink）   取">
+<meta property="og:description" content="前情提要前兩篇把 GCP 免費 VM + n8n + cloudflared tunnel + Cloudflare Access 都設好了。 但整個過程是邊做邊踩坑，步驟不一定是最乾淨的順序。這篇把環境完整清理掉，再照前兩篇的步驟重建一次，驗證文章可以重現。  清理步驟清理順序：從外到內，先 Cloudflare 再 GCP。 步驟一：刪除 Cloudflare Access Applicati">
 <meta property="og:locale" content="zh_TW">
-<meta property="article:published_time" content="2026-04-20T06:20:23.000Z">
-<meta property="article:modified_time" content="2026-04-24T10:39:09.104Z">
+<meta property="article:published_time" content="2026-04-18T03:29:53.000Z">
+<meta property="article:modified_time" content="2026-04-27T06:41:22.535Z">
 <meta property="article:author" content="Marsen L.">
 <meta property="article:tag" content="實作筆記">
 <meta name="twitter:card" content="summary">
@@ -106,10 +106,10 @@ j=d.createElement(s),dl=l!='dataLayer'?'&l='+l:'';j.async=true;j.src=
   </div>
 </header>
       <div class="outer">
-        <section id="main"><article id="post-2026/automation-pipeline-fetch-read-write" class="article article-type-post" itemscope itemprop="blogPost">
+        <section id="main"><article id="post-2026/n8n-4-rebuild-infromation" class="article article-type-post" itemscope itemprop="blogPost">
   <div class="article-meta">
-    <a href="/2026/04/20/2026/automation-pipeline-fetch-read-write/" class="article-date">
-  <time datetime="2026-04-20T06:20:23.000Z" itemprop="datePublished">2026-04-20</time>
+    <a href="/2026/04/18/2026/n8n-4-rebuild-infromation/" class="article-date">
+  <time datetime="2026-04-18T03:29:53.000Z" itemprop="datePublished">2026-04-18</time>
 </a>
     
   </div>
@@ -120,7 +120,7 @@ j=d.createElement(s),dl=l!='dataLayer'?'&l='+l:'';j.async=true;j.src=
         
   
     <h1 class="article-title" itemprop="name">
-      [實作筆記] 個人自動化平台(三) 取、讀、寫：三層可插拔管道設計
+      [實作筆記] 個人自動化平台(番外) 拆掉重建 GCP VM &amp; Cloudflared Tunnel &amp; Cloudflare Access 
     </h1>
   
 
@@ -128,101 +128,50 @@ j=d.createElement(s),dl=l!='dataLayer'?'&l='+l:'';j.async=true;j.src=
     
     <div class="article-entry" itemprop="articleBody">
       
-        <h2 id="前情提要"><a href="#前情提要" class="headerlink" title="前情提要"></a>前情提要</h2><p>前兩篇把 GCP VM + n8n + cloudflared tunnel 都設好了，環境就緒。</p>
-<p>這篇不急著動手，先把架構想清楚。</p>
-<p>目標是一個可以自由擴充的個人內容自動化平台：新增資料來源、換 AI 模型、改輸出管道，都不需要重寫整個流程。</p>
+        <h2 id="前情提要"><a href="#前情提要" class="headerlink" title="前情提要"></a>前情提要</h2><p>前兩篇把 GCP 免費 VM + n8n + cloudflared tunnel + Cloudflare Access 都設好了。</p>
+<p>但整個過程是邊做邊踩坑，步驟不一定是最乾淨的順序。<br>這篇把環境完整清理掉，再照前兩篇的步驟重建一次，驗證文章可以重現。</p>
 <hr>
-<h2 id="核心設計：三層分離"><a href="#核心設計：三層分離" class="headerlink" title="核心設計：三層分離"></a>核心設計：三層分離</h2><p>把整個管道拆成三層，每層只負責一件事：</p>
-<figure class="highlight text"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">取（Fetch）   →   讀（Process）   →   寫（Sink）</span><br></pre></td></tr></table></figure>
+<h2 id="清理步驟"><a href="#清理步驟" class="headerlink" title="清理步驟"></a>清理步驟</h2><p>清理順序：從外到內，先 Cloudflare 再 GCP。</p>
+<h3 id="步驟一：刪除-Cloudflare-Access-Application"><a href="#步驟一：刪除-Cloudflare-Access-Application" class="headerlink" title="步驟一：刪除 Cloudflare Access Application"></a>步驟一：刪除 Cloudflare Access Application</h3><p>進 Cloudflare 主控台 → <strong>Zero Trust</strong> → <strong>Access → Applications</strong></p>
+<p>找到 <code>butler.marsen.me</code> 的 application，刪除。</p>
+<p><strong>驗證</strong>：開瀏覽器試 <code>https://butler.marsen.me</code>，如果 Access 已清除，不會再看到驗證頁面。</p>
+<h3 id="步驟二：刪除-Cloudflare-Tunnel"><a href="#步驟二：刪除-Cloudflare-Tunnel" class="headerlink" title="步驟二：刪除 Cloudflare Tunnel"></a>步驟二：刪除 Cloudflare Tunnel</h3><p>SSH 進 VM，先停 cloudflared service，再刪 tunnel：</p>
+<figure class="highlight bash"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br></pre></td><td class="code"><pre><span class="line">sudo systemctl stop cloudflared</span><br><span class="line">cloudflared tunnel delete butler</span><br></pre></td></tr></table></figure>
 
-<ul>
-<li><strong>取</strong>：從外部拿資料，不做任何處理</li>
-<li><strong>讀</strong>：理解資料，產生新資訊</li>
-<li><strong>寫</strong>：把結果推出去</li>
-</ul>
-<p>每層都是介面，實作可以自由替換或組合。</p>
-<hr>
-<h2 id="每層的邊界"><a href="#每層的邊界" class="headerlink" title="每層的邊界"></a>每層的邊界</h2><h3 id="取（Fetch）"><a href="#取（Fetch）" class="headerlink" title="取（Fetch）"></a>取（Fetch）</h3><p>負責從各種來源拉資料：RSS、API、Webhook、爬蟲……</p>
-<p>不管來源是什麼，輸出格式統一：</p>
-<figure class="highlight json"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br></pre></td><td class="code"><pre><span class="line"><span class="punctuation">&#123;</span></span><br><span class="line">  <span class="attr">&quot;title&quot;</span><span class="punctuation">:</span> <span class="string">&quot;文章標題&quot;</span><span class="punctuation">,</span></span><br><span class="line">  <span class="attr">&quot;url&quot;</span><span class="punctuation">:</span> <span class="string">&quot;https://...&quot;</span><span class="punctuation">,</span></span><br><span class="line">  <span class="attr">&quot;content&quot;</span><span class="punctuation">:</span> <span class="string">&quot;原文內容或摘要&quot;</span><span class="punctuation">,</span></span><br><span class="line">  <span class="attr">&quot;source&quot;</span><span class="punctuation">:</span> <span class="string">&quot;來源名稱&quot;</span><span class="punctuation">,</span></span><br><span class="line">  <span class="attr">&quot;published_at&quot;</span><span class="punctuation">:</span> <span class="string">&quot;2026-04-20T00:00:00Z&quot;</span></span><br><span class="line"><span class="punctuation">&#125;</span></span><br></pre></td></tr></table></figure>
+<p><strong>驗證</strong>：</p>
+<figure class="highlight bash"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">cloudflared tunnel list</span><br></pre></td></tr></table></figure>
 
-<p>這個格式就是「取」和「讀」之間的契約。只要每個來源都輸出這個 schema，「讀」完全不需要知道資料從哪來。</p>
-<p>新增來源：建一個新的 sub-workflow，輸出同樣格式。<br>停用來源：把那個 sub-workflow 關掉。</p>
-<h3 id="讀（Process）"><a href="#讀（Process）" class="headerlink" title="讀（Process）"></a>讀（Process）</h3><p>負責理解資料，產生新資訊。</p>
-<p>目前規劃的功能：</p>
-<table>
-<thead>
-<tr>
-<th>功能</th>
-<th>說明</th>
-</tr>
-</thead>
-<tbody><tr>
-<td>摘要歸納</td>
-<td>把長文濃縮成重點</td>
-</tr>
-<tr>
-<td>事實查核</td>
-<td>驗證內容可信度（未來）</td>
-</tr>
-<tr>
-<td>創意發想</td>
-<td>從資料延伸新觀點（未來）</td>
-</tr>
-</tbody></table>
-<p>AI 是「讀」層的實作細節，不是介面的一部分。</p>
-<p>今天用 Claude，明天換 Gemini，或跑地端模型（Ollama）——主流程不在意，只呼叫「讀」的 sub-workflow，不管裡面用的是什麼模型。</p>
-<p>「讀」層的輸出格式：</p>
-<figure class="highlight json"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br></pre></td><td class="code"><pre><span class="line"><span class="punctuation">&#123;</span></span><br><span class="line">  <span class="attr">&quot;title&quot;</span><span class="punctuation">:</span> <span class="string">&quot;文章標題&quot;</span><span class="punctuation">,</span></span><br><span class="line">  <span class="attr">&quot;url&quot;</span><span class="punctuation">:</span> <span class="string">&quot;https://...&quot;</span><span class="punctuation">,</span></span><br><span class="line">  <span class="attr">&quot;summary&quot;</span><span class="punctuation">:</span> <span class="string">&quot;AI 整理的重點&quot;</span><span class="punctuation">,</span></span><br><span class="line">  <span class="attr">&quot;tags&quot;</span><span class="punctuation">:</span> <span class="punctuation">[</span><span class="string">&quot;AI&quot;</span><span class="punctuation">,</span> <span class="string">&quot;LLM&quot;</span><span class="punctuation">]</span><span class="punctuation">,</span></span><br><span class="line">  <span class="attr">&quot;source&quot;</span><span class="punctuation">:</span> <span class="string">&quot;來源名稱&quot;</span><span class="punctuation">,</span></span><br><span class="line">  <span class="attr">&quot;published_at&quot;</span><span class="punctuation">:</span> <span class="string">&quot;2026-04-20T00:00:00Z&quot;</span></span><br><span class="line"><span class="punctuation">&#125;</span></span><br></pre></td></tr></table></figure>
+<p><code>butler</code> 不在列表裡就是刪成功了。</p>
+<blockquote>
+<p>也可以在 UI 刪：<strong>Zero Trust → Networks → Tunnels</strong> → 找 <code>butler</code> → 刪除。<br>但要先確認 tunnel 已停止（cloudflared service 停掉或 VM 已關機）。</p>
+</blockquote>
+<h3 id="步驟三：刪除-DNS-記錄"><a href="#步驟三：刪除-DNS-記錄" class="headerlink" title="步驟三：刪除 DNS 記錄"></a>步驟三：刪除 DNS 記錄</h3><p>進 Cloudflare 主控台 → <strong>marsen.me → DNS</strong></p>
+<p>找到 <code>butler.marsen.me</code> 的 CNAME 記錄（<code>4ba20fc4-...cfargotunnel.com</code>），刪除。</p>
+<p><strong>驗證</strong>：開瀏覽器，出現 <code>DNS_PROBE_FINISHED_NXDOMAIN</code> 就是清除成功。</p>
+<blockquote>
+<p>DNS 記錄目前只能透過 UI 刪除，或使用 Cloudflare API（需要 API Token）。</p>
+</blockquote>
+<h3 id="步驟四：刪除-GCP-VM"><a href="#步驟四：刪除-GCP-VM" class="headerlink" title="步驟四：刪除 GCP VM"></a>步驟四：刪除 GCP VM</h3><figure class="highlight bash"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br></pre></td><td class="code"><pre><span class="line">gcloud compute instances delete ai-butler-vm00 \</span><br><span class="line">  --zone=us-east1-b \</span><br><span class="line">  --project=YOUR_PROJECT_ID</span><br></pre></td></tr></table></figure>
 
-<h3 id="寫（Sink）"><a href="#寫（Sink）" class="headerlink" title="寫（Sink）"></a>寫（Sink）</h3><p>負責把結果推出去。</p>
-<p>兩個維度都可以擴充：</p>
-<p><strong>格式</strong>：</p>
+<p>確認後輸入 <code>Y</code>，VM 和磁碟都會一起移除。</p>
+<h2 id="參考"><a href="#參考" class="headerlink" title="參考"></a>參考</h2><p>清理完成後，照以下兩篇文章重建</p>
 <ul>
-<li>純文字</li>
-<li>簡報（未來）</li>
-<li>影音（未來）</li>
+<li><a href="/2026/n8n-1-in-gcp-free-tier-vm/">個人自動化平台(一) n8n &amp; GCP VM</a></li>
+<li><a href="/2026/n8n-2-cloudflared-and-tunnel/">個人自動化平台(二) Cloudflare Access &amp; Cloudflare Tunnel</a></li>
+<li><a href="/2026/n8n-3-pipeline-overview/">個人自動化平台(三) 取、讀、寫：三層可插拔管道設計</a></li>
 </ul>
-<p><strong>管道</strong>：</p>
-<ul>
-<li>Email</li>
-<li>LINE</li>
-<li>YouTube &#x2F; Instagram &#x2F; Facebook（未來）</li>
-</ul>
-<p>從「讀」到「寫」可以有多條路線，同一批摘要可以同時走不同路線，互不干擾：</p>
-<figure class="highlight text"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br></pre></td><td class="code"><pre><span class="line">讀（摘要結果）</span><br><span class="line">  ├─ → Email 週報（長版純文字）</span><br><span class="line">  ├─ → LINE 推播（短版）</span><br><span class="line">  └─ → 存檔（JSON，備用）</span><br></pre></td></tr></table></figure>
-
-<hr>
-<h2 id="在-n8n-的實作方式"><a href="#在-n8n-的實作方式" class="headerlink" title="在 n8n 的實作方式"></a>在 n8n 的實作方式</h2><p>n8n 的 sub-workflow 機制很適合做這件事：</p>
-<ul>
-<li>每個「取」來源 → 一個 sub-workflow</li>
-<li>每個「讀」功能 → 一個 sub-workflow</li>
-<li>每個「寫」管道 → 一個 sub-workflow</li>
-<li>主流程：用 <strong>Execute Workflow</strong> 節點串起來，用 <strong>Merge</strong> 合併多個來源，用 <strong>Switch &#x2F; If</strong> 分流到不同輸出</li>
-</ul>
-<p>新增或停用任何環節，只需要在主流程加減節點，不動其他邏輯。</p>
-<hr>
 <h2 id="小結"><a href="#小結" class="headerlink" title="小結"></a>小結</h2><ul>
-<li>三層分離（取、讀、寫），每層依賴介面不依賴實作</li>
-<li>各層之間用固定的 JSON schema 溝通，是可替換性的基礎</li>
-<li>「讀」層的 AI 模型是實作細節，抽成 sub-workflow 就能自由替換</li>
-<li>「寫」層支援多路線同時輸出，格式和管道各自獨立擴充</li>
-<li>n8n 的 sub-workflow 機制天然適合這個設計</li>
-</ul>
-<p>下一篇開始動手實作第一條 pipeline：AI 新聞週報。</p>
-<h2 id="參考"><a href="#參考" class="headerlink" title="參考"></a>參考</h2><ul>
-<li><a href="/2026/gcp-free-tier-n8n/">個人自動化平台(一) n8n &amp; GCP VM</a></li>
-<li><a href="/2026/gcp-n8n-cloudflared/">個人自動化平台(二) Cloudflare Access &amp; Cloudflare Tunnel</a></li>
-<li><a href="/2026/gcp-n8n-rebuild/">個人自動化平台(番外) 拆掉重建 GCP VM &amp; Cloudflared Tunnel &amp; Cloudflare Access</a></li>
+<li>清理順序：從外到內，先 Cloudflare 再 GCP，避免 tunnel 刪除時出現狀態不一致</li>
+<li>刪 VM 時磁碟會一起移除，n8n 資料不保留</li>
 </ul>
 <p>(fin)</p>
 
       
     </div>
     <footer class="article-footer">
-      <a data-url="https://blog.marsen.me/2026/04/20/2026/automation-pipeline-fetch-read-write/" data-id="cuidApP_Ce1MYM3aQTwIoSuWl" class="article-share-link">Share</a>
+      <a data-url="https://blog.marsen.me/2026/04/18/2026/n8n-4-rebuild-infromation/" data-id="cuidXeauNRMNCWp16xMzcGR-N" class="article-share-link">Share</a>
       
-        <a href="https://blog.marsen.me/2026/04/20/2026/automation-pipeline-fetch-read-write/#disqus_thread" class="article-comment-link">留言</a>
+        <a href="https://blog.marsen.me/2026/04/18/2026/n8n-4-rebuild-infromation/#disqus_thread" class="article-comment-link">留言</a>
       
       
   <ul class="article-tag-list" itemprop="keywords"><li class="article-tag-list-item"><a class="article-tag-list-link" href="/tags/%E5%AF%A6%E4%BD%9C%E7%AD%86%E8%A8%98/" rel="tag">實作筆記</a></li></ul>
@@ -233,19 +182,19 @@ j=d.createElement(s),dl=l!='dataLayer'?'&l='+l:'';j.async=true;j.src=
     
 <nav id="article-nav">
   
-    <a href="/2026/04/20/2026/n8n-ai-weekly-fetch-layer/" id="article-nav-newer" class="article-nav-link-wrap">
+    <a href="/2026/04/20/2026/n8n-3-pipeline-overview/" id="article-nav-newer" class="article-nav-link-wrap">
       <strong class="article-nav-caption">Newer</strong>
       <div class="article-nav-title">
         
-          [實作筆記] 個人自動化平台(四) n8n 實作：取層，RSS 資料來源
+          [實作筆記] 個人自動化平台(三) 取、讀、寫：三層可插拔管道設計
         
       </div>
     </a>
   
   
-    <a href="/2026/04/18/2026/gcp-n8n-rebuild/" id="article-nav-older" class="article-nav-link-wrap">
+    <a href="/2026/04/17/2026/n8n-2-cloudflared-and-tunnel/" id="article-nav-older" class="article-nav-link-wrap">
       <strong class="article-nav-caption">Older</strong>
-      <div class="article-nav-title">[實作筆記] 個人自動化平台(番外) 拆掉重建 GCP VM &amp; Cloudflared Tunnel &amp; Cloudflare Access </div>
+      <div class="article-nav-title">個人自動化平台(二) Cloudflare Access &amp; Cloudflare Tunnel</div>
     </a>
   
 </nav>
@@ -287,7 +236,7 @@ Please enable JavaScript to view the LikeCoin. :P
 
   (function(){
     var ifrm = document.createElement("iframe");
-    ifrm.setAttribute("src", "https://button.like.co/in/embed/marsenlin/button?referrer=https%3A%2F%2Fblog.marsen.me%2F2026%2F04%2F20%2F2026%2Fautomation-pipeline-fetch-read-write%2F");      
+    ifrm.setAttribute("src", "https://button.like.co/in/embed/marsenlin/button?referrer=https%3A%2F%2Fblog.marsen.me%2F2026%2F04%2F18%2F2026%2Fn8n-4-rebuild-infromation%2F");      
     ifrm.setAttribute("sandbox","allow-scripts allow-same-origin allow-popups allow-popups-to-escape-sandbox");
     ifrm.frameborder = "0";
     ifrm.scrolling = "no";
@@ -315,19 +264,19 @@ Please enable JavaScript to view the LikeCoin. :P
           </li>
         
           <li>
-            <a href="/2026/04/20/2026/n8n-ai-weekly-fetch-layer/">[實作筆記] 個人自動化平台(四) n8n 實作：取層，RSS 資料來源</a>
+            <a href="/2026/04/20/2026/n8n-5-pipeline-read/">[實作筆記] 個人自動化平台(四) n8n 實作：取層，RSS 資料來源</a>
           </li>
         
           <li>
-            <a href="/2026/04/20/2026/automation-pipeline-fetch-read-write/">[實作筆記] 個人自動化平台(三) 取、讀、寫：三層可插拔管道設計</a>
+            <a href="/2026/04/20/2026/n8n-3-pipeline-overview/">[實作筆記] 個人自動化平台(三) 取、讀、寫：三層可插拔管道設計</a>
           </li>
         
           <li>
-            <a href="/2026/04/18/2026/gcp-n8n-rebuild/">[實作筆記] 個人自動化平台(番外) 拆掉重建 GCP VM &amp; Cloudflared Tunnel &amp; Cloudflare Access </a>
+            <a href="/2026/04/18/2026/n8n-4-rebuild-infromation/">[實作筆記] 個人自動化平台(番外) 拆掉重建 GCP VM &amp; Cloudflared Tunnel &amp; Cloudflare Access </a>
           </li>
         
           <li>
-            <a href="/2026/04/17/2026/gcp-n8n-cloudflared/">個人自動化平台(二) Cloudflare Access &amp; Cloudflare Tunnel</a>
+            <a href="/2026/04/17/2026/n8n-2-cloudflared-and-tunnel/">個人自動化平台(二) Cloudflare Access &amp; Cloudflare Tunnel</a>
           </li>
         
       </ul>
@@ -433,7 +382,7 @@ Please enable JavaScript to view the LikeCoin. :P
 
   (function(){
     var ifrm = document.createElement("iframe");
-    ifrm.setAttribute("src", "https://button.like.co/in/embed/marsenlin/button?referrer=https%3A%2F%2Fblog.marsen.me%2F2026%2F04%2F20%2F2026%2Fautomation-pipeline-fetch-read-write%2F");      
+    ifrm.setAttribute("src", "https://button.like.co/in/embed/marsenlin/button?referrer=https%3A%2F%2Fblog.marsen.me%2F2026%2F04%2F18%2F2026%2Fn8n-4-rebuild-infromation%2F");      
     ifrm.setAttribute("sandbox","allow-scripts allow-same-origin allow-popups allow-popups-to-escape-sandbox");
     ifrm.frameborder = "0";
     ifrm.scrolling = "no";
@@ -445,7 +394,7 @@ Please enable JavaScript to view the LikeCoin. :P
 
   var disqus_shortname = 'marsenlin';
   
-  var disqus_url = 'https://blog.marsen.me/2026/04/20/2026/automation-pipeline-fetch-read-write/';
+  var disqus_url = 'https://blog.marsen.me/2026/04/18/2026/n8n-4-rebuild-infromation/';
   
   (function(){
     var dsq = document.createElement('script');

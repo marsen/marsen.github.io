@@ -33,17 +33,17 @@ j=d.createElement(s),dl=l!='dataLayer'?'&l='+l:'';j.async=true;j.src=
 
   <meta charset="utf-8">
   
-  <title>[實作筆記] 個人自動化平台(一) n8n &amp; GCP VM | Marsen&#39;s Blog</title>
+  <title>[實作筆記] 個人自動化平台(四) n8n 實作：取層，RSS 資料來源 | Marsen&#39;s Blog</title>
   <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
-  <meta name="description" content="前情提要最近想整合 AI 與自已的職能，建立一些小工具。 第一個想法是資料搜集器，可以自由擴充的個人內容自動化平台。 核心概念「捕捉資料」、「整理資料」、「發送報告」拆成三種抽象概念元件， 隨時可以組合或替換。 1234567Sources（捕捉資料）  →  Processors（整理）  →  Sinks（發送）─────────────────     ─────────────────">
+  <meta name="description" content="前情提要上一篇定好了「取、讀、寫」三層架構，這篇開始實作第一層：取。 目標是從四個 AI 新聞來源拉資料，輸出統一格式，交給讀層處理。  資料來源選擇驗證過四個 RSS 來源都可用：    來源 URL 說明    OpenAI https:&#x2F;&#x2F;openai.com&#x2F;news&#x2F;rss.xml 官方，第一手產品更新   Google Blog AI https:&#x2F;&#x2F;blog.google&#x2F;innov">
 <meta property="og:type" content="article">
-<meta property="og:title" content="[實作筆記] 個人自動化平台(一) n8n &amp; GCP VM">
-<meta property="og:url" content="https://blog.marsen.me/2026/04/17/2026/gcp-free-tier-n8n/index.html">
+<meta property="og:title" content="[實作筆記] 個人自動化平台(四) n8n 實作：取層，RSS 資料來源">
+<meta property="og:url" content="https://blog.marsen.me/2026/04/20/2026/n8n-5-pipeline-read/index.html">
 <meta property="og:site_name" content="Marsen&#39;s Blog">
-<meta property="og:description" content="前情提要最近想整合 AI 與自已的職能，建立一些小工具。 第一個想法是資料搜集器，可以自由擴充的個人內容自動化平台。 核心概念「捕捉資料」、「整理資料」、「發送報告」拆成三種抽象概念元件， 隨時可以組合或替換。 1234567Sources（捕捉資料）  →  Processors（整理）  →  Sinks（發送）─────────────────     ─────────────────">
+<meta property="og:description" content="前情提要上一篇定好了「取、讀、寫」三層架構，這篇開始實作第一層：取。 目標是從四個 AI 新聞來源拉資料，輸出統一格式，交給讀層處理。  資料來源選擇驗證過四個 RSS 來源都可用：    來源 URL 說明    OpenAI https:&#x2F;&#x2F;openai.com&#x2F;news&#x2F;rss.xml 官方，第一手產品更新   Google Blog AI https:&#x2F;&#x2F;blog.google&#x2F;innov">
 <meta property="og:locale" content="zh_TW">
-<meta property="article:published_time" content="2026-04-17T03:37:12.000Z">
-<meta property="article:modified_time" content="2026-04-24T10:39:09.105Z">
+<meta property="article:published_time" content="2026-04-20T10:15:17.000Z">
+<meta property="article:modified_time" content="2026-04-27T06:41:22.535Z">
 <meta property="article:author" content="Marsen L.">
 <meta property="article:tag" content="實作筆記">
 <meta name="twitter:card" content="summary">
@@ -106,10 +106,10 @@ j=d.createElement(s),dl=l!='dataLayer'?'&l='+l:'';j.async=true;j.src=
   </div>
 </header>
       <div class="outer">
-        <section id="main"><article id="post-2026/gcp-free-tier-n8n" class="article article-type-post" itemscope itemprop="blogPost">
+        <section id="main"><article id="post-2026/n8n-5-pipeline-read" class="article article-type-post" itemscope itemprop="blogPost">
   <div class="article-meta">
-    <a href="/2026/04/17/2026/gcp-free-tier-n8n/" class="article-date">
-  <time datetime="2026-04-17T03:37:12.000Z" itemprop="datePublished">2026-04-17</time>
+    <a href="/2026/04/20/2026/n8n-5-pipeline-read/" class="article-date">
+  <time datetime="2026-04-20T10:15:17.000Z" itemprop="datePublished">2026-04-20</time>
 </a>
     
   </div>
@@ -120,7 +120,7 @@ j=d.createElement(s),dl=l!='dataLayer'?'&l='+l:'';j.async=true;j.src=
         
   
     <h1 class="article-title" itemprop="name">
-      [實作筆記] 個人自動化平台(一) n8n &amp; GCP VM
+      [實作筆記] 個人自動化平台(四) n8n 實作：取層，RSS 資料來源
     </h1>
   
 
@@ -128,166 +128,150 @@ j=d.createElement(s),dl=l!='dataLayer'?'&l='+l:'';j.async=true;j.src=
     
     <div class="article-entry" itemprop="articleBody">
       
-        <h2 id="前情提要"><a href="#前情提要" class="headerlink" title="前情提要"></a>前情提要</h2><p>最近想整合 AI 與自已的職能，建立一些小工具。</p>
-<p>第一個想法是資料搜集器，可以自由擴充的個人內容自動化平台。</p>
-<h2 id="核心概念"><a href="#核心概念" class="headerlink" title="核心概念"></a>核心概念</h2><p>「捕捉資料」、「整理資料」、「發送報告」拆成三種抽象概念元件，</p>
-<p>隨時可以組合或替換。</p>
-<figure class="highlight text"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br></pre></td><td class="code"><pre><span class="line">Sources（捕捉資料）  →  Processors（整理）  →  Sinks（發送）</span><br><span class="line">─────────────────     ─────────────────      ─────────────</span><br><span class="line">AI 新聞               摘要整理                LINE</span><br><span class="line">RSS 訂閱              翻譯                    Email</span><br><span class="line">YouTube               事實查核                Instagram</span><br><span class="line">Gmail                 格式化                  GitHub</span><br><span class="line">...                   ...                     ...</span><br></pre></td></tr></table></figure>
-
-<p>一條 pipeline &#x3D; 選幾個 Source + Processor + Sink 組合起來。<br>加新管道只需要加一個 Sink 節點，不動其他邏輯。</p>
-<h2 id="技術選擇與環境規格"><a href="#技術選擇與環境規格" class="headerlink" title="技術選擇與環境規格"></a>技術選擇與環境規格</h2><p>選 n8n 當 runtime，因為它本來就是這個思路設計的，</p>
-<p>而且可以自己架，不用把資料交給第三方。</p>
-<p>也有考慮過其他方案：</p>
+        <h2 id="前情提要"><a href="#前情提要" class="headerlink" title="前情提要"></a>前情提要</h2><p>上一篇定好了「取、讀、寫」三層架構，這篇開始實作第一層：取。</p>
+<p>目標是從四個 AI 新聞來源拉資料，輸出統一格式，交給讀層處理。</p>
+<hr>
+<h2 id="資料來源選擇"><a href="#資料來源選擇" class="headerlink" title="資料來源選擇"></a>資料來源選擇</h2><p>驗證過四個 RSS 來源都可用：</p>
 <table>
 <thead>
 <tr>
-<th>方案</th>
-<th>優點</th>
-<th>缺點</th>
+<th>來源</th>
+<th>URL</th>
+<th>說明</th>
 </tr>
 </thead>
 <tbody><tr>
-<td>CCR（Claude Code Remote，Anthropic 雲端排程 agent）</td>
-<td>免維護</td>
-<td>無法自訂節點、靈活度低</td>
+<td>OpenAI</td>
+<td><code>https://openai.com/news/rss.xml</code></td>
+<td>官方，第一手產品更新</td>
 </tr>
 <tr>
-<td>VM + cron</td>
-<td>自由度高</td>
-<td>要自己維護腳本</td>
+<td>Google Blog AI</td>
+<td><code>https://blog.google/innovation-and-ai/technology/ai/rss/</code></td>
+<td>官方，涵蓋 Gemini 等產品</td>
 </tr>
 <tr>
-<td>n8n</td>
-<td>視覺化、可擴充、節點生態豐富、私心想學</td>
-<td>需要維護 VM</td>
+<td>The Verge AI</td>
+<td><code>https://www.theverge.com/rss/ai-artificial-intelligence/index.xml</code></td>
+<td>綜合媒體，覆蓋廣</td>
+</tr>
+<tr>
+<td>HackerNews</td>
+<td><code>https://hnrss.org/newest?q=AI&amp;points=50</code></td>
+<td>社群篩選，工程師視角</td>
 </tr>
 </tbody></table>
-<p>考慮控制力與學習新技能，最後選 n8n。</p>
-<p>一、跑在 GCP e2-micro，always free，完全不用花錢。</p>
-<p>GCP Always Free 的條件：</p>
+<blockquote>
+<p><strong>Anthropic 目前無官方 RSS</strong>，是個缺口，之後另找方案補上。</p>
+</blockquote>
+<p>CLI 驗證方式：</p>
+<figure class="highlight bash"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">curl -s -o /dev/null -w <span class="string">&quot;%&#123;http_code&#125; %&#123;url_effective&#125;\n&quot;</span> &lt;RSS_URL&gt;</span><br></pre></td></tr></table></figure>
+
+<hr>
+<h2 id="n8n-節點選擇"><a href="#n8n-節點選擇" class="headerlink" title="n8n 節點選擇"></a>n8n 節點選擇</h2><p>取層用兩個節點組合：</p>
 <ul>
-<li>機器：<code>e2-micro</code>（2 vCPU 共享、1 GB RAM）</li>
-<li>區域：美國區（us-east1 &#x2F; us-west1 &#x2F; us-central1）</li>
-<li>磁碟：30 GB 標準永久磁碟</li>
-<li>網路：每月 1 GB 對外流量</li>
+<li><strong>Schedule Trigger</strong>：控制執行時機（每週一次）</li>
+<li><strong>RSS Read</strong>：拉取完整 feed 內容</li>
 </ul>
-<h3 id="關於-IP-費用"><a href="#關於-IP-費用" class="headerlink" title="關於 IP 費用"></a>關於 IP 費用</h3><p>GCP 的外部 IP 分兩種：</p>
+<p>為什麼不用 <strong>RSS Feed Trigger</strong>？</p>
+<p>RSS Feed Trigger 會記住上次讀到哪，只推送新增項目。概念上正確，但它是 Trigger 節點，不適合被主流程呼叫（sub-workflow 架構）。</p>
+<p>若要用 RSS Feed Trigger，需要搭配暫存層（如 Supabase &#x2F; Google Sheets），每天增量存入，週報時再一次撈出，架構更複雜。在沒有暫存層的前提下，改用 <strong>RSS Read + Filter 節點過濾日期</strong>是更簡單的選擇：</p>
+<figure class="highlight text"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">Schedule Trigger → RSS Read → Filter（只保留近 7 天文章）</span><br></pre></td></tr></table></figure>
+
+<p>這樣取層不需要管狀態，邏輯乾淨，日期範圍由 Filter 節點統一控制。</p>
+<hr>
+<h2 id="實作步驟"><a href="#實作步驟" class="headerlink" title="實作步驟"></a>實作步驟</h2><h3 id="步驟一：建立-Workflow"><a href="#步驟一：建立-Workflow" class="headerlink" title="步驟一：建立 Workflow"></a>步驟一：建立 Workflow</h3><p>新增 Workflow，命名 <code>[取] The Verge AI</code>。</p>
+<p>觸發節點選 <strong>Schedule Trigger</strong>，預設每天午夜執行即可（之後調整為週報頻率）。</p>
+<h3 id="步驟二：加入-RSS-Read-節點"><a href="#步驟二：加入-RSS-Read-節點" class="headerlink" title="步驟二：加入 RSS Read 節點"></a>步驟二：加入 RSS Read 節點</h3><p>在 Schedule Trigger 後加 <strong>RSS Read</strong> 節點，填入 URL：</p>
+<figure class="highlight text"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">https://www.theverge.com/rss/ai-artificial-intelligence/index.xml</span><br></pre></td></tr></table></figure>
+
+<h3 id="步驟三：Filter-節點過濾日期"><a href="#步驟三：Filter-節點過濾日期" class="headerlink" title="步驟三：Filter 節點過濾日期"></a>步驟三：Filter 節點過濾日期</h3><p>在 RSS Read 後加 <strong>Filter</strong> 節點，條件：</p>
+<figure class="highlight text"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">isoDate → is after → &#123;&#123; $now.minus(&#123;days: 7&#125;).toISO() &#125;&#125;</span><br></pre></td></tr></table></figure>
+
+<h3 id="步驟四：Edit-Fields-節點標準化輸出"><a href="#步驟四：Edit-Fields-節點標準化輸出" class="headerlink" title="步驟四：Edit Fields 節點標準化輸出"></a>步驟四：Edit Fields 節點標準化輸出</h3><p>在 Filter 後加 <strong>Edit Fields（Set）</strong> 節點，對應欄位：</p>
 <table>
 <thead>
 <tr>
-<th>類型</th>
-<th>說明</th>
-<th>費用</th>
+<th>Name</th>
+<th>Value</th>
 </tr>
 </thead>
 <tbody><tr>
-<td>臨時外部 IP</td>
-<td>VM 運行時自動分配，刪除後釋放</td>
-<td>免費</td>
+<td><code>title</code></td>
+<td><code>&#123;&#123; $json.title &#125;&#125;</code></td>
 </tr>
 <tr>
-<td>靜態外部 IP（附在 VM 上）</td>
-<td>固定 IP，VM 刪了還保留</td>
-<td>免費</td>
+<td><code>url</code></td>
+<td><code>&#123;&#123; $json.link &#125;&#125;</code></td>
 </tr>
 <tr>
-<td>靜態外部 IP（未附在 VM）</td>
-<td>保留但沒有用</td>
-<td>收費</td>
+<td><code>content</code></td>
+<td><code>&#123;&#123; $json.contentSnippet &#125;&#125;</code></td>
+</tr>
+<tr>
+<td><code>published_at</code></td>
+<td><code>&#123;&#123; $json.isoDate &#125;&#125;</code></td>
+</tr>
+<tr>
+<td><code>source</code></td>
+<td><code>The Verge AI</code></td>
 </tr>
 </tbody></table>
-<p>我們用臨時 IP，免費。</p>
-<h3 id="關於流量費用"><a href="#關於流量費用" class="headerlink" title="關於流量費用"></a>關於流量費用</h3><p>GCP 計算的是 VM 的對外流量（VM → 外部）。<br>後面會用 cloudflared tunnel，流量路徑是 VM → Cloudflare → 使用者，<br>GCP 端的出站流量極小，個人 n8n 使用幾乎不會超過每月 1GB 的免費額度。</p>
-<p>個人用的 n8n 排程任務，這個規格完全夠。</p>
-<p>二、在 GCP 的 VM 上安裝 n8n(文章待補)</p>
-<p>三、在 n8n 上設定 pipeline(文章待補)</p>
-<hr>
-<h2 id="步驟一：建立-VM"><a href="#步驟一：建立-VM" class="headerlink" title="步驟一：建立 VM"></a>步驟一：建立 VM</h2><p>以下我直接讓 AI 執行，你也可以手動或是使用瀏覽器的圖形介面操作</p>
-<p>先裝 gcloud CLI：</p>
-<figure class="highlight bash"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">brew install google-cloud-sdk</span><br></pre></td></tr></table></figure>
-
-<p>登入並設定 project：</p>
-<figure class="highlight bash"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br></pre></td><td class="code"><pre><span class="line">gcloud auth login</span><br><span class="line">gcloud config <span class="built_in">set</span> project YOUR_PROJECT_ID</span><br></pre></td></tr></table></figure>
-
-<p>建立 VM：</p>
-<figure class="highlight bash"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br></pre></td><td class="code"><pre><span class="line">gcloud compute instances create n8n-server \</span><br><span class="line">  --zone=us-east1-b \</span><br><span class="line">  --machine-type=e2-micro \</span><br><span class="line">  --image-family=debian-12 \</span><br><span class="line">  --image-project=debian-cloud \</span><br><span class="line">  --boot-disk-size=30GB \</span><br><span class="line">  --boot-disk-type=pd-standard \</span><br><span class="line">  --tags=http-server,https-server</span><br></pre></td></tr></table></figure>
+<p>執行成功，每筆輸出格式如下：</p>
+<figure class="highlight json"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br></pre></td><td class="code"><pre><span class="line"><span class="punctuation">&#123;</span></span><br><span class="line">  <span class="attr">&quot;title&quot;</span><span class="punctuation">:</span> <span class="string">&quot;Cloud development platform Vercel was hacked&quot;</span><span class="punctuation">,</span></span><br><span class="line">  <span class="attr">&quot;url&quot;</span><span class="punctuation">:</span> <span class="string">&quot;https://www.theverge.com/tech/914723/vercel-hacked&quot;</span><span class="punctuation">,</span></span><br><span class="line">  <span class="attr">&quot;content&quot;</span><span class="punctuation">:</span> <span class="string">&quot;Vercel, a major development platform...&quot;</span><span class="punctuation">,</span></span><br><span class="line">  <span class="attr">&quot;published_at&quot;</span><span class="punctuation">:</span> <span class="string">&quot;2026-04-19T19:54:52.000Z&quot;</span><span class="punctuation">,</span></span><br><span class="line">  <span class="attr">&quot;source&quot;</span><span class="punctuation">:</span> <span class="string">&quot;The Verge AI&quot;</span></span><br><span class="line"><span class="punctuation">&#125;</span></span><br></pre></td></tr></table></figure>
 
 <hr>
-<h2 id="步驟二：設定-SSH（OS-Login）"><a href="#步驟二：設定-SSH（OS-Login）" class="headerlink" title="步驟二：設定 SSH（OS Login）"></a>步驟二：設定 SSH（OS Login）</h2><p>預設的 SSH key 方式要管理本機的 key 檔案，換機器或多人共用都麻煩。</p>
-<p>我個人比較喜歡　OS Login 改用 Google 帳號做身份驗證，key 綁在帳號上，不依賴本機檔案。</p>
-<p>實際上還是有 ssh key 只是不用特別在意它。</p>
-<p>開啟 OS Login：</p>
-<figure class="highlight bash"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br></pre></td><td class="code"><pre><span class="line">gcloud compute instances add-metadata n8n-server \</span><br><span class="line">  --metadata enable-oslogin=TRUE \</span><br><span class="line">  --zone=us-east1-b \</span><br><span class="line">  --project=YOUR_PROJECT_ID</span><br></pre></td></tr></table></figure>
-
-<p>之後連線就直接，不需要帶任何 key 參數：</p>
-<figure class="highlight bash"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">gcloud compute ssh n8n-server --zone=us-east1-b --project=YOUR_PROJECT_ID</span><br></pre></td></tr></table></figure>
-
-<p>第一次連會問你要不要建立 SSH key，輸入 <code>y</code> 就好，之後不用再動。</p>
+<h2 id="API-Credential-的資安決策"><a href="#API-Credential-的資安決策" class="headerlink" title="API Credential 的資安決策"></a>API Credential 的資安決策</h2><p>設定 Google Gemini credential 時，有一個值得討論的選項：<strong>Allowed HTTP Request Domains</strong>。</p>
+<p>n8n 官方說明：</p>
+<blockquote>
+<p>Control which domains this credential can be used with in HTTP Request nodes</p>
+</blockquote>
+<p>這個設定限制的是<strong>被呼叫端</strong>（destination）——也就是「這組 key 只能被送往哪些 domain」，不是「誰能在 n8n 裡使用這組 key」。</p>
+<p><strong>能防護的範圍</strong>：</p>
+<ul>
+<li>攻擊者透過 HTTP Request 節點把 key 帶著打到外部惡意 server</li>
+</ul>
+<p><strong>防護不到的範圍</strong>：</p>
+<ul>
+<li>n8n 原生節點（如 Google Gemini Chat Model）</li>
+<li>直接存取 n8n 資料庫</li>
+<li>從 n8n UI 讀取 credential</li>
+</ul>
+<p><strong>決策</strong>：填 <code>generativelanguage.googleapis.com</code>，遵守最小權限原則。但主要防線是 Cloudflare Access（限制誰能登入 n8n），這個設定是額外的縱深防禦，不能過度依賴。</p>
+<p>核心原則：<strong>理解每層保護的邊界，不要以為設了就完全安全。</strong></p>
 <hr>
-<h2 id="步驟三：設定-Swap"><a href="#步驟三：設定-Swap" class="headerlink" title="步驟三：設定 Swap"></a>步驟三：設定 Swap</h2><p>e2-micro 只有 1 GB RAM，n8n 本身就吃掉一半左右。<br>加 swap 避免 OOM crash：</p>
-<figure class="highlight bash"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br></pre></td><td class="code"><pre><span class="line">sudo fallocate -l 2G /swapfile</span><br><span class="line">sudo <span class="built_in">chmod</span> 600 /swapfile</span><br><span class="line">sudo mkswap /swapfile</span><br><span class="line">sudo swapon /swapfile</span><br><span class="line"><span class="built_in">echo</span> <span class="string">&#x27;/swapfile none swap sw 0 0&#x27;</span> | sudo <span class="built_in">tee</span> -a /etc/fstab</span><br></pre></td></tr></table></figure>
+<h2 id="讀層：Aggregate-Basic-LLM-Chain"><a href="#讀層：Aggregate-Basic-LLM-Chain" class="headerlink" title="讀層：Aggregate + Basic LLM Chain"></a>讀層：Aggregate + Basic LLM Chain</h2><p>取層跑通後，接讀層。</p>
+<h3 id="為什麼要先-Aggregate？"><a href="#為什麼要先-Aggregate？" class="headerlink" title="為什麼要先 Aggregate？"></a>為什麼要先 Aggregate？</h3><p>RSS Read 輸出 10 筆獨立資料，Basic LLM Chain 預設對每筆各送一次請求。10 筆 &#x3D; 10 次 API call，超過免費版 5 RPM 限制。</p>
+<p>正確做法：先用 <strong>Aggregate</strong> 節點把 10 筆合成一筆，再送一次請求給 AI，請它整理成一份週報。這也更符合「週報」的本意——要的是一份完整報告，不是 10 篇獨立摘要。</p>
+<figure class="highlight text"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">Edit Fields → Aggregate（All Item Data）→ Basic LLM Chain（Google Gemini）</span><br></pre></td></tr></table></figure>
 
-<p>最後一行讓 swap 重開機後也自動生效。</p>
-<hr>
-<h2 id="步驟四：安裝-Docker"><a href="#步驟四：安裝-Docker" class="headerlink" title="步驟四：安裝 Docker"></a>步驟四：安裝 Docker</h2><figure class="highlight bash"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br></pre></td><td class="code"><pre><span class="line">curl -fsSL https://get.docker.com | sudo sh</span><br><span class="line">sudo usermod -aG docker <span class="variable">$USER</span></span><br></pre></td></tr></table></figure>
+<h3 id="Prompt-設計"><a href="#Prompt-設計" class="headerlink" title="Prompt 設計"></a>Prompt 設計</h3><figure class="highlight text"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br></pre></td><td class="code"><pre><span class="line">週報日期：&#123;&#123; $now.toFormat(&#x27;yyyy年MM月dd日&#x27;) &#125;&#125;</span><br><span class="line"></span><br><span class="line">以下是本週 AI 新聞，請用繁體中文整理成一份週報。</span><br><span class="line">每則新聞說明「是什麼」和「為什麼重要」，條列呈現。</span><br><span class="line"></span><br><span class="line">&#123;&#123; $json.data.map(i =&gt; `【$&#123;i.source&#125;】$&#123;i.title&#125;\n$&#123;i.content&#125;`).join(&#x27;\n\n&#x27;) &#125;&#125;</span><br></pre></td></tr></table></figure>
 
-<p><code>usermod</code> 讓你的帳號不用 <code>sudo</code> 就能跑 docker，要重新登入才生效。</p>
-<hr>
-<h2 id="步驟五：跑-n8n"><a href="#步驟五：跑-n8n" class="headerlink" title="步驟五：跑 n8n"></a>步驟五：跑 n8n</h2><p>n8n 容器裡的 <code>node</code> 用戶 UID 是 1000。</p>
-<p>先把 volume 目錄的 owner 設成 1000，避免容器啟動後出現 permission denied：</p>
-<p>port 使用預設的 <code>5678</code>。後面會用 cloudflared tunnel 轉發，這個 port 不會對外暴露，改不改都一樣。</p>
-<figure class="highlight bash"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br></pre></td><td class="code"><pre><span class="line"><span class="built_in">mkdir</span> -p ~/.n8n</span><br><span class="line">sudo <span class="built_in">chown</span> 1000:1000 ~/.n8n</span><br><span class="line">sudo docker run -d \</span><br><span class="line">  --name n8n \</span><br><span class="line">  --restart unless-stopped \</span><br><span class="line">  -p 5678:5678 \</span><br><span class="line">  -v ~/.n8n:/home/node/.n8n \</span><br><span class="line">  -e N8N_SECURE_COOKIE=<span class="literal">false</span> \</span><br><span class="line">  docker.n8n.io/n8nio/n8n</span><br></pre></td></tr></table></figure>
+<p>執行結果：日期正確，內容有條理，每篇清楚說明「是什麼」和「為什麼重要」。</p>
+<h3 id="踩坑：Rate-Limit"><a href="#踩坑：Rate-Limit" class="headerlink" title="踩坑：Rate Limit"></a>踩坑：Rate Limit</h3><p>第一次直接把 10 筆送給 LLM，遇到 <code>429 Too Many Requests</code>：</p>
+<figure class="highlight text"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">quota exceeded: limit 5 requests/minute (gemini-2.5-flash free tier)</span><br></pre></td></tr></table></figure>
 
-<p>幾個參數說明：</p>
-<table>
-<thead>
-<tr>
-<th>參數</th>
-<th>說明</th>
-</tr>
-</thead>
-<tbody><tr>
-<td><code>--restart unless-stopped</code></td>
-<td>VM 重開機自動重啟 n8n</td>
-</tr>
-<tr>
-<td><code>-v ~/.n8n:/home/node/.n8n</code></td>
-<td>資料持久化，不會因為容器重建而消失</td>
-</tr>
-<tr>
-<td><code>N8N_SECURE_COOKIE=false</code></td>
-<td>n8n 預設要求 HTTPS 才設定 cookie。對外雖然是 HTTPS，但 cloudflared 到 n8n 的內部連線是 HTTP，所以這個設定要保留</td>
-</tr>
-</tbody></table>
-<p>n8n 映像檔本來就用非 root 的 <code>node</code> 用戶執行，不需要加 <code>--user</code>。</p>
-<p>確認有跑起來：</p>
-<figure class="highlight bash"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br></pre></td><td class="code"><pre><span class="line">sudo docker ps</span><br><span class="line">sudo docker logs n8n --<span class="built_in">tail</span> 20</span><br></pre></td></tr></table></figure>
-
-<p>正常的話會看到 port <code>0.0.0.0:5678-&gt;5678/tcp</code>，STATUS 是 <code>Up</code>。</p>
-<p>log 裡可能有 community packages 的 error，是 n8n 找不到額外套件，不影響運作，忽略即可。</p>
-<hr>
+<p>解法：加 Aggregate 節點合併成一筆，從 10 次請求降為 1 次，問題消失。</p>
 <h2 id="參考"><a href="#參考" class="headerlink" title="參考"></a>參考</h2><ul>
-<li><a href="/2026/gcp-n8n-cloudflared/">個人自動化平台(二) Cloudflare Access &amp; Cloudflare Tunnel</a></li>
-<li><a href="/2026/automation-pipeline-fetch-read-write/">個人自動化平台(三) 取、讀、寫：三層可插拔管道設計</a></li>
-<li><a href="/2026/gcp-n8n-rebuild/">個人自動化平台(番外) 拆掉重建 GCP VM &amp; Cloudflared Tunnel &amp; Cloudflare Access</a></li>
+<li><a href="/2026/n8n-1-in-gcp-free-tier-vm/">個人自動化平台(一) n8n &amp; GCP VM</a></li>
+<li><a href="/2026/n8n-2-cloudflared-and-tunnel/">個人自動化平台(二) Cloudflare Access &amp; Cloudflare Tunnel</a></li>
+<li><a href="/2026/n8n-3-pipeline-overview/">個人自動化平台(三) 取、讀、寫：三層可插拔管道設計</a></li>
+<li><a href="/2026/n8n-4-rebuild-infromation/">個人自動化平台(番外) 拆掉重建 GCP VM &amp; Cloudflared Tunnel &amp; Cloudflare Access</a></li>
 </ul>
-<hr>
-<h2 id="小結"><a href="#小結" class="headerlink" title="小結"></a>小結</h2><p>到這裡，n8n 已經在 GCP 免費 VM 上跑起來了。</p>
-<ul>
-<li>GCP e2-micro 免費，加 swap 跑 n8n 沒問題</li>
-<li>OS Login 用 Google 帳號認證，不依賴本機 SSH key 檔案</li>
-<li>n8n image 約 2.3GB，第一次 pull 要等幾分鐘</li>
-<li><code>--restart unless-stopped</code> 確保 VM 重開機後 n8n 自動恢復</li>
+<h2 id="小結"><a href="#小結" class="headerlink" title="小結"></a>小結</h2><ul>
+<li>取層用 RSS Read + Filter 過濾近 7 天，四個來源統一輸出格式</li>
+<li>讀層用 Aggregate 合併後一次送 AI，解決 Gemini free tier 5 RPM 限制</li>
+<li>Credential 的 Allowed HTTP Request Domains 是縱深防禦，主防線還是 Cloudflare Access</li>
 </ul>
-<p>目前 n8n 只能從 VM 內部存取，下一篇會用 cloudflared tunnel 讓它可以從外部用 HTTPS 開啟，不用動防火牆。</p>
+<p>目前架構可以跑通，但不是最優解。更好的做法是 <strong>RSS Feed Trigger + 暫存層</strong>：每天增量收文章，累積一週後才送 AI 整理。這樣每篇文章只抓一次，token 消耗也最省。待之後有需要再優化。</p>
 <p>(fin)</p>
 
       
     </div>
     <footer class="article-footer">
-      <a data-url="https://blog.marsen.me/2026/04/17/2026/gcp-free-tier-n8n/" data-id="cuid5n7yWBQveypn-2cQNsHWx" class="article-share-link">Share</a>
+      <a data-url="https://blog.marsen.me/2026/04/20/2026/n8n-5-pipeline-read/" data-id="cuidtnDdkP_4gH7W2mACYhLF6" class="article-share-link">Share</a>
       
-        <a href="https://blog.marsen.me/2026/04/17/2026/gcp-free-tier-n8n/#disqus_thread" class="article-comment-link">留言</a>
+        <a href="https://blog.marsen.me/2026/04/20/2026/n8n-5-pipeline-read/#disqus_thread" class="article-comment-link">留言</a>
       
       
   <ul class="article-tag-list" itemprop="keywords"><li class="article-tag-list-item"><a class="article-tag-list-link" href="/tags/%E5%AF%A6%E4%BD%9C%E7%AD%86%E8%A8%98/" rel="tag">實作筆記</a></li></ul>
@@ -298,19 +282,19 @@ j=d.createElement(s),dl=l!='dataLayer'?'&l='+l:'';j.async=true;j.src=
     
 <nav id="article-nav">
   
-    <a href="/2026/04/17/2026/gcp-n8n-cloudflared/" id="article-nav-newer" class="article-nav-link-wrap">
+    <a href="/2026/04/22/2026/deepracer-to-robotaxi/" id="article-nav-newer" class="article-nav-link-wrap">
       <strong class="article-nav-caption">Newer</strong>
       <div class="article-nav-title">
         
-          個人自動化平台(二) Cloudflare Access &amp; Cloudflare Tunnel
+          [產業報告] 從 DeepRacer 到 Robotaxi：Tesla vs Waymo 的無人駕駛現況
         
       </div>
     </a>
   
   
-    <a href="/2026/04/01/2026/interview-b-company-ai-workflow-tech-lead/" id="article-nav-older" class="article-nav-link-wrap">
+    <a href="/2026/04/20/2026/n8n-3-pipeline-overview/" id="article-nav-older" class="article-nav-link-wrap">
       <strong class="article-nav-caption">Older</strong>
-      <div class="article-nav-title">[生活筆記] 面試記錄 B 社 — AI Workflow Tech Lead</div>
+      <div class="article-nav-title">[實作筆記] 個人自動化平台(三) 取、讀、寫：三層可插拔管道設計</div>
     </a>
   
 </nav>
@@ -352,7 +336,7 @@ Please enable JavaScript to view the LikeCoin. :P
 
   (function(){
     var ifrm = document.createElement("iframe");
-    ifrm.setAttribute("src", "https://button.like.co/in/embed/marsenlin/button?referrer=https%3A%2F%2Fblog.marsen.me%2F2026%2F04%2F17%2F2026%2Fgcp-free-tier-n8n%2F");      
+    ifrm.setAttribute("src", "https://button.like.co/in/embed/marsenlin/button?referrer=https%3A%2F%2Fblog.marsen.me%2F2026%2F04%2F20%2F2026%2Fn8n-5-pipeline-read%2F");      
     ifrm.setAttribute("sandbox","allow-scripts allow-same-origin allow-popups allow-popups-to-escape-sandbox");
     ifrm.frameborder = "0";
     ifrm.scrolling = "no";
@@ -380,19 +364,19 @@ Please enable JavaScript to view the LikeCoin. :P
           </li>
         
           <li>
-            <a href="/2026/04/20/2026/n8n-ai-weekly-fetch-layer/">[實作筆記] 個人自動化平台(四) n8n 實作：取層，RSS 資料來源</a>
+            <a href="/2026/04/20/2026/n8n-5-pipeline-read/">[實作筆記] 個人自動化平台(四) n8n 實作：取層，RSS 資料來源</a>
           </li>
         
           <li>
-            <a href="/2026/04/20/2026/automation-pipeline-fetch-read-write/">[實作筆記] 個人自動化平台(三) 取、讀、寫：三層可插拔管道設計</a>
+            <a href="/2026/04/20/2026/n8n-3-pipeline-overview/">[實作筆記] 個人自動化平台(三) 取、讀、寫：三層可插拔管道設計</a>
           </li>
         
           <li>
-            <a href="/2026/04/18/2026/gcp-n8n-rebuild/">[實作筆記] 個人自動化平台(番外) 拆掉重建 GCP VM &amp; Cloudflared Tunnel &amp; Cloudflare Access </a>
+            <a href="/2026/04/18/2026/n8n-4-rebuild-infromation/">[實作筆記] 個人自動化平台(番外) 拆掉重建 GCP VM &amp; Cloudflared Tunnel &amp; Cloudflare Access </a>
           </li>
         
           <li>
-            <a href="/2026/04/17/2026/gcp-n8n-cloudflared/">個人自動化平台(二) Cloudflare Access &amp; Cloudflare Tunnel</a>
+            <a href="/2026/04/17/2026/n8n-2-cloudflared-and-tunnel/">個人自動化平台(二) Cloudflare Access &amp; Cloudflare Tunnel</a>
           </li>
         
       </ul>
@@ -498,7 +482,7 @@ Please enable JavaScript to view the LikeCoin. :P
 
   (function(){
     var ifrm = document.createElement("iframe");
-    ifrm.setAttribute("src", "https://button.like.co/in/embed/marsenlin/button?referrer=https%3A%2F%2Fblog.marsen.me%2F2026%2F04%2F17%2F2026%2Fgcp-free-tier-n8n%2F");      
+    ifrm.setAttribute("src", "https://button.like.co/in/embed/marsenlin/button?referrer=https%3A%2F%2Fblog.marsen.me%2F2026%2F04%2F20%2F2026%2Fn8n-5-pipeline-read%2F");      
     ifrm.setAttribute("sandbox","allow-scripts allow-same-origin allow-popups allow-popups-to-escape-sandbox");
     ifrm.frameborder = "0";
     ifrm.scrolling = "no";
@@ -510,7 +494,7 @@ Please enable JavaScript to view the LikeCoin. :P
 
   var disqus_shortname = 'marsenlin';
   
-  var disqus_url = 'https://blog.marsen.me/2026/04/17/2026/gcp-free-tier-n8n/';
+  var disqus_url = 'https://blog.marsen.me/2026/04/20/2026/n8n-5-pipeline-read/';
   
   (function(){
     var dsq = document.createElement('script');

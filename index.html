@@ -165,7 +165,7 @@ j=d.createElement(s),dl=l!='dataLayer'?'&l='+l:'';j.async=true;j.src=
       
     </div>
     <footer class="article-footer">
-      <a data-url="https://blog.marsen.me/2026/04/22/2026/deepracer-to-robotaxi/" data-id="cuidkteQuUerwl0LZ7vLcgL1a" class="article-share-link">Share</a>
+      <a data-url="https://blog.marsen.me/2026/04/22/2026/deepracer-to-robotaxi/" data-id="cuidXnb1k4yZGLqQoRlzD9qyc" class="article-share-link">Share</a>
       
         <a href="https://blog.marsen.me/2026/04/22/2026/deepracer-to-robotaxi/#disqus_thread" class="article-comment-link">留言</a>
       
@@ -179,9 +179,9 @@ j=d.createElement(s),dl=l!='dataLayer'?'&l='+l:'';j.async=true;j.src=
 
 
   
-    <article id="post-2026/n8n-ai-weekly-fetch-layer" class="article article-type-post" itemscope itemprop="blogPost">
+    <article id="post-2026/n8n-5-pipeline-read" class="article article-type-post" itemscope itemprop="blogPost">
   <div class="article-meta">
-    <a href="/2026/04/20/2026/n8n-ai-weekly-fetch-layer/" class="article-date">
+    <a href="/2026/04/20/2026/n8n-5-pipeline-read/" class="article-date">
   <time datetime="2026-04-20T10:15:17.000Z" itemprop="datePublished">2026-04-20</time>
 </a>
     
@@ -193,7 +193,7 @@ j=d.createElement(s),dl=l!='dataLayer'?'&l='+l:'';j.async=true;j.src=
         
   
     <h1 itemprop="name">
-      <a class="article-title" href="/2026/04/20/2026/n8n-ai-weekly-fetch-layer/">[實作筆記] 個人自動化平台(四) n8n 實作：取層，RSS 資料來源</a>
+      <a class="article-title" href="/2026/04/20/2026/n8n-5-pipeline-read/">[實作筆記] 個人自動化平台(四) n8n 實作：取層，RSS 資料來源</a>
     </h1>
   
 
@@ -248,7 +248,7 @@ j=d.createElement(s),dl=l!='dataLayer'?'&l='+l:'';j.async=true;j.src=
 </ul>
 <p>為什麼不用 <strong>RSS Feed Trigger</strong>？</p>
 <p>RSS Feed Trigger 會記住上次讀到哪，只推送新增項目。概念上正確，但它是 Trigger 節點，不適合被主流程呼叫（sub-workflow 架構）。</p>
-<p>改用 <strong>RSS Read + Filter 節點過濾日期</strong>：</p>
+<p>若要用 RSS Feed Trigger，需要搭配暫存層（如 Supabase &#x2F; Google Sheets），每天增量存入，週報時再一次撈出，架構更複雜。在沒有暫存層的前提下，改用 <strong>RSS Read + Filter 節點過濾日期</strong>是更簡單的選擇：</p>
 <figure class="highlight text"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">Schedule Trigger → RSS Read → Filter（只保留近 7 天文章）</span><br></pre></td></tr></table></figure>
 
 <p>這樣取層不需要管狀態，邏輯乾淨，日期範圍由 Filter 節點統一控制。</p>
@@ -313,12 +313,6 @@ j=d.createElement(s),dl=l!='dataLayer'?'&l='+l:'';j.async=true;j.src=
 <p><strong>決策</strong>：填 <code>generativelanguage.googleapis.com</code>，遵守最小權限原則。但主要防線是 Cloudflare Access（限制誰能登入 n8n），這個設定是額外的縱深防禦，不能過度依賴。</p>
 <p>核心原則：<strong>理解每層保護的邊界，不要以為設了就完全安全。</strong></p>
 <hr>
-<h2 id="參考"><a href="#參考" class="headerlink" title="參考"></a>參考</h2><ul>
-<li><a href="/2026/gcp-free-tier-n8n/">個人自動化平台(一) n8n &amp; GCP VM</a></li>
-<li><a href="/2026/gcp-n8n-cloudflared/">個人自動化平台(二) Cloudflare Access &amp; Cloudflare Tunnel</a></li>
-<li><a href="/2026/automation-pipeline-fetch-read-write/">個人自動化平台(三) 取、讀、寫：三層可插拔管道設計</a></li>
-<li><a href="/2026/gcp-n8n-rebuild/">個人自動化平台(番外) 拆掉重建 GCP VM &amp; Cloudflared Tunnel &amp; Cloudflare Access</a></li>
-</ul>
 <h2 id="讀層：Aggregate-Basic-LLM-Chain"><a href="#讀層：Aggregate-Basic-LLM-Chain" class="headerlink" title="讀層：Aggregate + Basic LLM Chain"></a>讀層：Aggregate + Basic LLM Chain</h2><p>取層跑通後，接讀層。</p>
 <h3 id="為什麼要先-Aggregate？"><a href="#為什麼要先-Aggregate？" class="headerlink" title="為什麼要先 Aggregate？"></a>為什麼要先 Aggregate？</h3><p>RSS Read 輸出 10 筆獨立資料，Basic LLM Chain 預設對每筆各送一次請求。10 筆 &#x3D; 10 次 API call，超過免費版 5 RPM 限制。</p>
 <p>正確做法：先用 <strong>Aggregate</strong> 節點把 10 筆合成一筆，再送一次請求給 AI，請它整理成一份週報。這也更符合「週報」的本意——要的是一份完整報告，不是 10 篇獨立摘要。</p>
@@ -331,15 +325,26 @@ j=d.createElement(s),dl=l!='dataLayer'?'&l='+l:'';j.async=true;j.src=
 <figure class="highlight text"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">quota exceeded: limit 5 requests/minute (gemini-2.5-flash free tier)</span><br></pre></td></tr></table></figure>
 
 <p>解法：加 Aggregate 節點合併成一筆，從 10 次請求降為 1 次，問題消失。</p>
-<h2 id="小結"><a href="#小結" class="headerlink" title="小結"></a>小結</h2><p>（待補）</p>
+<h2 id="參考"><a href="#參考" class="headerlink" title="參考"></a>參考</h2><ul>
+<li><a href="/2026/n8n-1-in-gcp-free-tier-vm/">個人自動化平台(一) n8n &amp; GCP VM</a></li>
+<li><a href="/2026/n8n-2-cloudflared-and-tunnel/">個人自動化平台(二) Cloudflare Access &amp; Cloudflare Tunnel</a></li>
+<li><a href="/2026/n8n-3-pipeline-overview/">個人自動化平台(三) 取、讀、寫：三層可插拔管道設計</a></li>
+<li><a href="/2026/n8n-4-rebuild-infromation/">個人自動化平台(番外) 拆掉重建 GCP VM &amp; Cloudflared Tunnel &amp; Cloudflare Access</a></li>
+</ul>
+<h2 id="小結"><a href="#小結" class="headerlink" title="小結"></a>小結</h2><ul>
+<li>取層用 RSS Read + Filter 過濾近 7 天，四個來源統一輸出格式</li>
+<li>讀層用 Aggregate 合併後一次送 AI，解決 Gemini free tier 5 RPM 限制</li>
+<li>Credential 的 Allowed HTTP Request Domains 是縱深防禦，主防線還是 Cloudflare Access</li>
+</ul>
+<p>目前架構可以跑通，但不是最優解。更好的做法是 <strong>RSS Feed Trigger + 暫存層</strong>：每天增量收文章，累積一週後才送 AI 整理。這樣每篇文章只抓一次，token 消耗也最省。待之後有需要再優化。</p>
 <p>(fin)</p>
 
       
     </div>
     <footer class="article-footer">
-      <a data-url="https://blog.marsen.me/2026/04/20/2026/n8n-ai-weekly-fetch-layer/" data-id="cuiddwtXXSSssXSe8VyKcK6PA" class="article-share-link">Share</a>
+      <a data-url="https://blog.marsen.me/2026/04/20/2026/n8n-5-pipeline-read/" data-id="cuidtnDdkP_4gH7W2mACYhLF6" class="article-share-link">Share</a>
       
-        <a href="https://blog.marsen.me/2026/04/20/2026/n8n-ai-weekly-fetch-layer/#disqus_thread" class="article-comment-link">留言</a>
+        <a href="https://blog.marsen.me/2026/04/20/2026/n8n-5-pipeline-read/#disqus_thread" class="article-comment-link">留言</a>
       
       
   <ul class="article-tag-list" itemprop="keywords"><li class="article-tag-list-item"><a class="article-tag-list-link" href="/tags/%E5%AF%A6%E4%BD%9C%E7%AD%86%E8%A8%98/" rel="tag">實作筆記</a></li></ul>
@@ -351,9 +356,9 @@ j=d.createElement(s),dl=l!='dataLayer'?'&l='+l:'';j.async=true;j.src=
 
 
   
-    <article id="post-2026/automation-pipeline-fetch-read-write" class="article article-type-post" itemscope itemprop="blogPost">
+    <article id="post-2026/n8n-3-pipeline-overview" class="article article-type-post" itemscope itemprop="blogPost">
   <div class="article-meta">
-    <a href="/2026/04/20/2026/automation-pipeline-fetch-read-write/" class="article-date">
+    <a href="/2026/04/20/2026/n8n-3-pipeline-overview/" class="article-date">
   <time datetime="2026-04-20T06:20:23.000Z" itemprop="datePublished">2026-04-20</time>
 </a>
     
@@ -365,7 +370,7 @@ j=d.createElement(s),dl=l!='dataLayer'?'&l='+l:'';j.async=true;j.src=
         
   
     <h1 itemprop="name">
-      <a class="article-title" href="/2026/04/20/2026/automation-pipeline-fetch-read-write/">[實作筆記] 個人自動化平台(三) 取、讀、寫：三層可插拔管道設計</a>
+      <a class="article-title" href="/2026/04/20/2026/n8n-3-pipeline-overview/">[實作筆記] 個人自動化平台(三) 取、讀、寫：三層可插拔管道設計</a>
     </h1>
   
 
@@ -456,18 +461,18 @@ j=d.createElement(s),dl=l!='dataLayer'?'&l='+l:'';j.async=true;j.src=
 </ul>
 <p>下一篇開始動手實作第一條 pipeline：AI 新聞週報。</p>
 <h2 id="參考"><a href="#參考" class="headerlink" title="參考"></a>參考</h2><ul>
-<li><a href="/2026/gcp-free-tier-n8n/">個人自動化平台(一) n8n &amp; GCP VM</a></li>
-<li><a href="/2026/gcp-n8n-cloudflared/">個人自動化平台(二) Cloudflare Access &amp; Cloudflare Tunnel</a></li>
-<li><a href="/2026/gcp-n8n-rebuild/">個人自動化平台(番外) 拆掉重建 GCP VM &amp; Cloudflared Tunnel &amp; Cloudflare Access</a></li>
+<li><a href="/2026/n8n-1-in-gcp-free-tier-vm/">個人自動化平台(一) n8n &amp; GCP VM</a></li>
+<li><a href="/2026/n8n-2-cloudflared-and-tunnel/">個人自動化平台(二) Cloudflare Access &amp; Cloudflare Tunnel</a></li>
+<li><a href="/2026/n8n-4-rebuild-infromation/">個人自動化平台(番外) 拆掉重建 GCP VM &amp; Cloudflared Tunnel &amp; Cloudflare Access</a></li>
 </ul>
 <p>(fin)</p>
 
       
     </div>
     <footer class="article-footer">
-      <a data-url="https://blog.marsen.me/2026/04/20/2026/automation-pipeline-fetch-read-write/" data-id="cuidApP_Ce1MYM3aQTwIoSuWl" class="article-share-link">Share</a>
+      <a data-url="https://blog.marsen.me/2026/04/20/2026/n8n-3-pipeline-overview/" data-id="cuidqbQSraWcAwqqBoMuXKonl" class="article-share-link">Share</a>
       
-        <a href="https://blog.marsen.me/2026/04/20/2026/automation-pipeline-fetch-read-write/#disqus_thread" class="article-comment-link">留言</a>
+        <a href="https://blog.marsen.me/2026/04/20/2026/n8n-3-pipeline-overview/#disqus_thread" class="article-comment-link">留言</a>
       
       
   <ul class="article-tag-list" itemprop="keywords"><li class="article-tag-list-item"><a class="article-tag-list-link" href="/tags/%E5%AF%A6%E4%BD%9C%E7%AD%86%E8%A8%98/" rel="tag">實作筆記</a></li></ul>
@@ -479,9 +484,9 @@ j=d.createElement(s),dl=l!='dataLayer'?'&l='+l:'';j.async=true;j.src=
 
 
   
-    <article id="post-2026/gcp-n8n-rebuild" class="article article-type-post" itemscope itemprop="blogPost">
+    <article id="post-2026/n8n-4-rebuild-infromation" class="article article-type-post" itemscope itemprop="blogPost">
   <div class="article-meta">
-    <a href="/2026/04/18/2026/gcp-n8n-rebuild/" class="article-date">
+    <a href="/2026/04/18/2026/n8n-4-rebuild-infromation/" class="article-date">
   <time datetime="2026-04-18T03:29:53.000Z" itemprop="datePublished">2026-04-18</time>
 </a>
     
@@ -493,7 +498,7 @@ j=d.createElement(s),dl=l!='dataLayer'?'&l='+l:'';j.async=true;j.src=
         
   
     <h1 itemprop="name">
-      <a class="article-title" href="/2026/04/18/2026/gcp-n8n-rebuild/">[實作筆記] 個人自動化平台(番外) 拆掉重建 GCP VM &amp; Cloudflared Tunnel &amp; Cloudflare Access </a>
+      <a class="article-title" href="/2026/04/18/2026/n8n-4-rebuild-infromation/">[實作筆記] 個人自動化平台(番外) 拆掉重建 GCP VM &amp; Cloudflared Tunnel &amp; Cloudflare Access </a>
     </h1>
   
 
@@ -529,9 +534,9 @@ j=d.createElement(s),dl=l!='dataLayer'?'&l='+l:'';j.async=true;j.src=
 <p>確認後輸入 <code>Y</code>，VM 和磁碟都會一起移除。</p>
 <h2 id="參考"><a href="#參考" class="headerlink" title="參考"></a>參考</h2><p>清理完成後，照以下兩篇文章重建</p>
 <ul>
-<li><a href="/2026/gcp-free-tier-n8n/">個人自動化平台(一) n8n &amp; GCP VM</a></li>
-<li><a href="/2026/gcp-n8n-cloudflared/">個人自動化平台(二) Cloudflare Access &amp; Cloudflare Tunnel</a></li>
-<li><a href="/2026/automation-pipeline-fetch-read-write/">個人自動化平台(三) 取、讀、寫：三層可插拔管道設計</a></li>
+<li><a href="/2026/n8n-1-in-gcp-free-tier-vm/">個人自動化平台(一) n8n &amp; GCP VM</a></li>
+<li><a href="/2026/n8n-2-cloudflared-and-tunnel/">個人自動化平台(二) Cloudflare Access &amp; Cloudflare Tunnel</a></li>
+<li><a href="/2026/n8n-3-pipeline-overview/">個人自動化平台(三) 取、讀、寫：三層可插拔管道設計</a></li>
 </ul>
 <h2 id="小結"><a href="#小結" class="headerlink" title="小結"></a>小結</h2><ul>
 <li>清理順序：從外到內，先 Cloudflare 再 GCP，避免 tunnel 刪除時出現狀態不一致</li>
@@ -542,9 +547,9 @@ j=d.createElement(s),dl=l!='dataLayer'?'&l='+l:'';j.async=true;j.src=
       
     </div>
     <footer class="article-footer">
-      <a data-url="https://blog.marsen.me/2026/04/18/2026/gcp-n8n-rebuild/" data-id="cuidocMt47pGlh2SSWEc-J8hC" class="article-share-link">Share</a>
+      <a data-url="https://blog.marsen.me/2026/04/18/2026/n8n-4-rebuild-infromation/" data-id="cuidXeauNRMNCWp16xMzcGR-N" class="article-share-link">Share</a>
       
-        <a href="https://blog.marsen.me/2026/04/18/2026/gcp-n8n-rebuild/#disqus_thread" class="article-comment-link">留言</a>
+        <a href="https://blog.marsen.me/2026/04/18/2026/n8n-4-rebuild-infromation/#disqus_thread" class="article-comment-link">留言</a>
       
       
   <ul class="article-tag-list" itemprop="keywords"><li class="article-tag-list-item"><a class="article-tag-list-link" href="/tags/%E5%AF%A6%E4%BD%9C%E7%AD%86%E8%A8%98/" rel="tag">實作筆記</a></li></ul>
@@ -556,9 +561,9 @@ j=d.createElement(s),dl=l!='dataLayer'?'&l='+l:'';j.async=true;j.src=
 
 
   
-    <article id="post-2026/gcp-n8n-cloudflared" class="article article-type-post" itemscope itemprop="blogPost">
+    <article id="post-2026/n8n-2-cloudflared-and-tunnel" class="article article-type-post" itemscope itemprop="blogPost">
   <div class="article-meta">
-    <a href="/2026/04/17/2026/gcp-n8n-cloudflared/" class="article-date">
+    <a href="/2026/04/17/2026/n8n-2-cloudflared-and-tunnel/" class="article-date">
   <time datetime="2026-04-17T06:54:04.000Z" itemprop="datePublished">2026-04-17</time>
 </a>
     
@@ -570,7 +575,7 @@ j=d.createElement(s),dl=l!='dataLayer'?'&l='+l:'';j.async=true;j.src=
         
   
     <h1 itemprop="name">
-      <a class="article-title" href="/2026/04/17/2026/gcp-n8n-cloudflared/">個人自動化平台(二) Cloudflare Access &amp; Cloudflare Tunnel</a>
+      <a class="article-title" href="/2026/04/17/2026/n8n-2-cloudflared-and-tunnel/">個人自動化平台(二) Cloudflare Access &amp; Cloudflare Tunnel</a>
     </h1>
   
 
@@ -729,9 +734,9 @@ j=d.createElement(s),dl=l!='dataLayer'?'&l='+l:'';j.async=true;j.src=
 <p>n8n 映像檔本來就用非 root 的 <code>node</code> 用戶執行，不需要加 <code>--user</code>。</p>
 <hr>
 <h2 id="參考"><a href="#參考" class="headerlink" title="參考"></a>參考</h2><ul>
-<li><a href="/2026/gcp-free-tier-n8n/">個人自動化平台(一) n8n &amp; GCP VM</a></li>
-<li><a href="/2026/automation-pipeline-fetch-read-write/">個人自動化平台(三) 取、讀、寫：三層可插拔管道設計</a></li>
-<li><a href="/2026/gcp-n8n-rebuild/">個人自動化平台(番外) 拆掉重建 GCP VM &amp; Cloudflared Tunnel &amp; Cloudflare Access</a></li>
+<li><a href="/2026/n8n-1-in-gcp-free-tier-vm/">個人自動化平台(一) n8n &amp; GCP VM</a></li>
+<li><a href="/2026/n8n-3-pipeline-overview/">個人自動化平台(三) 取、讀、寫：三層可插拔管道設計</a></li>
+<li><a href="/2026/n8n-4-rebuild-infromation/">個人自動化平台(番外) 拆掉重建 GCP VM &amp; Cloudflared Tunnel &amp; Cloudflare Access</a></li>
 </ul>
 <h2 id="小結"><a href="#小結" class="headerlink" title="小結"></a>小結</h2><ul>
 <li>cloudflared tunnel 讓 n8n 對外，不用開 GCP 防火牆、不暴露任何 port</li>
@@ -744,9 +749,9 @@ j=d.createElement(s),dl=l!='dataLayer'?'&l='+l:'';j.async=true;j.src=
       
     </div>
     <footer class="article-footer">
-      <a data-url="https://blog.marsen.me/2026/04/17/2026/gcp-n8n-cloudflared/" data-id="cuidM_OCa6M5sG_8GPl4HNmkd" class="article-share-link">Share</a>
+      <a data-url="https://blog.marsen.me/2026/04/17/2026/n8n-2-cloudflared-and-tunnel/" data-id="cuidxSjHPU5n_7Phh6l4KO_xS" class="article-share-link">Share</a>
       
-        <a href="https://blog.marsen.me/2026/04/17/2026/gcp-n8n-cloudflared/#disqus_thread" class="article-comment-link">留言</a>
+        <a href="https://blog.marsen.me/2026/04/17/2026/n8n-2-cloudflared-and-tunnel/#disqus_thread" class="article-comment-link">留言</a>
       
       
   <ul class="article-tag-list" itemprop="keywords"><li class="article-tag-list-item"><a class="article-tag-list-link" href="/tags/%E5%AF%A6%E4%BD%9C%E7%AD%86%E8%A8%98/" rel="tag">實作筆記</a></li></ul>
@@ -758,9 +763,9 @@ j=d.createElement(s),dl=l!='dataLayer'?'&l='+l:'';j.async=true;j.src=
 
 
   
-    <article id="post-2026/gcp-free-tier-n8n" class="article article-type-post" itemscope itemprop="blogPost">
+    <article id="post-2026/n8n-1-in-gcp-free-tier-vm" class="article article-type-post" itemscope itemprop="blogPost">
   <div class="article-meta">
-    <a href="/2026/04/17/2026/gcp-free-tier-n8n/" class="article-date">
+    <a href="/2026/04/17/2026/n8n-1-in-gcp-free-tier-vm/" class="article-date">
   <time datetime="2026-04-17T03:37:12.000Z" itemprop="datePublished">2026-04-17</time>
 </a>
     
@@ -772,7 +777,7 @@ j=d.createElement(s),dl=l!='dataLayer'?'&l='+l:'';j.async=true;j.src=
         
   
     <h1 itemprop="name">
-      <a class="article-title" href="/2026/04/17/2026/gcp-free-tier-n8n/">[實作筆記] 個人自動化平台(一) n8n &amp; GCP VM</a>
+      <a class="article-title" href="/2026/04/17/2026/n8n-1-in-gcp-free-tier-vm/">[實作筆記] 個人自動化平台(一) n8n &amp; GCP VM</a>
     </h1>
   
 
@@ -919,9 +924,9 @@ j=d.createElement(s),dl=l!='dataLayer'?'&l='+l:'';j.async=true;j.src=
 <p>log 裡可能有 community packages 的 error，是 n8n 找不到額外套件，不影響運作，忽略即可。</p>
 <hr>
 <h2 id="參考"><a href="#參考" class="headerlink" title="參考"></a>參考</h2><ul>
-<li><a href="/2026/gcp-n8n-cloudflared/">個人自動化平台(二) Cloudflare Access &amp; Cloudflare Tunnel</a></li>
-<li><a href="/2026/automation-pipeline-fetch-read-write/">個人自動化平台(三) 取、讀、寫：三層可插拔管道設計</a></li>
-<li><a href="/2026/gcp-n8n-rebuild/">個人自動化平台(番外) 拆掉重建 GCP VM &amp; Cloudflared Tunnel &amp; Cloudflare Access</a></li>
+<li><a href="/2026/n8n-2-cloudflared-and-tunnel/">個人自動化平台(二) Cloudflare Access &amp; Cloudflare Tunnel</a></li>
+<li><a href="/2026/n8n-3-pipeline-overview/">個人自動化平台(三) 取、讀、寫：三層可插拔管道設計</a></li>
+<li><a href="/2026/n8n-4-rebuild-infromation/">個人自動化平台(番外) 拆掉重建 GCP VM &amp; Cloudflared Tunnel &amp; Cloudflare Access</a></li>
 </ul>
 <hr>
 <h2 id="小結"><a href="#小結" class="headerlink" title="小結"></a>小結</h2><p>到這裡，n8n 已經在 GCP 免費 VM 上跑起來了。</p>
@@ -937,9 +942,9 @@ j=d.createElement(s),dl=l!='dataLayer'?'&l='+l:'';j.async=true;j.src=
       
     </div>
     <footer class="article-footer">
-      <a data-url="https://blog.marsen.me/2026/04/17/2026/gcp-free-tier-n8n/" data-id="cuid5n7yWBQveypn-2cQNsHWx" class="article-share-link">Share</a>
+      <a data-url="https://blog.marsen.me/2026/04/17/2026/n8n-1-in-gcp-free-tier-vm/" data-id="cuidWXspPatCXCqufcQjrIHWO" class="article-share-link">Share</a>
       
-        <a href="https://blog.marsen.me/2026/04/17/2026/gcp-free-tier-n8n/#disqus_thread" class="article-comment-link">留言</a>
+        <a href="https://blog.marsen.me/2026/04/17/2026/n8n-1-in-gcp-free-tier-vm/#disqus_thread" class="article-comment-link">留言</a>
       
       
   <ul class="article-tag-list" itemprop="keywords"><li class="article-tag-list-item"><a class="article-tag-list-link" href="/tags/%E5%AF%A6%E4%BD%9C%E7%AD%86%E8%A8%98/" rel="tag">實作筆記</a></li></ul>
@@ -1054,7 +1059,7 @@ j=d.createElement(s),dl=l!='dataLayer'?'&l='+l:'';j.async=true;j.src=
       
     </div>
     <footer class="article-footer">
-      <a data-url="https://blog.marsen.me/2026/04/01/2026/interview-b-company-ai-workflow-tech-lead/" data-id="cuidufvj8ZFYg_nu7TbgWvPR_" class="article-share-link">Share</a>
+      <a data-url="https://blog.marsen.me/2026/04/01/2026/interview-b-company-ai-workflow-tech-lead/" data-id="cuid2UPpJDJ55S_UwdQKCg9Ne" class="article-share-link">Share</a>
       
         <a href="https://blog.marsen.me/2026/04/01/2026/interview-b-company-ai-workflow-tech-lead/#disqus_thread" class="article-comment-link">留言</a>
       
@@ -1139,7 +1144,7 @@ j=d.createElement(s),dl=l!='dataLayer'?'&l='+l:'';j.async=true;j.src=
       
     </div>
     <footer class="article-footer">
-      <a data-url="https://blog.marsen.me/2026/03/31/2026/structured-game-breakout/" data-id="cuidSlvheEuW5CdA1LWtTNRjp" class="article-share-link">Share</a>
+      <a data-url="https://blog.marsen.me/2026/03/31/2026/structured-game-breakout/" data-id="cuidx1DYNf5qjmNNrwl5Q-Qvb" class="article-share-link">Share</a>
       
         <a href="https://blog.marsen.me/2026/03/31/2026/structured-game-breakout/#disqus_thread" class="article-comment-link">留言</a>
       
@@ -1283,7 +1288,7 @@ j=d.createElement(s),dl=l!='dataLayer'?'&l='+l:'';j.async=true;j.src=
       
     </div>
     <footer class="article-footer">
-      <a data-url="https://blog.marsen.me/2026/03/27/2026/ssr-safe-client-detection/" data-id="cuidCb3kRpwPxrDdcF_UXBNP9" class="article-share-link">Share</a>
+      <a data-url="https://blog.marsen.me/2026/03/27/2026/ssr-safe-client-detection/" data-id="cuid32G7E_4v4xrS3tsqqF_vE" class="article-share-link">Share</a>
       
         <a href="https://blog.marsen.me/2026/03/27/2026/ssr-safe-client-detection/#disqus_thread" class="article-comment-link">留言</a>
       
@@ -1411,7 +1416,7 @@ j=d.createElement(s),dl=l!='dataLayer'?'&l='+l:'';j.async=true;j.src=
       
     </div>
     <footer class="article-footer">
-      <a data-url="https://blog.marsen.me/2026/03/18/2026/line-bot-bridge-claude-code/" data-id="cuidymJPaFpkjsgiVETGO9ICd" class="article-share-link">Share</a>
+      <a data-url="https://blog.marsen.me/2026/03/18/2026/line-bot-bridge-claude-code/" data-id="cuidweZeqrJkJ10mRsxqqLWYe" class="article-share-link">Share</a>
       
         <a href="https://blog.marsen.me/2026/03/18/2026/line-bot-bridge-claude-code/#disqus_thread" class="article-comment-link">留言</a>
       
@@ -1445,19 +1450,19 @@ j=d.createElement(s),dl=l!='dataLayer'?'&l='+l:'';j.async=true;j.src=
           </li>
         
           <li>
-            <a href="/2026/04/20/2026/n8n-ai-weekly-fetch-layer/">[實作筆記] 個人自動化平台(四) n8n 實作：取層，RSS 資料來源</a>
+            <a href="/2026/04/20/2026/n8n-5-pipeline-read/">[實作筆記] 個人自動化平台(四) n8n 實作：取層，RSS 資料來源</a>
           </li>
         
           <li>
-            <a href="/2026/04/20/2026/automation-pipeline-fetch-read-write/">[實作筆記] 個人自動化平台(三) 取、讀、寫：三層可插拔管道設計</a>
+            <a href="/2026/04/20/2026/n8n-3-pipeline-overview/">[實作筆記] 個人自動化平台(三) 取、讀、寫：三層可插拔管道設計</a>
           </li>
         
           <li>
-            <a href="/2026/04/18/2026/gcp-n8n-rebuild/">[實作筆記] 個人自動化平台(番外) 拆掉重建 GCP VM &amp; Cloudflared Tunnel &amp; Cloudflare Access </a>
+            <a href="/2026/04/18/2026/n8n-4-rebuild-infromation/">[實作筆記] 個人自動化平台(番外) 拆掉重建 GCP VM &amp; Cloudflared Tunnel &amp; Cloudflare Access </a>
           </li>
         
           <li>
-            <a href="/2026/04/17/2026/gcp-n8n-cloudflared/">個人自動化平台(二) Cloudflare Access &amp; Cloudflare Tunnel</a>
+            <a href="/2026/04/17/2026/n8n-2-cloudflared-and-tunnel/">個人自動化平台(二) Cloudflare Access &amp; Cloudflare Tunnel</a>
           </li>
         
       </ul>
