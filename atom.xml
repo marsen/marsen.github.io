@@ -12,7 +12,7 @@
   <rights>All rights reserved 2026, Marsen L.</rights>
   <subtitle>waiting to load</subtitle>
   <title>Marsen's Blog</title>
-  <updated>2026-04-28T06:14:27.369Z</updated>
+  <updated>2026-04-28T08:24:37.806Z</updated>
   <entry>
     <author>
       <name>Marsen L.</name>
@@ -29,7 +29,7 @@
       <![CDATA[<h2 id="前情提要"><a href="#前情提要" class="headerlink" title="前情提要"></a>前情提要</h2><p>在 <a href="/2026/n8n-6-pipeline-output/">個人自動化平台(六)</a> 實作 IG]]>
     </summary>
     <title>[實作筆記] 個人自動化平台(番外) Google OAuth redirect_uri_mismatch 除錯記錄</title>
-    <updated>2026-04-28T06:14:27.369Z</updated>
+    <updated>2026-04-28T08:24:37.806Z</updated>
   </entry>
   <entry>
     <author>
@@ -48,7 +48,7 @@
 <p>這篇記錄處理層：把多筆文章合併，送給 Gemini 整理成 A]]>
     </summary>
     <title>[實作筆記] 個人自動化平台(五) n8n 實作：處理層，Aggregate + Gemini 週報整理</title>
-    <updated>2026-04-28T06:14:27.369Z</updated>
+    <updated>2026-04-28T08:24:37.806Z</updated>
   </entry>
   <entry>
     <author>
@@ -57,7 +57,7 @@
     </author>
     <category term="實作筆記" scheme="https://blog.marsen.me/tags/%E5%AF%A6%E4%BD%9C%E7%AD%86%E8%A8%98/"/>
     <content>
-      <![CDATA[<h2 id="前情提要"><a href="#前情提要" class="headerlink" title="前情提要"></a>前情提要</h2><p>收集層（RSS 抓資料）和處理層（Gemini 整理週報）都跑通了，接下來要實作輸出層：把 AI 整理好的內容自動發布到社群媒體。</p><p>這篇記錄從「選哪個平台」到「拿到 Instagram Long-lived Token」的完整過程，包含踩到的坑和解法。</p><hr><h2 id="平台選擇"><a href="#平台選擇" class="headerlink" title="平台選擇"></a>平台選擇</h2><p>想把 AI 週報自動發布到社群媒體，先評估三個選項：</p><table><thead><tr><th>平台</th><th>純文字</th><th>API</th><th>帳號門檻</th><th>難度</th></tr></thead><tbody><tr><td>Instagram</td><td>不行（必須圖片）</td><td>有</td><td>Business 或 Creator</td><td>高</td></tr><tr><td>YouTube 影片</td><td>不行（必須影片）</td><td>有</td><td>普通 Google 帳號</td><td>最高</td></tr><tr><td>YouTube Community</td><td>可以</td><td><strong>無</strong></td><td>500+ 訂閱</td><td>—</td></tr><tr><td>LinkedIn</td><td>可以</td><td>有（需審查）</td><td>需要 Page</td><td>中</td></tr><tr><td>Telegram 公開頻道</td><td>可以</td><td>最簡單</td><td>無</td><td>低</td></tr></tbody></table><p>最終決定：<strong>Instagram</strong>。不是因為它最簡單——Telegram 才是——而是因為這是我實際在用的平台，想把週報發在自己的帳號上。但 IG 必須有圖片，輸出層要加圖片生成步驟。</p><hr><h2 id="IG-帳號準備"><a href="#IG-帳號準備" class="headerlink" title="IG 帳號準備"></a>IG 帳號準備</h2><p>Instagram API 發文需要 <strong>Business 或 Creator 帳號</strong>。個人帳號的 Basic Display API 已於 2024 年 12 月關閉。</p><p>切換 Creator 帳號（免費，不需要 Facebook Page）：</p><figure class="highlight text"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">IG App → 設定和隱私 → 帳號類型和工具 → 切換為專業帳號 → 創作者</span><br></pre></td></tr></table></figure><p>切換後保留所有粉絲和貼文，只是解鎖 API 權限。</p><hr><h2 id="Facebook-Developer-App-設定"><a href="#Facebook-Developer-App-設定" class="headerlink" title="Facebook Developer App 設定"></a>Facebook Developer App 設定</h2><h3 id="App-類型要選對"><a href="#App-類型要選對" class="headerlink" title="App 類型要選對"></a>App 類型要選對</h3><p>建 App 時類型有坑：</p><ul><li><strong>Consumer</strong>：給舊版 Basic Display API 用，已關閉，選了找不到 Instagram Graph API</li><li><strong>Business</strong>：正確選項，支援 Instagram Graph API content publishing</li></ul><p>前往 <a href="https://developers.facebook.com/apps/create">developers.facebook.com&#x2F;apps&#x2F;create</a>，選 <strong>Business</strong>。</p><h3 id="Instagram-API-流程選擇"><a href="#Instagram-API-流程選擇" class="headerlink" title="Instagram API 流程選擇"></a>Instagram API 流程選擇</h3><p>進 App 後找 Instagram 產品，有兩種 API 流程：</p><table><thead><tr><th></th><th>Instagram Login</th><th>Facebook Login</th></tr></thead><tbody><tr><td>支援 Creator 帳號</td><td>是</td><td>需要連 FB Page</td></tr><tr><td>需要 Facebook Page</td><td>不需要</td><td>需要</td></tr></tbody></table><p>選 <strong>API setup with Instagram business login</strong>（Instagram Login 流程）。</p><h3 id="加-Tester-帳號"><a href="#加-Tester-帳號" class="headerlink" title="加 Tester 帳號"></a>加 Tester 帳號</h3><p>Step 1 要先在 Roles 頁籤加 Instagram Tester：</p><ol><li>左側選單 → App Roles → Instagram Testers</li><li>輸入 IG username 送出邀請</li><li>在畫面下方找到連結，點開到 <code>https://www.instagram.com/accounts/manage_access/</code> 接受邀請</li></ol><hr><h2 id="踩雷筆記：OAuth-黑-白畫面-bug"><a href="#踩雷筆記：OAuth-黑-白畫面-bug" class="headerlink" title="踩雷筆記：OAuth 黑&#x2F;白畫面 bug"></a>踩雷筆記：OAuth 黑&#x2F;白畫面 bug</h2><p>點 <strong>Generate token</strong> 後，Instagram 授權頁面出現黑畫面或白畫面，token 無法顯示。</p><p>這是 Instagram Developer Console 已知的 rendering bug。OAuth 授權其實已完成，authorization code 在 redirect URL 裡，只是 UI 沒渲染出來。</p><h3 id="解法：webhook-site-當臨時-Redirect-URI"><a href="#解法：webhook-site-當臨時-Redirect-URI" class="headerlink" title="解法：webhook.site 當臨時 Redirect URI"></a>解法：webhook.site 當臨時 Redirect URI</h3><p><strong>步驟一</strong>：前往 <a href="https://webhook.site/">webhook.site</a>，取得唯一 URL，例如：</p><figure class="highlight text"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">https://webhook.site/98ec2192-c62e-459e-848a-334b370887f0</span><br></pre></td></tr></table></figure><p><strong>步驟二</strong>：加到 Instagram App → Step 3 → OAuth Redirect URLs。</p><p><strong>步驟三</strong>：手動打開授權 URL（替換 <code>YOUR_WEBHOOK_URL</code>）：</p><figure class="highlight text"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">https://www.instagram.com/oauth/authorize?client_id=APP_ID&amp;redirect_uri=YOUR_WEBHOOK_URL&amp;response_type=code&amp;scope=instagram_business_basic,instagram_business_content_publish</span><br></pre></td></tr></table></figure><p><strong>步驟四</strong>：Instagram 授權後 redirect 到 webhook.site，從 URL 取得 <code>code=</code> 後面的值。</p><p><strong>步驟五</strong>：馬上換 short-lived token（code 幾分鐘過期）：</p><figure class="highlight bash"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br></pre></td><td class="code"><pre><span class="line">curl -X POST https://api.instagram.com/oauth/access_token \</span><br><span class="line">  -F client_id=APP_ID \</span><br><span class="line">  -F client_secret=APP_SECRET \</span><br><span class="line">  -F grant_type=authorization_code \</span><br><span class="line">  -F redirect_uri=YOUR_WEBHOOK_URL \</span><br><span class="line">  -F <span class="string">&quot;code=YOUR_CODE&quot;</span></span><br></pre></td></tr></table></figure><p><strong>步驟六</strong>：換 long-lived token（有效 60 天）：</p><figure class="highlight bash"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">curl -X GET <span class="string">&quot;https://graph.instagram.com/access_token?grant_type=ig_exchange_token&amp;client_secret=APP_SECRET&amp;access_token=SHORT_LIVED_TOKEN&quot;</span></span><br></pre></td></tr></table></figure><p>回傳範例：</p><figure class="highlight json"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br></pre></td><td class="code"><pre><span class="line"><span class="punctuation">&#123;</span></span><br><span class="line">  <span class="attr">&quot;access_token&quot;</span><span class="punctuation">:</span> <span class="string">&quot;IGAAYLng3...&quot;</span><span class="punctuation">,</span></span><br><span class="line">  <span class="attr">&quot;token_type&quot;</span><span class="punctuation">:</span> <span class="string">&quot;bearer&quot;</span><span class="punctuation">,</span></span><br><span class="line">  <span class="attr">&quot;expires_in&quot;</span><span class="punctuation">:</span> <span class="number">5165491</span></span><br><span class="line"><span class="punctuation">&#125;</span></span><br></pre></td></tr></table></figure><p>Token 更新（60 天到期前跑一次即可）：</p><figure class="highlight bash"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">curl -X GET <span class="string">&quot;https://graph.instagram.com/refresh_access_token?grant_type=ig_refresh_token&amp;access_token=LONG_LIVED_TOKEN&quot;</span></span><br></pre></td></tr></table></figure><hr><h3 id="加速解-IG-Token-Generator-工具"><a href="#加速解-IG-Token-Generator-工具" class="headerlink" title="加速解: IG Token Generator 工具"></a>加速解: IG Token Generator 工具</h3><p>OAuth 流程太繁瑣，自製工具放在 <code>demo.marsen.me/admin/tools/ig-token</code>，下次取 token 不需要手動操作。</p><p>目前只有我能使用，如果有人有興趣可以與我聯絡我再視情況開放工具，具體還是希望 Bug 可以修複</p><p><strong>技術棧</strong>：Next.js 16 App Router</p><p><strong>流程設計</strong>：</p><figure class="highlight text"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br></pre></td><td class="code"><pre><span class="line">使用者輸入 App ID + App Secret</span><br><span class="line">  → POST /api/instagram/start</span><br><span class="line">    → server 存 session cookie（5 分鐘 TTL）</span><br><span class="line">    → 回傳 Instagram OAuth URL</span><br><span class="line">  → 瀏覽器跳轉到 Instagram 授權</span><br><span class="line">  → Instagram redirect 到 /api/instagram/callback</span><br><span class="line">    → server 讀 cookie 取得 App Secret</span><br><span class="line">    → 換 short-lived token → 換 long-lived token</span><br><span class="line">    → redirect 到工具頁顯示結果</span><br></pre></td></tr></table></figure><p>App Secret 全程只在 server-side 流通，不暴露給客戶端。</p><p>待改進項目</p><ul><li><strong>範例資料不用真實值</strong>：截圖或 UI 展示時，input 欄位的 placeholder 不應出現真實 App ID，用假資料代替</li><li><strong>Input 欄位短暫快取</strong>：App ID 和 App Secret 用 <code>sessionStorage</code> 快取 15～30 分鐘，避免每次授權都要重填（注意 App Secret 快取有資安風險，要考慮清楚）</li><li><strong>Token 長期快取 90 天</strong>：取得 long-lived token 後存到 <code>localStorage</code>，90 天內重開頁面自動顯示，不需重新授權</li></ul><hr><h2 id="踩雷筆記：Vercel-部署的-prebuilt-限制"><a href="#踩雷筆記：Vercel-部署的-prebuilt-限制" class="headerlink" title="踩雷筆記：Vercel 部署的 prebuilt 限制"></a>踩雷筆記：Vercel 部署的 prebuilt 限制</h2><p>這個專案用 GitHub Actions 做 CI&#x2F;CD，採 <code>vercel build --prebuilt</code> 方案：</p><figure class="highlight yaml"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment"># GitHub Actions</span></span><br><span class="line"><span class="bullet">-</span> <span class="attr">run:</span> <span class="string">vercel</span> <span class="string">build</span> <span class="string">--prod</span>    <span class="comment"># Actions 裡 build</span></span><br><span class="line"><span class="bullet">-</span> <span class="attr">run:</span> <span class="string">vercel</span> <span class="string">deploy</span> <span class="string">--prebuilt</span> <span class="string">--prod</span>  <span class="comment"># 上傳 build 產出物</span></span><br></pre></td></tr></table></figure><p>更新 Vercel 環境變數後，<strong>不能直接 Redeploy</strong>，因為 Vercel 沒有原始碼可重新 build。必須 push 新 commit 觸發 GitHub Actions 重新 build 才能套用新設定：</p><figure class="highlight bash"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br></pre></td><td class="code"><pre><span class="line">git commit --allow-empty -m <span class="string">&quot;chore: trigger redeploy&quot;</span></span><br><span class="line">git push origin main</span><br></pre></td></tr></table></figure><p>prebuilt 的好處是 CI 與 deploy 分離，確保 lint&#x2F;type-check&#x2F;test 通過才部署；代價是 env var 更新要重新 build。</p><hr><h2 id="踩雷筆記：Meta-廣告帳號被限制"><a href="#踩雷筆記：Meta-廣告帳號被限制" class="headerlink" title="踩雷筆記：Meta 廣告帳號被限制"></a>踩雷筆記：Meta 廣告帳號被限制</h2><p>20260427 處理中</p><p>測試期間收到 Meta 通知：「Your professional ad account is restricted from advertising」。</p><p>第一反應是懷疑跟自動化發文有關，查了一下：這個限制針對的是<strong>廣告功能</strong>（投放廣告、Meta Pixel、推廣貼文），不影響 Content Publishing API。用官方 API 發文是 Meta 明確允許的行為，沒有違規。</p><p>推測原因：新開 Business App 首次觸發系統自動審查，誤判。已按「Request a Review」申訴中。</p><p>API 發文功能在申訴期間不受影響，繼續正常運作。</p><hr><h2 id="參考"><a href="#參考" class="headerlink" title="參考"></a>參考</h2><ul><li><a href="/2026/n8n-1-in-gcp-free-tier-vm/">個人自動化平台(一) n8n &amp; GCP VM</a></li><li><a href="/2026/n8n-2-cloudflared-and-tunnel/">個人自動化平台(二) Cloudflare Access &amp; Cloudflare Tunnel</a></li><li><a href="/2026/n8n-3-pipeline-overview/">個人自動化平台(三) 收集、處理、輸出：三層可插拔管道設計</a></li><li><a href="/2026/n8n-3.1-rebuild-infromation/">個人自動化平台(番外) 拆掉重建 GCP VM &amp; Cloudflared Tunnel &amp; Cloudflare Access</a></li><li><a href="/2026/n8n-4-pipeline-fetch/">個人自動化平台(四) n8n 實作：收集層，RSS 資料來源</a></li><li><a href="/2026/n8n-5-pipeline-process/">個人自動化平台(五) n8n 實作：處理層，Aggregate + Gemini 週報整理</a></li></ul><h2 id="小結"><a href="#小結" class="headerlink" title="小結"></a>小結</h2><ul><li>IG API 只支援 Business 或 Creator 帳號，個人帳號的 Basic Display API 已關閉</li><li>Facebook Developer App 類型要選 Business，流程選 Instagram Login（不需要 FB Page）</li><li>Developer Console 的 token generator 有 bug，用 webhook.site 當臨時 redirect URI 繞過</li><li>Long-lived token 有效 60 天，到期前用 refresh API 更新即可</li><li>自製工具把 OAuth 流程自動化，之後取 token 一鍵搞定</li></ul><p>（待補：圖片生成 + 實際 IG 發文流程）</p><p>(fin)</p>]]>
+      <![CDATA[<h2 id="前情提要"><a href="#前情提要" class="headerlink" title="前情提要"></a>前情提要</h2><p>收集層（RSS 抓資料）和處理層（Gemini 整理週報）都跑通了，接下來要實作輸出層：把 AI 整理好的內容自動發布到社群媒體。</p><p>這篇記錄從「選哪個平台」到「拿到 Instagram Long-lived Token」的完整過程，包含踩到的坑和解法。</p><hr><h2 id="平台選擇"><a href="#平台選擇" class="headerlink" title="平台選擇"></a>平台選擇</h2><p>想把 AI 週報自動發布到社群媒體，先評估三個選項：</p><table><thead><tr><th>平台</th><th>純文字</th><th>API</th><th>帳號門檻</th><th>難度</th></tr></thead><tbody><tr><td>Instagram</td><td>不行（必須圖片）</td><td>有</td><td>Business 或 Creator</td><td>高</td></tr><tr><td>YouTube 影片</td><td>不行（必須影片）</td><td>有</td><td>普通 Google 帳號</td><td>最高</td></tr><tr><td>YouTube Community</td><td>可以</td><td><strong>無</strong></td><td>500+ 訂閱</td><td>—</td></tr><tr><td>LinkedIn</td><td>可以</td><td>有（需審查）</td><td>需要 Page</td><td>中</td></tr><tr><td>Telegram 公開頻道</td><td>可以</td><td>最簡單</td><td>無</td><td>低</td></tr></tbody></table><p>最終決定：<strong>Instagram</strong>。不是因為它最簡單——Telegram 才是——而是因為這是我實際在用的平台，想把週報發在自己的帳號上。但 IG 必須有圖片，輸出層要加圖片生成步驟。</p><hr><h2 id="IG-帳號準備"><a href="#IG-帳號準備" class="headerlink" title="IG 帳號準備"></a>IG 帳號準備</h2><p>Instagram API 發文需要 <strong>Business 或 Creator 帳號</strong>。個人帳號的 Basic Display API 已於 2024 年 12 月關閉。</p><p>切換 Creator 帳號（免費，不需要 Facebook Page）：</p><figure class="highlight text"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">IG App → 設定和隱私 → 帳號類型和工具 → 切換為專業帳號 → 創作者</span><br></pre></td></tr></table></figure><p>切換後保留所有粉絲和貼文，只是解鎖 API 權限。</p><hr><h2 id="Facebook-Developer-App-設定"><a href="#Facebook-Developer-App-設定" class="headerlink" title="Facebook Developer App 設定"></a>Facebook Developer App 設定</h2><h3 id="App-類型要選對"><a href="#App-類型要選對" class="headerlink" title="App 類型要選對"></a>App 類型要選對</h3><p>建 App 時類型有坑：</p><ul><li><strong>Consumer</strong>：給舊版 Basic Display API 用，已關閉，選了找不到 Instagram Graph API</li><li><strong>Business</strong>：正確選項，支援 Instagram Graph API content publishing</li></ul><p>前往 <a href="https://developers.facebook.com/apps/create">developers.facebook.com&#x2F;apps&#x2F;create</a>，選 <strong>Business</strong>。</p><h3 id="Instagram-API-流程選擇"><a href="#Instagram-API-流程選擇" class="headerlink" title="Instagram API 流程選擇"></a>Instagram API 流程選擇</h3><p>進 App 後找 Instagram 產品，有兩種 API 流程：</p><table><thead><tr><th></th><th>Instagram Login</th><th>Facebook Login</th></tr></thead><tbody><tr><td>支援 Creator 帳號</td><td>是</td><td>需要連 FB Page</td></tr><tr><td>需要 Facebook Page</td><td>不需要</td><td>需要</td></tr></tbody></table><p>選 <strong>API setup with Instagram business login</strong>（Instagram Login 流程）。</p><h3 id="加-Tester-帳號"><a href="#加-Tester-帳號" class="headerlink" title="加 Tester 帳號"></a>加 Tester 帳號</h3><p>Step 1 要先在 Roles 頁籤加 Instagram Tester：</p><ol><li>左側選單 → App Roles → Instagram Testers</li><li>輸入 IG username 送出邀請</li><li>在畫面下方找到連結，點開到 <code>https://www.instagram.com/accounts/manage_access/</code> 接受邀請</li></ol><hr><h2 id="踩雷筆記：OAuth-黑-白畫面-bug"><a href="#踩雷筆記：OAuth-黑-白畫面-bug" class="headerlink" title="踩雷筆記：OAuth 黑&#x2F;白畫面 bug"></a>踩雷筆記：OAuth 黑&#x2F;白畫面 bug</h2><p>點 <strong>Generate token</strong> 後，Instagram 授權頁面出現黑畫面或白畫面，token 無法顯示。</p><p>這是 Instagram Developer Console 已知的 rendering bug。OAuth 授權其實已完成，authorization code 在 redirect URL 裡，只是 UI 沒渲染出來。</p><h3 id="解法：webhook-site-當臨時-Redirect-URI"><a href="#解法：webhook-site-當臨時-Redirect-URI" class="headerlink" title="解法：webhook.site 當臨時 Redirect URI"></a>解法：webhook.site 當臨時 Redirect URI</h3><p><strong>步驟一</strong>：前往 <a href="https://webhook.site/">webhook.site</a>，取得唯一 URL，例如：</p><figure class="highlight text"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">https://webhook.site/98ec2192-c62e-459e-848a-334b370887f0</span><br></pre></td></tr></table></figure><p><strong>步驟二</strong>：加到 Instagram App → Step 3 → OAuth Redirect URLs。</p><p><strong>步驟三</strong>：手動打開授權 URL（替換 <code>YOUR_WEBHOOK_URL</code>）：</p><figure class="highlight text"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">https://www.instagram.com/oauth/authorize?client_id=APP_ID&amp;redirect_uri=YOUR_WEBHOOK_URL&amp;response_type=code&amp;scope=instagram_business_basic,instagram_business_content_publish</span><br></pre></td></tr></table></figure><p><strong>步驟四</strong>：Instagram 授權後 redirect 到 webhook.site，從 URL 取得 <code>code=</code> 後面的值。</p><p><strong>步驟五</strong>：馬上換 short-lived token（code 幾分鐘過期）：</p><figure class="highlight bash"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br></pre></td><td class="code"><pre><span class="line">curl -X POST https://api.instagram.com/oauth/access_token \</span><br><span class="line">  -F client_id=APP_ID \</span><br><span class="line">  -F client_secret=APP_SECRET \</span><br><span class="line">  -F grant_type=authorization_code \</span><br><span class="line">  -F redirect_uri=YOUR_WEBHOOK_URL \</span><br><span class="line">  -F <span class="string">&quot;code=YOUR_CODE&quot;</span></span><br></pre></td></tr></table></figure><p><strong>步驟六</strong>：換 long-lived token（有效 60 天）：</p><figure class="highlight bash"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">curl -X GET <span class="string">&quot;https://graph.instagram.com/access_token?grant_type=ig_exchange_token&amp;client_secret=APP_SECRET&amp;access_token=SHORT_LIVED_TOKEN&quot;</span></span><br></pre></td></tr></table></figure><p>回傳範例：</p><figure class="highlight json"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br></pre></td><td class="code"><pre><span class="line"><span class="punctuation">&#123;</span></span><br><span class="line">  <span class="attr">&quot;access_token&quot;</span><span class="punctuation">:</span> <span class="string">&quot;IGAAYLng3...&quot;</span><span class="punctuation">,</span></span><br><span class="line">  <span class="attr">&quot;token_type&quot;</span><span class="punctuation">:</span> <span class="string">&quot;bearer&quot;</span><span class="punctuation">,</span></span><br><span class="line">  <span class="attr">&quot;expires_in&quot;</span><span class="punctuation">:</span> <span class="number">5165491</span></span><br><span class="line"><span class="punctuation">&#125;</span></span><br></pre></td></tr></table></figure><p>Token 更新（60 天到期前跑一次即可）：</p><figure class="highlight bash"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">curl -X GET <span class="string">&quot;https://graph.instagram.com/refresh_access_token?grant_type=ig_refresh_token&amp;access_token=LONG_LIVED_TOKEN&quot;</span></span><br></pre></td></tr></table></figure><hr><h3 id="加速解-IG-Token-Generator-工具"><a href="#加速解-IG-Token-Generator-工具" class="headerlink" title="加速解: IG Token Generator 工具"></a>加速解: IG Token Generator 工具</h3><p>OAuth 流程太繁瑣，自製工具放在 <code>demo.marsen.me/admin/tools/ig-token</code>，下次取 token 不需要手動操作。</p><p>目前只有我能使用，如果有人有興趣可以與我聯絡我再視情況開放工具，具體還是希望 Bug 可以修複</p><p><strong>技術棧</strong>：Next.js 16 App Router</p><p><strong>流程設計</strong>：</p><figure class="highlight text"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br></pre></td><td class="code"><pre><span class="line">使用者輸入 App ID + App Secret</span><br><span class="line">  → POST /api/instagram/start</span><br><span class="line">    → server 存 session cookie（5 分鐘 TTL）</span><br><span class="line">    → 回傳 Instagram OAuth URL</span><br><span class="line">  → 瀏覽器跳轉到 Instagram 授權</span><br><span class="line">  → Instagram redirect 到 /api/instagram/callback</span><br><span class="line">    → server 讀 cookie 取得 App Secret</span><br><span class="line">    → 換 short-lived token → 換 long-lived token</span><br><span class="line">    → redirect 到工具頁顯示結果</span><br></pre></td></tr></table></figure><p>App Secret 全程只在 server-side 流通，不暴露給客戶端。</p><p>待改進項目</p><ul><li><strong>範例資料不用真實值</strong>：截圖或 UI 展示時，input 欄位的 placeholder 不應出現真實 App ID，用假資料代替</li><li><strong>Input 欄位短暫快取</strong>：App ID 和 App Secret 用 <code>sessionStorage</code> 快取 15～30 分鐘，避免每次授權都要重填（注意 App Secret 快取有資安風險，要考慮清楚）</li><li><strong>Token 長期快取 90 天</strong>：取得 long-lived token 後存到 <code>localStorage</code>，90 天內重開頁面自動顯示，不需重新授權</li></ul><hr><h2 id="踩雷筆記：Vercel-部署的-prebuilt-限制"><a href="#踩雷筆記：Vercel-部署的-prebuilt-限制" class="headerlink" title="踩雷筆記：Vercel 部署的 prebuilt 限制"></a>踩雷筆記：Vercel 部署的 prebuilt 限制</h2><p>這個專案用 GitHub Actions 做 CI&#x2F;CD，採 <code>vercel build --prebuilt</code> 方案：</p><figure class="highlight yaml"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment"># GitHub Actions</span></span><br><span class="line"><span class="bullet">-</span> <span class="attr">run:</span> <span class="string">vercel</span> <span class="string">build</span> <span class="string">--prod</span>    <span class="comment"># Actions 裡 build</span></span><br><span class="line"><span class="bullet">-</span> <span class="attr">run:</span> <span class="string">vercel</span> <span class="string">deploy</span> <span class="string">--prebuilt</span> <span class="string">--prod</span>  <span class="comment"># 上傳 build 產出物</span></span><br></pre></td></tr></table></figure><p>更新 Vercel 環境變數後，<strong>不能直接 Redeploy</strong>，因為 Vercel 沒有原始碼可重新 build。必須 push 新 commit 觸發 GitHub Actions 重新 build 才能套用新設定：</p><figure class="highlight bash"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br></pre></td><td class="code"><pre><span class="line">git commit --allow-empty -m <span class="string">&quot;chore: trigger redeploy&quot;</span></span><br><span class="line">git push origin main</span><br></pre></td></tr></table></figure><p>prebuilt 的好處是 CI 與 deploy 分離，確保 lint&#x2F;type-check&#x2F;test 通過才部署；代價是 env var 更新要重新 build。</p><hr><h2 id="踩雷筆記：Meta-廣告帳號被限制"><a href="#踩雷筆記：Meta-廣告帳號被限制" class="headerlink" title="踩雷筆記：Meta 廣告帳號被限制"></a>踩雷筆記：Meta 廣告帳號被限制</h2><p>20260427 處理中</p><p>測試期間收到 Meta 通知：「Your professional ad account is restricted from advertising」。</p><p>第一反應是懷疑跟自動化發文有關，查了一下：這個限制針對的是<strong>廣告功能</strong>（投放廣告、Meta Pixel、推廣貼文），不影響 Content Publishing API。用官方 API 發文是 Meta 明確允許的行為，沒有違規。</p><p>推測原因：新開 Business App 首次觸發系統自動審查，誤判。已按「Request a Review」申訴中。</p><p>API 發文功能在申訴期間不受影響，繼續正常運作。</p><hr><h2 id="參考"><a href="#參考" class="headerlink" title="參考"></a>參考</h2><ul><li><a href="/2026/n8n-1-in-gcp-free-tier-vm/">個人自動化平台(一) n8n &amp; GCP VM</a></li><li><a href="/2026/n8n-2-cloudflared-and-tunnel/">個人自動化平台(二) Cloudflare Access &amp; Cloudflare Tunnel</a></li><li><a href="/2026/n8n-3-pipeline-overview/">個人自動化平台(三) 收集、處理、輸出：三層可插拔管道設計</a></li><li><a href="/2026/n8n-3.1-rebuild-infromation/">個人自動化平台(番外) 拆掉重建 GCP VM &amp; Cloudflared Tunnel &amp; Cloudflare Access</a></li><li><a href="/2026/n8n-4-pipeline-fetch/">個人自動化平台(四) n8n 實作：收集層，RSS 資料來源</a></li><li><a href="/2026/n8n-5-pipeline-process/">個人自動化平台(五) n8n 實作：處理層，Aggregate + Gemini 週報整理</a></li><li><a href="/2026/n8n-6.1-google-oauth-redirect-uri-debug/">個人自動化平台(番外) Google OAuth redirect_uri_mismatch 除錯記錄</a></li></ul><h2 id="小結"><a href="#小結" class="headerlink" title="小結"></a>小結</h2><ul><li>IG API 只支援 Business 或 Creator 帳號，個人帳號的 Basic Display API 已關閉</li><li>Facebook Developer App 類型要選 Business，流程選 Instagram Login（不需要 FB Page）</li><li>Developer Console 的 token generator 有 bug，用 webhook.site 當臨時 redirect URI 繞過</li><li>Long-lived token 有效 60 天，到期前用 refresh API 更新即可</li><li>自製工具把 OAuth 流程自動化，之後取 token 一鍵搞定</li></ul><p>（待補：圖片生成 + 實際 IG 發文流程）</p><p>(fin)</p>]]>
     </content>
     <id>https://blog.marsen.me/2026/04/22/2026/n8n-6-pipeline-output/</id>
     <link href="https://blog.marsen.me/2026/04/22/2026/n8n-6-pipeline-output/"/>
@@ -66,7 +66,7 @@
       <![CDATA[<h2 id="前情提要"><a href="#前情提要" class="headerlink" title="前情提要"></a>前情提要</h2><p>收集層（RSS 抓資料）和處理層（Gemini 整理週報）都跑通了，接下來要實作輸出層：把 AI 整理好的內容自動發布到社群]]>
     </summary>
     <title>[實作筆記] 個人自動化平台(六) n8n 實作：輸出層，Instagram API 取得 Token 全記錄</title>
-    <updated>2026-04-28T06:14:27.369Z</updated>
+    <updated>2026-04-28T08:24:37.806Z</updated>
   </entry>
   <entry>
     <author>
@@ -84,7 +84,7 @@
       <![CDATA[<h2 id="前情提要"><a href="#前情提要" class="headerlink" title="前情提要"></a>前情提要</h2><p>2019 年，我在 <a href="https://blog.marsen.me/2019/05/18/2019/aws_]]>
     </summary>
     <title>[產業報告] 從 DeepRacer 到 Robotaxi：Tesla vs Waymo 的無人駕駛現況</title>
-    <updated>2026-04-28T06:14:27.368Z</updated>
+    <updated>2026-04-28T08:24:37.805Z</updated>
   </entry>
   <entry>
     <author>
@@ -103,7 +103,7 @@
 <p>目標是從四個 AI 新聞來源拉資料，輸出]]>
     </summary>
     <title>[實作筆記] 個人自動化平台(四) n8n 實作：收集層，RSS 資料來源</title>
-    <updated>2026-04-28T06:14:27.369Z</updated>
+    <updated>2026-04-28T08:24:37.806Z</updated>
   </entry>
   <entry>
     <author>
@@ -122,7 +122,7 @@
 <p>這篇不急著]]>
     </summary>
     <title>[實作筆記] 個人自動化平台(三) 收集、處理、輸出：三層可插拔管道設計</title>
-    <updated>2026-04-28T06:14:27.369Z</updated>
+    <updated>2026-04-28T08:24:37.806Z</updated>
   </entry>
   <entry>
     <author>
@@ -142,7 +142,7 @@
     <title>
       <![CDATA[[實作筆記] 個人自動化平台(番外) 拆掉重建 GCP VM & Cloudflared Tunnel & Cloudflare Access]]>
     </title>
-    <updated>2026-04-28T06:14:27.369Z</updated>
+    <updated>2026-04-28T08:24:37.806Z</updated>
   </entry>
   <entry>
     <author>
@@ -163,7 +163,7 @@
     <title>
       <![CDATA[個人自動化平台(二) Cloudflare Access & Cloudflare Tunnel]]>
     </title>
-    <updated>2026-04-28T06:14:27.369Z</updated>
+    <updated>2026-04-28T08:24:37.806Z</updated>
   </entry>
   <entry>
     <author>
@@ -184,7 +184,7 @@
     <title>
       <![CDATA[[實作筆記] 個人自動化平台(一) n8n & GCP VM]]>
     </title>
-    <updated>2026-04-28T06:14:27.369Z</updated>
+    <updated>2026-04-28T08:24:37.806Z</updated>
   </entry>
   <entry>
     <author>
@@ -202,7 +202,7 @@
       <![CDATA[<h2 id="前情提要"><a href="#前情提要" class="headerlink" title="前情提要"></a>前情提要</h2><p>Gap year 期間收到一封獵頭的 LinkedIn 邀約，職位是 AI Workflow Tech Lead。  </p]]>
     </summary>
     <title>[生活筆記] 面試記錄 B 社 — AI Workflow Tech Lead</title>
-    <updated>2026-04-28T06:14:27.369Z</updated>
+    <updated>2026-04-28T08:24:37.806Z</updated>
   </entry>
   <entry>
     <author>
@@ -221,7 +221,7 @@
 <p>「系統性剝削」讓財富自動從勞動者流向資產持有者，普通人很難透過努力翻]]>
     </summary>
     <title>[生活筆記] 系統思考打工人生</title>
-    <updated>2026-04-28T06:14:27.369Z</updated>
+    <updated>2026-04-28T08:24:37.806Z</updated>
   </entry>
   <entry>
     <author>
@@ -239,7 +239,7 @@
       <![CDATA[<h2 id="前情提要"><a href="#前情提要" class="headerlink" title="前情提要"></a>前情提要</h2><p>在做韓文注音學習工具時，需要偵測瀏覽器是否支援 <code>speechSynthesis</code>，然後顯示提示訊息。]]>
     </summary>
     <title>[實作筆記] 在 Next.js 安全讀取 window：從 useEffect 到 useSyncExternalStore</title>
-    <updated>2026-04-28T06:14:27.369Z</updated>
+    <updated>2026-04-28T08:24:37.806Z</updated>
   </entry>
   <entry>
     <author>
@@ -258,7 +258,7 @@
 <p>例如「LINE Bot 的 Messaging API]]>
     </summary>
     <title>[實作筆記] 用 Cloudflare Tunnel 讓 LINE Bot Webhook 打到本機</title>
-    <updated>2026-04-28T06:14:27.369Z</updated>
+    <updated>2026-04-28T08:24:37.806Z</updated>
   </entry>
   <entry>
     <author>
@@ -277,7 +277,7 @@
 <figure class="highlight]]>
     </summary>
     <title>[實作筆記] Ghostty 打字出現 [O[27u 亂碼的原因與修正</title>
-    <updated>2026-04-28T06:14:27.369Z</updated>
+    <updated>2026-04-28T08:24:37.806Z</updated>
   </entry>
   <entry>
     <author>
@@ -296,7 +296,7 @@
 <h]]>
     </summary>
     <title>[工具筆記] Terminal 工具怎麼選？Ghostty、iTerm2 與其他選手比較</title>
-    <updated>2026-04-28T06:14:27.369Z</updated>
+    <updated>2026-04-28T08:24:37.806Z</updated>
   </entry>
   <entry>
     <author>
@@ -315,7 +315,7 @@
 <figure cl]]>
     </summary>
     <title>[實作筆記] Next.js Hydration 與隨機性：從問題到正確架構</title>
-    <updated>2026-04-28T06:14:27.369Z</updated>
+    <updated>2026-04-28T08:24:37.806Z</updated>
   </entry>
   <entry>
     <author>
@@ -332,7 +332,7 @@
       <![CDATA[<h2 id="前情提要"><a href="#前情提要" class="headerlink" title="前情提要"></a>前情提要</h2><p>自從 2025 年 9 月台新把 @GoGo 卡、FlyGo 卡、玫瑰 Giving 卡、太陽&#x2F;玫瑰卡這些信用卡整]]>
     </summary>
     <title>[生活筆記] 2026 台新 Richart Life 切換方案回饋最大化</title>
-    <updated>2026-04-28T06:14:27.369Z</updated>
+    <updated>2026-04-28T08:24:37.806Z</updated>
   </entry>
   <entry>
     <author>
@@ -349,7 +349,7 @@
       <![CDATA[<h2 id="前情提要"><a href="#前情提要" class="headerlink" title="前情提要"></a>前情提要</h2><p>延續<a href="https://blog.marsen.me/2025/11/28/2025/iv_thixxxxxx]]>
     </summary>
     <title>[生活筆記] 2025 T社面試心得 - 二面</title>
-    <updated>2026-04-28T06:14:27.367Z</updated>
+    <updated>2026-04-28T08:24:37.804Z</updated>
   </entry>
   <entry>
     <author>
@@ -367,7 +367,7 @@
 <p>一面是 Pyth]]>
     </summary>
     <title>[生活筆記] 2025 T社面試心得 - 一面</title>
-    <updated>2026-04-28T06:14:27.367Z</updated>
+    <updated>2026-04-28T08:24:37.804Z</updated>
   </entry>
   <entry>
     <author>
@@ -386,6 +386,6 @@
 <h2 id="當軟體開發還是一門工程學"><a href="#當軟體開發還是一門工程學" class="headerlink" title="當軟體開發還是一門工程學"></a>當軟體開發還是一門工程學</h2><p>1970 年代，當軟體開發還是一門]]>
     </summary>
     <title>[SDD 與 Spec Kit]傳統瀑布式開發（1975-2000）</title>
-    <updated>2026-04-28T06:14:27.368Z</updated>
+    <updated>2026-04-28T08:24:37.805Z</updated>
   </entry>
 </feed>
