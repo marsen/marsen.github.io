@@ -12,7 +12,25 @@
   <rights>All rights reserved 2026, Marsen L.</rights>
   <subtitle>waiting to load</subtitle>
   <title>Marsen's Blog</title>
-  <updated>2026-04-27T10:07:21.660Z</updated>
+  <updated>2026-04-28T06:14:27.369Z</updated>
+  <entry>
+    <author>
+      <name>Marsen L.</name>
+      <email>admin@marsen.me</email>
+    </author>
+    <category term="實作筆記" scheme="https://blog.marsen.me/tags/%E5%AF%A6%E4%BD%9C%E7%AD%86%E8%A8%98/"/>
+    <content>
+      <![CDATA[<h2 id="前情提要"><a href="#前情提要" class="headerlink" title="前情提要"></a>前情提要</h2><p>在 <a href="/2026/n8n-6-pipeline-output/">個人自動化平台(六)</a> 實作 IG Token 工具時，</p><p>為了修 Instagram OAuth callback URL 的問題，在 Vercel 設了 <code>NEXT_PUBLIC_BASE_URL</code>。</p><p>沒想到這個動作讓 Google 登入炸掉，報 <code>redirect_uri_mismatch</code>。</p><p>表面上是「連帶損傷」，但根本原因是 <strong>production 的 Google 登入從來沒測試過</strong>，問題早就存在，只是這次才被發現。</p><hr><h2 id="事件時間線"><a href="#事件時間線" class="headerlink" title="事件時間線"></a>事件時間線</h2><h3 id="背景：production-Google-登入從來沒運作過"><a href="#背景：production-Google-登入從來沒運作過" class="headerlink" title="背景：production Google 登入從來沒運作過"></a>背景：production Google 登入從來沒運作過</h3><p><code>NEXT_PUBLIC_BASE_URL</code> 在 Vercel 上沒有設值時，<code>env.baseUrl</code> 是 <code>undefined</code>，Google OAuth 送出的 redirect URI 是：</p><figure class="highlight text"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">undefined/api/auth/google/callback</span><br></pre></td></tr></table></figure><p>這個字串不可能通過 Google 驗證。</p><p>但 production 上從來沒有人測試過 Google 登入，所以一直沒被發現。</p><p>本機開發設的是 <code>NEXT_PUBLIC_BASE_URL=http://localhost:3000</code>，Google Console 也只登記了 <code>http://localhost:3000/api/auth/google/callback</code>，本機正常，所以沒有警覺。</p><h3 id="起點：IG-Token-工具的-Instagram-OAuth-callback-URL-錯誤"><a href="#起點：IG-Token-工具的-Instagram-OAuth-callback-URL-錯誤" class="headerlink" title="起點：IG Token 工具的 Instagram OAuth callback URL 錯誤"></a>起點：IG Token 工具的 Instagram OAuth callback URL 錯誤</h3><p>實作 IG Token 工具時（<code>demo.marsen.me</code>），Instagram 授權完成後 callback 沒有導回正確的頁面，而是跑到 Vercel 內部 URL。</p><p>原因：Instagram callback route 的 <code>baseUrl</code> 在 Vercel 上沒有設定，fallback 讀到的是 Vercel 執行環境的 host，不是對外的 <code>demo.marsen.me</code>。</p><h3 id="修法：在-Vercel-設定-NEXT-PUBLIC-BASE-URL"><a href="#修法：在-Vercel-設定-NEXT-PUBLIC-BASE-URL" class="headerlink" title="修法：在 Vercel 設定 NEXT_PUBLIC_BASE_URL"></a>修法：在 Vercel 設定 <code>NEXT_PUBLIC_BASE_URL</code></h3><p>在 Vercel 環境變數加上：</p><figure class="highlight text"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">NEXT_PUBLIC_BASE_URL=https://demo.marsen.me</span><br></pre></td></tr></table></figure><p>因為專案用 <code>vercel build --prebuilt</code> 方案，直接 Redeploy 不會重新 build，必須 push 新的空 commit 觸發 GitHub Actions：</p><figure class="highlight bash"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br></pre></td><td class="code"><pre><span class="line">git commit --allow-empty -m <span class="string">&quot;chore: trigger redeploy&quot;</span></span><br><span class="line">git push origin main</span><br></pre></td></tr></table></figure><p>Instagram OAuth callback 正常了。</p><h3 id="問題浮現：第一次在-production-測試-Google-登入"><a href="#問題浮現：第一次在-production-測試-Google-登入" class="headerlink" title="問題浮現：第一次在 production 測試 Google 登入"></a>問題浮現：第一次在 production 測試 Google 登入</h3><p>設了 <code>NEXT_PUBLIC_BASE_URL</code> 後，第一次真正在 production 試 Google 登入。</p><p><code>NEXT_PUBLIC_BASE_URL</code> 同時影響 Google OAuth 的 redirect URI（<code>src/app/api/auth/google/route.ts</code>）：</p><figure class="highlight ts"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">const</span> google = <span class="keyword">new</span> <span class="title class_">Google</span>(</span><br><span class="line">  env.<span class="property">googleClientId</span>,</span><br><span class="line">  env.<span class="property">googleClientSecret</span>,</span><br><span class="line">  <span class="string">`<span class="subst">$&#123;env.baseUrl&#125;</span>/api/auth/google/callback`</span>,</span><br><span class="line">)</span><br></pre></td></tr></table></figure><p>app 送出的 redirect_uri 變成：</p><figure class="highlight text"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">https://demo.marsen.me/api/auth/google/callback</span><br></pre></td></tr></table></figure><p>但 Google Cloud Console 只登記了本機的那條：</p><figure class="highlight text"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">http://localhost:3000/api/auth/google/callback</span><br></pre></td></tr></table></figure><p>不符，報 <code>redirect_uri_mismatch</code>。</p><hr><h2 id="症狀"><a href="#症狀" class="headerlink" title="症狀"></a>症狀</h2><p>點「Google 登入」後，Google 跳出錯誤頁面：</p><figure class="highlight text"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br></pre></td><td class="code"><pre><span class="line">已封鎖存取權：這個應用程式的要求無效</span><br><span class="line">發生錯誤 400：redirect_uri_mismatch</span><br></pre></td></tr></table></figure><hr><h2 id="解法"><a href="#解法" class="headerlink" title="解法"></a>解法</h2><p>進 Google Cloud Console → Credentials → OAuth 2.0 Client → Authorized redirect URIs，新增：</p><figure class="highlight text"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">https://demo.marsen.me/api/auth/google/callback</span><br></pre></td></tr></table></figure><p>本機那條 <code>http://localhost:3000/api/auth/google/callback</code> 保留，本機開發還用得到。</p><p>存檔幾分鐘內生效，不需要重新 build 或 deploy。</p><hr><h2 id="參考"><a href="#參考" class="headerlink" title="參考"></a>參考</h2><ul><li><a href="/2026/n8n-6-pipeline-output/">個人自動化平台(六) n8n 實作：輸出層，Instagram API 取得 Token 全記錄</a></li></ul><h2 id="小結"><a href="#小結" class="headerlink" title="小結"></a>小結</h2><ul><li>根本原因不是「設定改壞了」，而是 <strong>production Google 登入從來沒被測試過</strong>，問題一直存在</li><li>IG Token 工具需要在 Vercel 設 <code>NEXT_PUBLIC_BASE_URL</code>，這個動作讓潛藏的問題第一次浮現</li><li><code>redirect_uri_mismatch</code> 代表 app 送出的 redirect URI 和 Google Console 登記的不符</li><li><code>NEXT_PUBLIC_BASE_URL</code> 影響所有 OAuth 服務，改了就要同步更新各 Console 的 redirect URI</li><li>Google Console 可以同時登記多條 URI，本機和 production 各一條，互不影響</li><li>用 <code>vercel build --prebuilt</code> 的專案，env var 更新後要 push 空 commit 才會生效</li></ul><p>(fin)</p>]]>
+    </content>
+    <id>https://blog.marsen.me/2026/04/27/2026/n8n-6.1-google-oauth-redirect-uri-debug/</id>
+    <link href="https://blog.marsen.me/2026/04/27/2026/n8n-6.1-google-oauth-redirect-uri-debug/"/>
+    <published>2026-04-27T15:28:15.000Z</published>
+    <summary>
+      <![CDATA[<h2 id="前情提要"><a href="#前情提要" class="headerlink" title="前情提要"></a>前情提要</h2><p>在 <a href="/2026/n8n-6-pipeline-output/">個人自動化平台(六)</a> 實作 IG]]>
+    </summary>
+    <title>[實作筆記] 個人自動化平台(番外) Google OAuth redirect_uri_mismatch 除錯記錄</title>
+    <updated>2026-04-28T06:14:27.369Z</updated>
+  </entry>
   <entry>
     <author>
       <name>Marsen L.</name>
@@ -30,7 +48,7 @@
 <p>這篇記錄處理層：把多筆文章合併，送給 Gemini 整理成 A]]>
     </summary>
     <title>[實作筆記] 個人自動化平台(五) n8n 實作：處理層，Aggregate + Gemini 週報整理</title>
-    <updated>2026-04-27T10:07:21.660Z</updated>
+    <updated>2026-04-28T06:14:27.369Z</updated>
   </entry>
   <entry>
     <author>
@@ -48,7 +66,7 @@
       <![CDATA[<h2 id="前情提要"><a href="#前情提要" class="headerlink" title="前情提要"></a>前情提要</h2><p>收集層（RSS 抓資料）和處理層（Gemini 整理週報）都跑通了，接下來要實作輸出層：把 AI 整理好的內容自動發布到社群]]>
     </summary>
     <title>[實作筆記] 個人自動化平台(六) n8n 實作：輸出層，Instagram API 取得 Token 全記錄</title>
-    <updated>2026-04-27T10:07:21.660Z</updated>
+    <updated>2026-04-28T06:14:27.369Z</updated>
   </entry>
   <entry>
     <author>
@@ -66,7 +84,7 @@
       <![CDATA[<h2 id="前情提要"><a href="#前情提要" class="headerlink" title="前情提要"></a>前情提要</h2><p>2019 年，我在 <a href="https://blog.marsen.me/2019/05/18/2019/aws_]]>
     </summary>
     <title>[產業報告] 從 DeepRacer 到 Robotaxi：Tesla vs Waymo 的無人駕駛現況</title>
-    <updated>2026-04-27T10:07:21.659Z</updated>
+    <updated>2026-04-28T06:14:27.368Z</updated>
   </entry>
   <entry>
     <author>
@@ -85,7 +103,7 @@
 <p>目標是從四個 AI 新聞來源拉資料，輸出]]>
     </summary>
     <title>[實作筆記] 個人自動化平台(四) n8n 實作：收集層，RSS 資料來源</title>
-    <updated>2026-04-27T10:07:21.660Z</updated>
+    <updated>2026-04-28T06:14:27.369Z</updated>
   </entry>
   <entry>
     <author>
@@ -104,7 +122,7 @@
 <p>這篇不急著]]>
     </summary>
     <title>[實作筆記] 個人自動化平台(三) 收集、處理、輸出：三層可插拔管道設計</title>
-    <updated>2026-04-27T10:07:21.659Z</updated>
+    <updated>2026-04-28T06:14:27.369Z</updated>
   </entry>
   <entry>
     <author>
@@ -124,7 +142,7 @@
     <title>
       <![CDATA[[實作筆記] 個人自動化平台(番外) 拆掉重建 GCP VM & Cloudflared Tunnel & Cloudflare Access]]>
     </title>
-    <updated>2026-04-27T10:07:21.660Z</updated>
+    <updated>2026-04-28T06:14:27.369Z</updated>
   </entry>
   <entry>
     <author>
@@ -145,7 +163,7 @@
     <title>
       <![CDATA[個人自動化平台(二) Cloudflare Access & Cloudflare Tunnel]]>
     </title>
-    <updated>2026-04-27T10:07:21.659Z</updated>
+    <updated>2026-04-28T06:14:27.369Z</updated>
   </entry>
   <entry>
     <author>
@@ -166,7 +184,7 @@
     <title>
       <![CDATA[[實作筆記] 個人自動化平台(一) n8n & GCP VM]]>
     </title>
-    <updated>2026-04-27T10:07:21.659Z</updated>
+    <updated>2026-04-28T06:14:27.369Z</updated>
   </entry>
   <entry>
     <author>
@@ -184,7 +202,7 @@
       <![CDATA[<h2 id="前情提要"><a href="#前情提要" class="headerlink" title="前情提要"></a>前情提要</h2><p>Gap year 期間收到一封獵頭的 LinkedIn 邀約，職位是 AI Workflow Tech Lead。  </p]]>
     </summary>
     <title>[生活筆記] 面試記錄 B 社 — AI Workflow Tech Lead</title>
-    <updated>2026-04-27T10:07:21.659Z</updated>
+    <updated>2026-04-28T06:14:27.369Z</updated>
   </entry>
   <entry>
     <author>
@@ -203,7 +221,7 @@
 <p>「系統性剝削」讓財富自動從勞動者流向資產持有者，普通人很難透過努力翻]]>
     </summary>
     <title>[生活筆記] 系統思考打工人生</title>
-    <updated>2026-04-27T10:07:21.660Z</updated>
+    <updated>2026-04-28T06:14:27.369Z</updated>
   </entry>
   <entry>
     <author>
@@ -221,7 +239,7 @@
       <![CDATA[<h2 id="前情提要"><a href="#前情提要" class="headerlink" title="前情提要"></a>前情提要</h2><p>在做韓文注音學習工具時，需要偵測瀏覽器是否支援 <code>speechSynthesis</code>，然後顯示提示訊息。]]>
     </summary>
     <title>[實作筆記] 在 Next.js 安全讀取 window：從 useEffect 到 useSyncExternalStore</title>
-    <updated>2026-04-27T10:07:21.660Z</updated>
+    <updated>2026-04-28T06:14:27.369Z</updated>
   </entry>
   <entry>
     <author>
@@ -240,7 +258,7 @@
 <p>例如「LINE Bot 的 Messaging API]]>
     </summary>
     <title>[實作筆記] 用 Cloudflare Tunnel 讓 LINE Bot Webhook 打到本機</title>
-    <updated>2026-04-27T10:07:21.659Z</updated>
+    <updated>2026-04-28T06:14:27.369Z</updated>
   </entry>
   <entry>
     <author>
@@ -259,7 +277,7 @@
 <figure class="highlight]]>
     </summary>
     <title>[實作筆記] Ghostty 打字出現 [O[27u 亂碼的原因與修正</title>
-    <updated>2026-04-27T10:07:21.659Z</updated>
+    <updated>2026-04-28T06:14:27.369Z</updated>
   </entry>
   <entry>
     <author>
@@ -278,7 +296,7 @@
 <h]]>
     </summary>
     <title>[工具筆記] Terminal 工具怎麼選？Ghostty、iTerm2 與其他選手比較</title>
-    <updated>2026-04-27T10:07:21.660Z</updated>
+    <updated>2026-04-28T06:14:27.369Z</updated>
   </entry>
   <entry>
     <author>
@@ -297,7 +315,7 @@
 <figure cl]]>
     </summary>
     <title>[實作筆記] Next.js Hydration 與隨機性：從問題到正確架構</title>
-    <updated>2026-04-27T10:07:21.660Z</updated>
+    <updated>2026-04-28T06:14:27.369Z</updated>
   </entry>
   <entry>
     <author>
@@ -314,7 +332,7 @@
       <![CDATA[<h2 id="前情提要"><a href="#前情提要" class="headerlink" title="前情提要"></a>前情提要</h2><p>自從 2025 年 9 月台新把 @GoGo 卡、FlyGo 卡、玫瑰 Giving 卡、太陽&#x2F;玫瑰卡這些信用卡整]]>
     </summary>
     <title>[生活筆記] 2026 台新 Richart Life 切換方案回饋最大化</title>
-    <updated>2026-04-27T10:07:21.660Z</updated>
+    <updated>2026-04-28T06:14:27.369Z</updated>
   </entry>
   <entry>
     <author>
@@ -331,7 +349,7 @@
       <![CDATA[<h2 id="前情提要"><a href="#前情提要" class="headerlink" title="前情提要"></a>前情提要</h2><p>延續<a href="https://blog.marsen.me/2025/11/28/2025/iv_thixxxxxx]]>
     </summary>
     <title>[生活筆記] 2025 T社面試心得 - 二面</title>
-    <updated>2026-04-27T10:07:21.658Z</updated>
+    <updated>2026-04-28T06:14:27.367Z</updated>
   </entry>
   <entry>
     <author>
@@ -349,7 +367,7 @@
 <p>一面是 Pyth]]>
     </summary>
     <title>[生活筆記] 2025 T社面試心得 - 一面</title>
-    <updated>2026-04-27T10:07:21.658Z</updated>
+    <updated>2026-04-28T06:14:27.367Z</updated>
   </entry>
   <entry>
     <author>
@@ -368,26 +386,6 @@
 <h2 id="當軟體開發還是一門工程學"><a href="#當軟體開發還是一門工程學" class="headerlink" title="當軟體開發還是一門工程學"></a>當軟體開發還是一門工程學</h2><p>1970 年代，當軟體開發還是一門]]>
     </summary>
     <title>[SDD 與 Spec Kit]傳統瀑布式開發（1975-2000）</title>
-    <updated>2026-04-27T10:07:21.659Z</updated>
-  </entry>
-  <entry>
-    <author>
-      <name>Marsen L.</name>
-      <email>admin@marsen.me</email>
-    </author>
-    <category term="學習筆記" scheme="https://blog.marsen.me/tags/%E5%AD%B8%E7%BF%92%E7%AD%86%E8%A8%98/"/>
-    <content>
-      <![CDATA[<p>TL;DR</p><h2 id="簡介-SDD"><a href="#簡介-SDD" class="headerlink" title="簡介 SDD"></a>簡介 SDD</h2><blockquote><p>What is Spec-Driven Development?<br>  Spec-Driven Development flips the script on traditional software development.<br>  For decades, code has been king — specifications were just scaffolding we built and discarded once the “real work” of coding began<br>  Spec-Driven Development changes this: specifications become executable, directly generating working implementations rather than jus<br>  guiding them.  – spec-kit</p></blockquote><p>什麼是規格驅動開發 ???<br>跟過往的開放方式什麼不同???<br>什麼原因讓它興起 ???  </p><h2 id="傳統開發流程-1990之前"><a href="#傳統開發流程-1990之前" class="headerlink" title="傳統開發流程(1990之前)"></a>傳統開發流程(1990之前)</h2><p>回顧軟體開發的歷史，個人電腦時代到網路時代(1975~1990)</p><p>大部份是傳統的瀑布式開發（Waterfall）流程是這樣的：</p><p>像是接力賽跑一樣一棒接一棒。</p><h3 id="需求分析-→-系統設計-→-實作-→-測試-→-部署-→-維護"><a href="#需求分析-→-系統設計-→-實作-→-測試-→-部署-→-維護" class="headerlink" title="需求分析 → 系統設計 → 實作 → 測試 → 部署 → 維護"></a>需求分析 → 系統設計 → 實作 → 測試 → 部署 → 維護</h3><p>每個階段都有明確的交付物：</p><p>需求分析:產出需求規格書（SRS），對應的角色會有 PM(產品或專案經理)</p><p>系統設計:產出設計文件（HLD&#x2F;LLD），對應的角色會有 SA&#x2F;SD(系統架構師&#x2F;系統設計師)</p><p>實作階段:產出程式碼，對應的角色會有 RD(工程師)</p><p>測試階段:產出測試報告，對應的角色會有 QA(測試工程師)</p><p>這個流程有幾個特點：</p><p>線性且不可逆 - 每個階段必須完成才能進入下一階段，很難回頭修改</p><p>文件導向 - 大量的文件作為階段間的交接依據</p><p>後期才見成果 - 要等到實作階段完成，才能看到實際的軟體</p><p>變更成本高 - 越晚發現問題，修改成本越高</p><p>在這個模式下，規格文件的角色是契約和藍圖。團隊花費大量時間撰寫詳細的規格，試圖在開始編碼前就想清楚所有細節。</p><p>但實務上，這些文件往往：</p><ul><li>寫完就過時，因為需求會變</li><li>與實作脫節，因為開發時會發現新問題</li><li>成為負擔，因為要花時間維護卻沒人看</li></ul><h2 id="敏捷開發流程-1990-至今"><a href="#敏捷開發流程-1990-至今" class="headerlink" title="敏捷開發流程(1990~至今)"></a>敏捷開發流程(1990~至今)</h2><p>敏捷開發（Agile）的出現，是對瀑布式開發的反思。它強調：</p><ul><li>個人與互動 &gt; 流程與工具</li><li>可用的軟體 &gt; 詳盡的文件</li><li>客戶合作 &gt; 合約協商</li><li>回應變化 &gt; 遵循計劃</li></ul><p>敏捷的典型流程（以 Scrum 為例）：</p><h3 id="Product-Backlog-→-Sprint-Planning-→-Daily-Standup-→-Sprint-Review-→-Sprint-Retrospective"><a href="#Product-Backlog-→-Sprint-Planning-→-Daily-Standup-→-Sprint-Review-→-Sprint-Retrospective" class="headerlink" title="Product Backlog → Sprint Planning → Daily Standup → Sprint Review → Sprint Retrospective"></a>Product Backlog → Sprint Planning → Daily Standup → Sprint Review → Sprint Retrospective</h3><p>這是一個迭代循環，每個 Sprint（通常 2-4 週）都會產出可用的軟體增量。</p><ul><li>Product Backlog: 對齊高層期望，主要角色 Stackholder&#x2F;Product Owner</li><li>Sprint Planning: 對齊實作時程與方式，主要角色 Product Owner&#x2F;Team</li><li>Daily Standup: 對齊每日進度，全角色參與</li><li>Sprint Review: 對齊結果，全角色參與</li><li>Sprint Retrospective: 對齊改善，全角色參與</li></ul><h3 id="雖然實施部分的Scrum-是可能的，但結果就不是Scrum-了"><a href="#雖然實施部分的Scrum-是可能的，但結果就不是Scrum-了" class="headerlink" title="雖然實施部分的Scrum 是可能的，但結果就不是Scrum 了"></a>雖然實施部分的Scrum 是可能的，但結果就不是Scrum 了</h3><p>敏捷的特點：</p><ul><li>迭代且增量 - 小步快跑，頻繁交付</li><li>溝通導向 - 強調面對面溝通勝過文件</li><li>早期且持續交付 - 每個 Sprint 都有可展示的成果</li><li>擁抱變化 - 將變更視為常態而非例外</li></ul><p>在敏捷模式下，規格文件的角色變成了溝通工具和備忘錄。  </p><p>User Story、Acceptance Criteria 這些輕量級的規格，主要是為了確保團隊理解一致。</p><p>程式碼本身成為了真相的來源 - “Code is the truth”。</p><p>在迭代過後，這些文件不再有意義。</p><p>這解決了瀑布式的一些問題，但也帶來新的挑戰：</p><ul><li>知識容易流失（口頭溝通沒有記錄，使用團隊記憶）</li><li>技術債累積（快速迭代可能犧牲品質）</li><li>規格與實作的差距依然存在</li><li>實際上團隊&#x2F;文化等因素，在跑的只是 Scurm-but&#x2F;小瀑布&#x2F;隕石</li><li>商業化的行為已經扭曲原意，甚至作為 KOL 老王賣瓜的神主牌 (看看”敏捷社群”)</li><li>在大型產品&#x2F;專案仍然不足夠，因而衍生 SAFe&#x2F;LeSS 等方法論</li><li>淪為表面功夫</li></ul><h2 id="隕石開發流程-Alpha-Omega"><a href="#隕石開發流程-Alpha-Omega" class="headerlink" title="隕石開發流程(Alpha~Omega)"></a>隕石開發流程(Alpha~Omega)</h2><p>典型流程</p><h3 id="老闆一句話-→-隨便硬幹出來-→-夠奴就加班-→-交付疊加態-→-塊逃啊"><a href="#老闆一句話-→-隨便硬幹出來-→-夠奴就加班-→-交付疊加態-→-塊逃啊" class="headerlink" title="老闆一句話 → 隨便硬幹出來 → 夠奴就加班 → 交付疊加態 → 塊逃啊"></a>老闆一句話 → 隨便硬幹出來 → 夠奴就加班 → 交付疊加態 → 塊逃啊</h3><ul><li>老闆一句話：靈感一來就開幹，需求模糊。</li><li>隨便硬幹出來：原型被誤當產品，直接上線。</li><li>夠奴就加班：團隊燃燒工時與理智，一次衝到底。</li><li>交付疊加態：交付內容沒人知，時程沒人知，測沒測沒人知。</li><li>塊逃啊：事後檢討變成批鬥大會，成功不在你，但失敗一定有份。</li></ul><h3 id="特點與本質"><a href="#特點與本質" class="headerlink" title="特點與本質"></a>特點與本質</h3><p>高壓短命、方向即興、溝通崩壞、文件失效、驗收模糊。<br>看似混亂，其實是一種生存策略(實用主義)：</p><ul><li>PM 可保命：有 Demo、有交付，能交差。</li><li>行銷能吹噓：原型當 MVP，上媒體先贏聲量。</li><li>市場能行（騙）銷：先開賣、後補齊。</li><li>老闆能交代：有成果、有故事，股東就安心。</li><li>RD 隨便作，洗個經驗跳糟加薪比較快</li></ul><p>隕石開發不是技術問題，而是組織文化的選擇。</p><h2 id="這些流程的異同、優劣與困境"><a href="#這些流程的異同、優劣與困境" class="headerlink" title="這些流程的異同、優劣與困境"></a>這些流程的異同、優劣與困境</h2><p>瀑布、敏捷與隕石開發的差別，反映的是組織文化與生存策略。</p><p>瀑布式重規劃與控制，適合穩定需求與高風險專案，但變更成本高、回饋慢。</p><p>敏捷式重回饋與溝通，能快速交付並擁抱變化。</p><p>隕石式則靠爆發力求生存，短期有成效，不考慮長期品質與維運。</p><p>我的看法是新創成長到高原期時，就會從隕石走而敏捷，再大規模就會考慮瀑布&#x2F;LeSS&#x2F;SAFe，</p><p>而市場大部份都是中小企業，真的能成長成巨人者(amazon&#x2F;spotify&#x2F;netfilx)，</p><p>一定有它的原因，開發流程應該隨著公司業務成長，形成自已的文化，沒有一定的好壞，也不是可以輕易模仿的。</p><h2 id="工程師的自我要求"><a href="#工程師的自我要求" class="headerlink" title="工程師的自我要求"></a>工程師的自我要求</h2><p>我個人是傾向 XP 的開發模式，但是它的缺點是學習門檻高，  </p><p>對面試沒幫助，更多的公司寧願你寫白板題或刷 LeetCode。</p><p>團隊不願意投入，相關的 TDD&#x2F;ATDD&#x2F;BDD 或是測試左移更難導入小團隊之中。</p><p>高層如果沒有技術能力，無法識別好壞，就容易被唬弄，導致需求與實作有落差</p><h2 id="AI-SDD-流程-2024-未來"><a href="#AI-SDD-流程-2024-未來" class="headerlink" title="AI SDD 流程(2024~未來?)"></a>AI SDD 流程(2024~未來?)</h2><p>AI Agent 或 SDD 出現後能不能帶來改變?</p><p>或是可以帶來什麼幫助呢?</p><p>對工程師而言</p><ul><li>內建 TDD，但是工程師仍要學習其觀念</li><li>降低學習門檻，可以用更 Clean 的方式實作代碼</li><li>全權委託，但是工程師要對架構負責(變得更像 SA ?)</li><li>淘汰劣質工程師，ex 轉職班、就業班、刷題仔，但是有的很會行銷自已，會被唬弄過去</li></ul><p>對產品而言</p><ul><li>可以縮短想法到實作的距離</li><li>保持一定的品質，特別是你的工程師都是來自x成、x匠時…</li><li>自已開發，更高的回饋</li></ul><p>問題，認知的差距，人只能賺到自已認知能力內的錢</p><p>之前有一個網紅行銷使用 Agent 開發賣課，犯了最低級的錯誤</p><p>這是因為他缺乏資安的認知; 所以原本不是開發的人員會需要快速的學習相關的知識(但是 AI 可以將門檻降低)</p><p>另外一些反思，那種工程師看不上眼的程式(普遍社群上的工程師都在嘲諷)，</p><p>人家已經拿來行銷賣錢，或許工程師應該反向思考怎麼朝行銷&#x2F;產品靠攏</p><p>也或許這個低級錯誤也是行銷手段的一環?</p><p>接下來， 我將會用一系列的文章來試作 SDD 並分享我的看法</p><h2 id="參考"><a href="#參考" class="headerlink" title="參考"></a>參考</h2><ul><li><a href="https://eiki.hatenablog.jp/entry/meteo_fall">隕石開發流程</a></li><li><a href="https://bclin.tw/2018/06/01/meteo-fall/">隕石開發流程-中文版</a></li><li><a href="https://martinfowler.com/articles/agile-aus-2018.html">Martin Fowler 澳洲演講筆記-變質的敏捷，回歸初衷。</a></li><li><a href="https://blog.cleancoder.com/uncle-bob/2018/08/28/CraftsmanshipMovement.html">軟體工匠的悲歌 The Tragedy of Craftsmanship.</a></li></ul><p>(fin)</p>]]>
-    </content>
-    <id>https://blog.marsen.me/2025/10/29/2025/sdd_spec_kit/</id>
-    <link href="https://blog.marsen.me/2025/10/29/2025/sdd_spec_kit/"/>
-    <published>2025-10-29T05:06:15.000Z</published>
-    <summary>
-      <![CDATA[<p>TL;DR</p>
-<h2 id="簡介-SDD"><a href="#簡介-SDD" class="headerlink" title="簡介 SDD"></a>簡介 SDD</h2><blockquote>
-<p>What is Spec-Driven Developm]]>
-    </summary>
-    <title>[學習筆記] SDD 與 Spec Kit - 前言</title>
-    <updated>2026-04-27T10:07:21.659Z</updated>
+    <updated>2026-04-28T06:14:27.368Z</updated>
   </entry>
 </feed>
