@@ -12,7 +12,7 @@
   <rights>All rights reserved 2026, Marsen L.</rights>
   <subtitle>waiting to load</subtitle>
   <title>Marsen's Blog</title>
-  <updated>2026-04-28T15:19:38.080Z</updated>
+  <updated>2026-04-29T03:50:07.813Z</updated>
   <entry>
     <author>
       <name>Marsen L.</name>
@@ -20,7 +20,7 @@
     </author>
     <category term="實作筆記" scheme="https://blog.marsen.me/tags/%E5%AF%A6%E4%BD%9C%E7%AD%86%E8%A8%98/"/>
     <content>
-      <![CDATA[<h2 id="前情提要"><a href="#前情提要" class="headerlink" title="前情提要"></a>前情提要</h2><p>整理一次技術面試的對話紀錄，主題圍繞在大流量電商系統的設計與應變。</p><p><strong>面試公司</strong>：H 社，北台灣，科技服務業，員工數十人。實際業務為線上遊戲平台的開發與維運；產品涵蓋自研遊戲、第三方遊戲接入，以及面向代理商與玩家的平台系統。整體採微服務架構，開發部門數十人，小組制運作。跨國營運，技術端設於台灣。</p><p><strong>職位</strong>：後端為主的全端工程師，技術棧含 Node.js &#x2F; Go、現代前端框架、SQL &#x2F; NoSQL，要求具備架構設計與 CI&#x2F;CD 實務能力，並承擔技術指導職責。</p><p>以下按主題整理成 Q&amp;A，並附上現代技術視角供參考。</p><hr><h2 id="大流量與快取架構"><a href="#大流量與快取架構" class="headerlink" title="大流量與快取架構"></a>大流量與快取架構</h2><p><strong>Q：電商搶購時流量瞬間暴增，怎麼擋？</strong></p><p>先接受「讓使用者排隊，不讓網站 crash」這個前提，整個設計才會清楚。</p><p>具體做法是多層 Cache 疊加：</p><ul><li><strong>前端</strong>：搶購期間關掉非核心的資訊（推薦、廣告等），減少後端壓力</li><li><strong>後端第一層</strong>：庫存資料放 Redis</li><li><strong>後端第二層</strong>：使用 MemoryCache（.NET 4.5&#x2F;4.6 內建）做本地快取</li><li><strong>DB 層</strong>：DB 自身的查詢快取</li></ul><p>流量依序被每一層擋掉，真正打到 DB 的請求量才能控制住。</p><p><strong>現代解法</strong>：Kubernetes + HPA（Horizontal Pod Autoscaler）根據 CPU &#x2F; Memory 自動擴縮容，不再需要預先備機和人工值班。Redis 依然是標準選擇，但搭配 Lua Script 或 WATCH&#x2F;MULTI&#x2F;EXEC 可更精確控制庫存的原子操作，避免超賣。</p><hr><p><strong>Q：那時候沒有 Kubernetes，怎麼做水平擴充？</strong></p><p>用 VM 搭配手動的負載分流。備用機平時待機，搶購前預先準備好；緊急時把流量導過去。</p><p>沒有自動 scale，所以需要人工值班監控——雙 11 期間三班制，值班加 on-call 全員待命。</p><p><strong>現代解法</strong>：Kubernetes 的 Deployment + HPA 讓水平擴充自動化，節省人力成本。搭配 Cluster Autoscaler，甚至連底層節點都能自動增減，不再需要預先開好備用機等待。</p><hr><h2 id="監控與事故應對"><a href="#監控與事故應對" class="headerlink" title="監控與事故應對"></a>監控與事故應對</h2><p><strong>Q：系統是 crash 了才知道，還是有提前預警？</strong></p><p>有兩個觸發條件：</p><ol><li><strong>資源閾值警報</strong>：CPU 或 Memory 超過 80% 就通知，不等到崩潰</li><li><strong>錯誤日誌頻率</strong>：同類型錯誤在短時間內高頻出現，自動告警</li></ol><p>這些監控都是自己開發的，那個年代沒有現成的 APM 工具可以直接套。</p><p><strong>現代解法</strong>：Prometheus + Grafana 是現在的標準配置，幾乎不需要自己開發。資源閾值警報用 AlertManager 設定即可；錯誤頻率則可搭配 ELK Stack 或 Loki，對 log 做 rate 統計觸發告警。SaaS 選項如 Datadog、New Relic 更是開箱即用。</p><hr><p><strong>Q：真的發生過事故嗎？當下怎麼處理？</strong></p><p>有發生過，包含主機掛掉切備用機、備用機跟著掛掉的連環情況。</p><p>第一線的原則是：<strong>先讓系統回來，問題找根因可以之後再說</strong>。</p><p>當下操作是執行預先備好的備案（切流量、重啟服務），同時通報讓有能力解決根本問題的人起來處理。</p><p>事後改進：正式搶購活動前一定先壓測，模擬預估流量的 110%，只測核心購物流程，把能關的功能全部關掉。</p><p><strong>現代解法</strong>：事故應對流程本身可以標準化為 <strong>Runbook</strong>，記錄每種已知情境的處置步驟，讓值班工程師不需要靠記憶應急。Kubernetes 搭配 liveness&#x2F;readiness probe 可自動偵測服務不健康並重啟，減少人工介入的時間窗口。壓測工具如 k6 或 Locust 可整合進 CI&#x2F;CD，讓每次上線前自動跑一輪基準測試。</p><hr><h2 id="金流系統設計"><a href="#金流系統設計" class="headerlink" title="金流系統設計"></a>金流系統設計</h2><p><strong>Q：對接多個金流廠商，程式碼怎麼不變成一團亂？</strong></p><p>用 Strategy Pattern 的概念，把金流流程切成 Workflow。</p><p>整個下單流程是一條工作站鍊：</p><figure class="highlight text"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">商品計算（折扣、贈品）→ 訂單建立 → 金流付款</span><br></pre></td></tr></table></figure><p>金流工作站本身的邏輯很薄：根據使用者選的付款方式，決定走哪個 Strategy。不同廠商（信用卡、超商取貨、銀行轉帳）各自封裝成獨立模組，主流程不在意裡面怎麼串接。</p><p>新增金流廠商：加一個新模組，主流程不用改。</p><p><strong>現代解法</strong>：這個架構今天依然適用，核心概念沒有過時。如果系統更大，可以把每個金流廠商拆成獨立的微服務，透過統一的 Payment Gateway API 對外暴露，主流程完全不感知廠商差異。設計模式上除了 Strategy，也可以考慮 Plugin Architecture，讓新廠商直接以套件形式掛入，不需要改動核心程式碼。</p><hr><p><strong>Q：訂單成立了，金流卻失敗，怎麼處理？</strong></p><p>訂單成立和金流付款是兩個獨立的 Transaction。</p><p>金流失敗不會 rollback 訂單，而是讓訂單保持「待付款」狀態，通知使用者重新付款或換付款方式。</p><p>好處是：金流失敗是常見的可預期錯誤，這樣設計使用者體驗比較好，也避免訂單資料不一致。</p><p><strong>現代解法</strong>：在微服務架構下，這個問題升級為<strong>分散式交易</strong>問題。現代標準解法是 <strong>Saga Pattern</strong>：每個步驟成功後發事件觸發下一步，失敗時執行 compensating transaction 回滾前面的狀態，整個流程不依賴跨服務的 ACID Transaction。Choreography Saga 適合步驟簡單的流程，Orchestration Saga 適合需要集中管控的複雜流程。</p><hr><h2 id="AI-與本地部署"><a href="#AI-與本地部署" class="headerlink" title="AI 與本地部署"></a>AI 與本地部署</h2><p><strong>Q：你做的法律 AI 系統，為什麼不用雲端大模型就好？</strong></p><p>客戶是大型企業（Sony、政府機關、醫療機構），他們不願意把公司內部資料送上雲端。</p><p>做法是把 AI 系統打包進實體機器，送進客戶的內網部署。功能類似 ChatGPT，但跑在客戶自己的機房裡。</p><p>主要應用場景是：</p><ol><li><strong>RAG</strong>：上傳法律文件，AI 從裡面查詢相關資訊</li><li><strong>專利風險分析</strong>：原本需要半年人工查詢各大專利資料庫，自動化後大幅縮短</li></ol><p><strong>現代工具</strong>：本地部署 AI 的技術棧已經成熟許多。<strong>Ollama</strong> 可以一鍵跑主流開源模型（Llama 3、Mistral 等），<strong>LlamaIndex</strong> 或 <strong>LangChain</strong> 提供 RAG pipeline 的標準建構塊，向量資料庫用 <strong>ChromaDB</strong>、<strong>Qdrant</strong> 或 <strong>Weaviate</strong> 都可以，整個 stack 都可以打包進客戶內網。對於需要更強模型的場景，也可以考慮 <strong>vLLM</strong> 搭配企業級 GPU，在不上雲的前提下跑到生產等級的推論效能。</p><hr><h2 id="關於-AI-對開發的影響"><a href="#關於-AI-對開發的影響" class="headerlink" title="關於 AI 對開發的影響"></a>關於 AI 對開發的影響</h2><p><strong>Q：你覺得 AI 工具對軟體開發的影響是什麼？</strong></p><p>一個工程師現在能產出的東西，可能相當於十年前一整個小團隊的產出。</p><p>但這也帶來新的問題：程式碼產出速度快了，但架構決策、程式碼品質的門檻反而更重要。AI 可以快速生出大量程式碼，但如果架構設計不對，技術債也會累積得更快。</p><p><strong>進一步的觀察</strong>：Coding style 和命名規範這類問題，現在完全可以交給 AI 處理——把 guideline 寫好，讓 AI 執行和稽核就好，不值得花人力在上面爭論。真正需要人把關的是 <strong>Domain 層和 Use Case 層的設計</strong>：商業邏輯有沒有被正確封裝？Unit Test 有沒有覆蓋核心行為？這兩層做對了，架構就不容易爛掉。六邊形架構（Hexagonal Architecture）或 Clean Architecture 在 AI 輔助開發的時代反而更值得落地，因為邊界清楚，AI 才不容易在錯誤的地方塞邏輯。</p><hr><h2 id="面試反思"><a href="#面試反思" class="headerlink" title="面試反思"></a>面試反思</h2><p><strong>用業界術語包裝已知的答案</strong></p><p>描述分散式交易的處理方式時，邏輯是對的，但沒有說出 <strong>Saga Pattern</strong> 這個詞。面試官如果熟悉這個詞，會更快建立信心；說不出來反而讓人以為是靠直覺摸索，不是系統性的設計知識。同樣的，提到 Request ID 追蹤時，可以直接說 <strong>Distributed Tracing</strong>、<strong>OpenTelemetry</strong>，展示對現代標準的認識。術語不是裝飾，它是讓對方快速理解你程度的捷徑。</p><p><strong>主動帶出現代解法</strong></p><p>談 91App 那個年代的做法時，可以補一句「現在我會用 Kubernetes + HPA 處理這個問題」——展示持續學習的態度。技術知識有，但沒有主動說出來，廣度就沒有完整呈現。</p><blockquote><p>這兩點對應的技術題目值得另外整理成文章研究：Saga Pattern、Distributed Tracing、OpenTelemetry。</p></blockquote><hr><h2 id="小結"><a href="#小結" class="headerlink" title="小結"></a>小結</h2><ul><li>大流量不靠單一技術解決，是多層 Cache + 系統開關 + 人工值班的組合</li><li>監控要在系統崩潰前就觸發，資源閾值和錯誤頻率是兩個實用的指標</li><li>事故處理分兩階段：先讓系統回來，再找根因</li><li>金流複雜性用 Strategy Pattern + Workflow 拆解，廠商細節封裝進模組</li><li>本地 AI 部署是企業安全性需求的實際解法，不只是技術選擇</li></ul><p>(fin)</p>]]>
+      <![CDATA[<h2 id="前情提要"><a href="#前情提要" class="headerlink" title="前情提要"></a>前情提要</h2><p>整理一次技術面試的對話紀錄，主題圍繞在大流量電商系統的設計與應變。</p><p><strong>面試公司</strong>：H 社，北台灣，科技服務業，員工數十人。實際業務為線上遊戲平台的開發與維運；產品涵蓋自研遊戲、第三方遊戲接入，以及面向代理商與玩家的平台系統。整體採微服務架構，開發部門數十人，小組制運作。跨國營運，技術端設於台灣。</p><p><strong>職位</strong>：後端為主的全端工程師，技術棧含 Node.js &#x2F; Go、現代前端框架、SQL &#x2F; NoSQL，要求具備架構設計與 CI&#x2F;CD 實務能力，並承擔技術指導職責。</p><p>以下按主題整理成 Q&amp;A，並附上現代技術視角供參考。</p><hr><h2 id="大流量與快取架構"><a href="#大流量與快取架構" class="headerlink" title="大流量與快取架構"></a>大流量與快取架構</h2><p><strong>Q：電商搶購時流量瞬間暴增，怎麼擋？</strong></p><p>先接受「讓使用者排隊，不讓網站 crash」這個前提，整個設計才會清楚。</p><p>具體做法是多層 Cache 疊加：</p><ul><li><strong>前端</strong>：搶購期間關掉非核心的資訊（推薦、廣告等），減少後端壓力</li><li><strong>後端第一層</strong>：庫存資料放 Redis</li><li><strong>後端第二層</strong>：使用 MemoryCache（.NET 4.5&#x2F;4.6 內建）做本地快取</li><li><strong>DB 層</strong>：DB 自身的查詢快取</li></ul><p>流量依序被每一層擋掉，真正打到 DB 的請求量才能控制住。</p><p><strong>現代解法</strong>：Kubernetes + HPA（Horizontal Pod Autoscaler）根據 CPU &#x2F; Memory 自動擴縮容，不再需要預先備機和人工值班。Redis 依然是標準選擇，但搭配 Lua Script 或 WATCH&#x2F;MULTI&#x2F;EXEC 可更精確控制庫存的原子操作，避免超賣。</p><hr><p><strong>Q：那時候沒有 Kubernetes，怎麼做水平擴充？</strong></p><p>用 VM 搭配手動的負載分流。備用機平時待機，搶購前預先準備好；緊急時把流量導過去。</p><p>沒有自動 scale，所以需要人工值班監控——雙 11 期間三班制，值班加 on-call 全員待命。</p><p><strong>現代解法</strong>：Kubernetes 的 Deployment + HPA 讓水平擴充自動化，節省人力成本。搭配 Cluster Autoscaler，甚至連底層節點都能自動增減，不再需要預先開好備用機等待。</p><hr><h2 id="監控與事故應對"><a href="#監控與事故應對" class="headerlink" title="監控與事故應對"></a>監控與事故應對</h2><p><strong>Q：系統是 crash 了才知道，還是有提前預警？</strong></p><p>有兩個觸發條件：</p><ol><li><strong>資源閾值警報</strong>：CPU 或 Memory 超過 80% 就通知，不等到崩潰</li><li><strong>錯誤日誌頻率</strong>：同類型錯誤在短時間內高頻出現，自動告警</li></ol><p>這些監控都是自己開發的，那個年代沒有現成的 APM 工具可以直接套。</p><p><strong>現代解法</strong>：Prometheus + Grafana 是現在的標準配置，幾乎不需要自己開發。資源閾值警報用 AlertManager 設定即可；錯誤頻率則可搭配 ELK Stack 或 Loki，對 log 做 rate 統計觸發告警。SaaS 選項如 Datadog、New Relic 更是開箱即用。</p><hr><p><strong>Q：真的發生過事故嗎？當下怎麼處理？</strong></p><p>有發生過，包含主機掛掉切備用機、備用機跟著掛掉的連環情況。</p><p>第一線的原則是：<strong>先讓系統回來，問題找根因可以之後再說</strong>。</p><p>當下操作是執行預先備好的備案（切流量、重啟服務），同時通報讓有能力解決根本問題的人起來處理。</p><p>事後改進：正式搶購活動前一定先壓測，模擬預估流量的 110%，只測核心購物流程，把能關的功能全部關掉。</p><p><strong>現代解法</strong>：事故應對流程本身可以標準化為 <strong>Runbook</strong>，記錄每種已知情境的處置步驟，讓值班工程師不需要靠記憶應急。Kubernetes 搭配 liveness&#x2F;readiness probe 可自動偵測服務不健康並重啟，減少人工介入的時間窗口。壓測工具如 k6 或 Locust 可整合進 CI&#x2F;CD，讓每次上線前自動跑一輪基準測試。</p><hr><h2 id="金流系統設計"><a href="#金流系統設計" class="headerlink" title="金流系統設計"></a>金流系統設計</h2><p><strong>Q：對接多個金流廠商，程式碼怎麼不變成一團亂？</strong></p><p>用 Strategy Pattern 的概念，把金流流程切成 Workflow。</p><p>整個下單流程是一條工作站鍊：</p><figure class="highlight text"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">商品計算（折扣、贈品）→ 訂單建立 → 金流付款</span><br></pre></td></tr></table></figure><p>金流工作站本身的邏輯很薄：根據使用者選的付款方式，決定走哪個 Strategy。不同廠商（信用卡、超商取貨、銀行轉帳）各自封裝成獨立模組，主流程不在意裡面怎麼串接。</p><p>新增金流廠商：加一個新模組，主流程不用改。</p><p><strong>現代解法</strong>：這個架構今天依然適用，核心概念沒有過時。如果系統更大，可以把每個金流廠商拆成獨立的微服務，透過統一的 Payment Gateway API 對外暴露，主流程完全不感知廠商差異。設計模式上除了 Strategy，也可以考慮 Plugin Architecture，讓新廠商直接以套件形式掛入，不需要改動核心程式碼。</p><hr><p><strong>Q：訂單成立了，金流卻失敗，怎麼處理？</strong></p><p>訂單成立和金流付款是兩個獨立的 Transaction。</p><p>金流失敗不會 rollback 訂單，而是讓訂單保持「待付款」狀態，通知使用者重新付款或換付款方式。</p><p>好處是：金流失敗是常見的可預期錯誤，這樣設計使用者體驗比較好，也避免訂單資料不一致。</p><p><strong>現代解法</strong>：在微服務架構下，這個問題升級為<strong>分散式交易</strong>問題。現代標準解法是 <strong>Saga Pattern</strong>：每個步驟成功後發事件觸發下一步，失敗時執行 compensating transaction 回滾前面的狀態，整個流程不依賴跨服務的 ACID Transaction。Choreography Saga 適合步驟簡單的流程，Orchestration Saga 適合需要集中管控的複雜流程。</p><hr><h2 id="AI-與本地部署"><a href="#AI-與本地部署" class="headerlink" title="AI 與本地部署"></a>AI 與本地部署</h2><p><strong>Q：你做的法律 AI 系統，為什麼不用雲端大模型就好？</strong></p><p>客戶是大型企業（Sony、政府機關、醫療機構），他們不願意把公司內部資料送上雲端。</p><p>做法是把 AI 系統打包進實體機器，送進客戶的內網部署。功能類似 ChatGPT，但跑在客戶自己的機房裡。</p><p>主要應用場景是：</p><ol><li><strong>RAG</strong>：上傳法律文件，AI 從裡面查詢相關資訊</li><li><strong>專利風險分析</strong>：原本需要半年人工查詢各大專利資料庫，自動化後大幅縮短</li></ol><p><strong>現代工具</strong>：本地部署 AI 的技術棧已經成熟許多。<strong>Ollama</strong> 可以一鍵跑主流開源模型（Llama 3、Mistral 等），<strong>LlamaIndex</strong> 或 <strong>LangChain</strong> 提供 RAG pipeline 的標準建構塊，向量資料庫用 <strong>ChromaDB</strong>、<strong>Qdrant</strong> 或 <strong>Weaviate</strong> 都可以，整個 stack 都可以打包進客戶內網。對於需要更強模型的場景，也可以考慮 <strong>vLLM</strong> 搭配企業級 GPU，在不上雲的前提下跑到生產等級的推論效能。</p><hr><h2 id="關於-AI-對開發的影響"><a href="#關於-AI-對開發的影響" class="headerlink" title="關於 AI 對開發的影響"></a>關於 AI 對開發的影響</h2><p><strong>Q：你覺得 AI 工具對軟體開發的影響是什麼？</strong></p><p>一個工程師現在能產出的東西，可能相當於十年前一整個小團隊的產出。</p><p>但這也帶來新的問題：程式碼產出速度快了，但架構決策、程式碼品質的門檻反而更重要。AI 可以快速生出大量程式碼，但如果架構設計不對，技術債也會累積得更快。</p><p><strong>進一步的觀察</strong>：Coding style 和命名規範這類問題，現在完全可以交給 AI 處理——把 guideline 寫好，讓 AI 執行和稽核就好，不值得花人力在上面爭論。真正需要人把關的是 <strong>Domain 層和 Use Case 層的設計</strong>：商業邏輯有沒有被正確封裝？Unit Test 有沒有覆蓋核心行為？這兩層做對了，架構就不容易爛掉。六邊形架構（Hexagonal Architecture）或 Clean Architecture 在 AI 輔助開發的時代反而更值得落地，因為邊界清楚，AI 才不容易在錯誤的地方塞邏輯。</p><hr><h2 id="面試反思"><a href="#面試反思" class="headerlink" title="面試反思"></a>面試反思</h2><p><strong>用業界術語包裝已知的答案</strong></p><p>描述分散式交易的處理方式時，邏輯是對的，但沒有說出 <strong>Saga Pattern</strong> 這個詞。面試官如果熟悉這個詞，會更快建立信心；說不出來反而讓人以為是靠直覺摸索，不是系統性的設計知識。同樣的，提到 Request ID 追蹤時，可以直接說 <strong>Distributed Tracing</strong>、<strong>OpenTelemetry</strong>，展示對現代標準的認識。術語不是裝飾，它是讓對方快速理解你程度的捷徑。</p><p><strong>主動帶出現代解法</strong></p><p>談 電商 N 社 那個年代的做法時，可以補一句「現在我會用 Kubernetes + HPA 處理這個問題」——展示持續學習的態度。技術知識有，但沒有主動說出來，廣度就沒有完整呈現。</p><blockquote><p>這兩點對應的技術題目值得另外整理成文章研究：Saga Pattern、Distributed Tracing、OpenTelemetry。</p></blockquote><hr><h2 id="小結"><a href="#小結" class="headerlink" title="小結"></a>小結</h2><ul><li>大流量不靠單一技術解決，是多層 Cache + 系統開關 + 人工值班的組合</li><li>監控要在系統崩潰前就觸發，資源閾值和錯誤頻率是兩個實用的指標</li><li>事故處理分兩階段：先讓系統回來，再找根因</li><li>金流複雜性用 Strategy Pattern + Workflow 拆解，廠商細節封裝進模組</li><li>本地 AI 部署是企業安全性需求的實際解法，不只是技術選擇</li></ul><p>(fin)</p>]]>
     </content>
     <id>https://blog.marsen.me/2026/04/28/2026/interview-high-traffic-system-design/</id>
     <link href="https://blog.marsen.me/2026/04/28/2026/interview-high-traffic-system-design/"/>
@@ -32,7 +32,7 @@
     <title>
       <![CDATA[[實作筆記] 技術面試 Q&A：大流量電商系統設計實戰]]>
     </title>
-    <updated>2026-04-28T15:19:38.080Z</updated>
+    <updated>2026-04-29T03:50:07.813Z</updated>
   </entry>
   <entry>
     <author>
@@ -50,7 +50,7 @@
       <![CDATA[<h2 id="前情提要"><a href="#前情提要" class="headerlink" title="前情提要"></a>前情提要</h2><p>在 <a href="/2026/n8n-6-pipeline-output/">個人自動化平台(六)</a> 實作 IG]]>
     </summary>
     <title>[實作筆記] 個人自動化平台(番外) Google OAuth redirect_uri_mismatch 除錯記錄</title>
-    <updated>2026-04-28T15:19:38.080Z</updated>
+    <updated>2026-04-29T03:50:07.813Z</updated>
   </entry>
   <entry>
     <author>
@@ -69,7 +69,7 @@
 <p>這篇記錄處理層：把多筆文章合併，送給 Gemini 整理成 A]]>
     </summary>
     <title>[實作筆記] 個人自動化平台(五) n8n 實作：處理層，Aggregate + Gemini 週報整理</title>
-    <updated>2026-04-28T15:19:38.080Z</updated>
+    <updated>2026-04-29T03:50:07.813Z</updated>
   </entry>
   <entry>
     <author>
@@ -87,7 +87,7 @@
       <![CDATA[<h2 id="前情提要"><a href="#前情提要" class="headerlink" title="前情提要"></a>前情提要</h2><p>收集層（RSS 抓資料）和處理層（Gemini 整理週報）都跑通了，接下來要實作輸出層：把 AI 整理好的內容自動發布到社群]]>
     </summary>
     <title>[實作筆記] 個人自動化平台(六) n8n 實作：輸出層，Instagram API 取得 Token 全記錄</title>
-    <updated>2026-04-28T15:19:38.080Z</updated>
+    <updated>2026-04-29T03:50:07.813Z</updated>
   </entry>
   <entry>
     <author>
@@ -105,7 +105,7 @@
       <![CDATA[<h2 id="前情提要"><a href="#前情提要" class="headerlink" title="前情提要"></a>前情提要</h2><p>2019 年，我在 <a href="https://blog.marsen.me/2019/05/18/2019/aws_]]>
     </summary>
     <title>[產業報告] 從 DeepRacer 到 Robotaxi：Tesla vs Waymo 的無人駕駛現況</title>
-    <updated>2026-04-28T15:19:38.078Z</updated>
+    <updated>2026-04-29T03:50:07.813Z</updated>
   </entry>
   <entry>
     <author>
@@ -124,7 +124,7 @@
 <p>目標是從四個 AI 新聞來源拉資料，輸出]]>
     </summary>
     <title>[實作筆記] 個人自動化平台(四) n8n 實作：收集層，RSS 資料來源</title>
-    <updated>2026-04-28T15:19:38.080Z</updated>
+    <updated>2026-04-29T03:50:07.813Z</updated>
   </entry>
   <entry>
     <author>
@@ -143,7 +143,7 @@
 <p>這篇不急著]]>
     </summary>
     <title>[實作筆記] 個人自動化平台(三) 收集、處理、輸出：三層可插拔管道設計</title>
-    <updated>2026-04-28T15:19:38.080Z</updated>
+    <updated>2026-04-29T03:50:07.813Z</updated>
   </entry>
   <entry>
     <author>
@@ -163,7 +163,7 @@
     <title>
       <![CDATA[[實作筆記] 個人自動化平台(番外) 拆掉重建 GCP VM & Cloudflared Tunnel & Cloudflare Access]]>
     </title>
-    <updated>2026-04-28T15:19:38.080Z</updated>
+    <updated>2026-04-29T03:50:07.813Z</updated>
   </entry>
   <entry>
     <author>
@@ -184,7 +184,7 @@
     <title>
       <![CDATA[個人自動化平台(二) Cloudflare Access & Cloudflare Tunnel]]>
     </title>
-    <updated>2026-04-28T15:19:38.080Z</updated>
+    <updated>2026-04-29T03:50:07.813Z</updated>
   </entry>
   <entry>
     <author>
@@ -205,7 +205,7 @@
     <title>
       <![CDATA[[實作筆記] 個人自動化平台(一) n8n & GCP VM]]>
     </title>
-    <updated>2026-04-28T15:19:38.080Z</updated>
+    <updated>2026-04-29T03:50:07.813Z</updated>
   </entry>
   <entry>
     <author>
@@ -223,7 +223,7 @@
       <![CDATA[<h2 id="前情提要"><a href="#前情提要" class="headerlink" title="前情提要"></a>前情提要</h2><p>Gap year 期間收到一封獵頭的 LinkedIn 邀約，職位是 AI Workflow Tech Lead。  </p]]>
     </summary>
     <title>[生活筆記] 面試記錄 B 社 — AI Workflow Tech Lead</title>
-    <updated>2026-04-28T15:19:38.080Z</updated>
+    <updated>2026-04-29T03:50:07.813Z</updated>
   </entry>
   <entry>
     <author>
@@ -242,7 +242,7 @@
 <p>「系統性剝削」讓財富自動從勞動者流向資產持有者，普通人很難透過努力翻]]>
     </summary>
     <title>[生活筆記] 系統思考打工人生</title>
-    <updated>2026-04-28T15:19:38.080Z</updated>
+    <updated>2026-04-29T03:50:07.814Z</updated>
   </entry>
   <entry>
     <author>
@@ -260,7 +260,7 @@
       <![CDATA[<h2 id="前情提要"><a href="#前情提要" class="headerlink" title="前情提要"></a>前情提要</h2><p>在做韓文注音學習工具時，需要偵測瀏覽器是否支援 <code>speechSynthesis</code>，然後顯示提示訊息。]]>
     </summary>
     <title>[實作筆記] 在 Next.js 安全讀取 window：從 useEffect 到 useSyncExternalStore</title>
-    <updated>2026-04-28T15:19:38.080Z</updated>
+    <updated>2026-04-29T03:50:07.814Z</updated>
   </entry>
   <entry>
     <author>
@@ -279,7 +279,7 @@
 <p>例如「LINE Bot 的 Messaging API]]>
     </summary>
     <title>[實作筆記] 用 Cloudflare Tunnel 讓 LINE Bot Webhook 打到本機</title>
-    <updated>2026-04-28T15:19:38.080Z</updated>
+    <updated>2026-04-29T03:50:07.813Z</updated>
   </entry>
   <entry>
     <author>
@@ -298,7 +298,7 @@
 <figure class="highlight]]>
     </summary>
     <title>[實作筆記] Ghostty 打字出現 [O[27u 亂碼的原因與修正</title>
-    <updated>2026-04-28T15:19:38.080Z</updated>
+    <updated>2026-04-29T03:50:07.813Z</updated>
   </entry>
   <entry>
     <author>
@@ -317,7 +317,7 @@
 <h]]>
     </summary>
     <title>[工具筆記] Terminal 工具怎麼選？Ghostty、iTerm2 與其他選手比較</title>
-    <updated>2026-04-28T15:19:38.080Z</updated>
+    <updated>2026-04-29T03:50:07.814Z</updated>
   </entry>
   <entry>
     <author>
@@ -336,7 +336,7 @@
 <figure cl]]>
     </summary>
     <title>[實作筆記] Next.js Hydration 與隨機性：從問題到正確架構</title>
-    <updated>2026-04-28T15:19:38.080Z</updated>
+    <updated>2026-04-29T03:50:07.813Z</updated>
   </entry>
   <entry>
     <author>
@@ -353,7 +353,7 @@
       <![CDATA[<h2 id="前情提要"><a href="#前情提要" class="headerlink" title="前情提要"></a>前情提要</h2><p>自從 2025 年 9 月台新把 @GoGo 卡、FlyGo 卡、玫瑰 Giving 卡、太陽&#x2F;玫瑰卡這些信用卡整]]>
     </summary>
     <title>[生活筆記] 2026 台新 Richart Life 切換方案回饋最大化</title>
-    <updated>2026-04-28T15:19:38.080Z</updated>
+    <updated>2026-04-29T03:50:07.813Z</updated>
   </entry>
   <entry>
     <author>
@@ -370,7 +370,7 @@
       <![CDATA[<h2 id="前情提要"><a href="#前情提要" class="headerlink" title="前情提要"></a>前情提要</h2><p>延續<a href="https://blog.marsen.me/2025/11/28/2025/iv_thixxxxxx]]>
     </summary>
     <title>[生活筆記] 2025 T社面試心得 - 二面</title>
-    <updated>2026-04-28T15:19:38.077Z</updated>
+    <updated>2026-04-29T03:50:07.812Z</updated>
   </entry>
   <entry>
     <author>
@@ -388,6 +388,6 @@
 <p>一面是 Pyth]]>
     </summary>
     <title>[生活筆記] 2025 T社面試心得 - 一面</title>
-    <updated>2026-04-28T15:19:38.077Z</updated>
+    <updated>2026-04-29T03:50:07.812Z</updated>
   </entry>
 </feed>
