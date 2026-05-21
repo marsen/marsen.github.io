@@ -12,7 +12,25 @@
   <rights>All rights reserved 2026, Marsen L.</rights>
   <subtitle>waiting to load</subtitle>
   <title>Marsen's Blog</title>
-  <updated>2026-05-10T19:56:29.364Z</updated>
+  <updated>2026-05-21T04:24:07.742Z</updated>
+  <entry>
+    <author>
+      <name>Marsen L.</name>
+      <email>admin@marsen.me</email>
+    </author>
+    <category term="實作筆記" scheme="https://blog.marsen.me/tags/%E5%AF%A6%E4%BD%9C%E7%AD%86%E8%A8%98/"/>
+    <content>
+      <![CDATA[<h2 id="前情提要"><a href="#前情提要" class="headerlink" title="前情提要"></a>前情提要</h2><p>用 LINE Bot 做系統通知，結果某天發現通知完全停了，重啟也沒用。<br>查了一圈才發現根本原因不是程式問題，這篇記錄怎麼查用量、以及為什麼停的。</p><hr><h2 id="問題現象"><a href="#問題現象" class="headerlink" title="問題現象"></a>問題現象</h2><p>LINE Bot 的 push 通知在某個時間點之後完全靜默。<br>程式沒報錯，因為程式碼裡的 push 用了 <code>.catch(() =&gt; {})</code> 吃掉所有錯誤：</p><figure class="highlight ts"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">async</span> <span class="keyword">function</span> <span class="title function_">push</span>(<span class="params">text: <span class="built_in">string</span></span>) &#123;</span><br><span class="line">  <span class="keyword">await</span> lineClient.<span class="title function_">pushMessage</span>(<span class="variable constant_">ALLOWED_USER_ID</span>, msg).<span class="title function_">catch</span>(<span class="function">() =&gt;</span> &#123;&#125;)</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure><p>靜默失敗，完全看不出來哪裡出問題。</p><hr><h2 id="怎麼查用量"><a href="#怎麼查用量" class="headerlink" title="怎麼查用量"></a>怎麼查用量</h2><p>LINE 的用量統計不在 Developers Console，要去 <strong>LINE Official Account Manager</strong>：</p><ol><li>打開 <a href="https://manager.line.biz/">manager.line.biz</a></li><li>選你的 Official Account</li><li>左側 → <strong>分析</strong> → <strong>訊息</strong></li></ol><p>可以看到：</p><table><thead><tr><th>欄位</th><th>說明</th></tr></thead><tbody><tr><td>合計（所有訊息）</td><td>Reply + Push 總和</td></tr><tr><td>Push</td><td>主動推播的則數</td></tr><tr><td>Reply</td><td>回覆訊息的則數</td></tr></tbody></table><p>可以選日期範圍，最長 60 天。</p><hr><h2 id="免費額度是多少"><a href="#免費額度是多少" class="headerlink" title="免費額度是多少"></a>免費額度是多少</h2><p>LINE Messaging API 免費方案每月有 <strong>500 則</strong>免費訊息（Push + Reply 合計）。</p><p>超過之後每則需要付費，或者訊息會被擋下來（依帳號設定而定）。</p><p>500 則聽起來很多，但如果 Bot 跑 AI 對話，Claude 回應很長，常常一次就切成好幾則 push（每則上限 5000 字），很快就會耗光。</p><hr><h2 id="這次的真正原因"><a href="#這次的真正原因" class="headerlink" title="這次的真正原因"></a>這次的真正原因</h2><p>查完用量才發現：5&#x2F;1 用了 141 則，5&#x2F;2 用了 59 則，5&#x2F;3 之後全部是 0。</p><p>5&#x2F;3 之後不是「發了但被擋」，是根本沒有觸發 webhook。</p><p>原因是 LINE Bot 用 <strong>Webhook 模式</strong>，需要一個對外的 HTTPS URL。<br>我的架構是：</p><figure class="highlight text"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">LINE 伺服器 → HTTPS Webhook URL → Cloudflare Tunnel → 本機 Express server</span><br></pre></td></tr></table></figure><p>Cloudflare Tunnel 的 launchd service 在 5&#x2F;3 掛掉，LINE 打不到 webhook，所以什麼都沒發生。</p><hr><h2 id="Telegram-為什麼更穩"><a href="#Telegram-為什麼更穩" class="headerlink" title="Telegram 為什麼更穩"></a>Telegram 為什麼更穩</h2><p>Telegram 用 <strong>Long Polling</strong> 模式，bot 主動去 Telegram 伺服器拉訊息，不需要對外開放任何 URL。</p><table><thead><tr><th></th><th>LINE</th><th>Telegram</th></tr></thead><tbody><tr><td>連線模式</td><td>Webhook（需要 tunnel）</td><td>Long Polling（不需要）</td></tr><tr><td>斷線風險</td><td>tunnel 掛、IP 變、PORT 未開</td><td>幾乎沒有</td></tr><tr><td>免費額度</td><td>500 則&#x2F;月</td><td>無限制</td></tr></tbody></table><p>如果是用來做系統通知（不可中斷），Telegram 比 LINE 穩定很多。</p><hr><h2 id="小結"><a href="#小結" class="headerlink" title="小結"></a>小結</h2><ul><li>LINE 用量在 LINE Official Account Manager → 分析 → 訊息</li><li>免費方案 500 則&#x2F;月，用完靜默失敗</li><li>Webhook 模式依賴 tunnel，tunnel 掛掉通知就停</li><li>對穩定性要求高的通知場景，Telegram Long Polling 更適合</li></ul><p>(fin)</p>]]>
+    </content>
+    <id>https://blog.marsen.me/2026/05/06/2026/line-messaging-api-quota/</id>
+    <link href="https://blog.marsen.me/2026/05/06/2026/line-messaging-api-quota/"/>
+    <published>2026-05-06T11:00:49.000Z</published>
+    <summary>
+      <![CDATA[<h2 id="前情提要"><a href="#前情提要" class="headerlink" title="前情提要"></a>前情提要</h2><p>用 LINE Bot 做系統通知，結果某天發現通知完全停了，重啟也沒用。<br>查了一圈才發現根本原因不是程式問題，這篇記錄]]>
+    </summary>
+    <title>[實作筆記] LINE Messaging API 用量查詢：免費額度怎麼看，以及為什麼通知會停止</title>
+    <updated>2026-05-21T04:24:07.742Z</updated>
+  </entry>
   <entry>
     <author>
       <name>Marsen L.</name>
@@ -30,7 +48,7 @@
 <li><a href="https://www.theverge.com/ai-artificial-intellig]]>
     </summary>
     <title>[AI生成]20260505 周報</title>
-    <updated>2026-05-10T19:56:29.364Z</updated>
+    <updated>2026-05-21T04:24:07.742Z</updated>
   </entry>
   <entry>
     <author>
@@ -49,7 +67,7 @@
 <li><a href="https://www.theverge.com/ai-artificial-intellig]]>
     </summary>
     <title>[AI生成]20260504 周報</title>
-    <updated>2026-05-10T19:56:29.364Z</updated>
+    <updated>2026-05-21T04:24:07.742Z</updated>
   </entry>
   <entry>
     <author>
@@ -68,7 +86,7 @@
 <li><a href="https://www.briefs.co/news/uber-torches-entire-]]>
     </summary>
     <title>[AI生成]20260502 周報</title>
-    <updated>2026-05-10T19:56:29.363Z</updated>
+    <updated>2026-05-21T04:24:07.741Z</updated>
   </entry>
   <entry>
     <author>
@@ -87,7 +105,7 @@
 <p>VM 重開機沒問題，但容器砍掉重建、或換]]>
     </summary>
     <title>[實作筆記] 個人自動化平台(七) n8n 備份自動化：workflow + credentials → GitHub</title>
-    <updated>2026-05-10T19:56:29.364Z</updated>
+    <updated>2026-05-21T04:24:07.742Z</updated>
   </entry>
   <entry>
     <author>
@@ -108,7 +126,7 @@
     <title>
       <![CDATA[[實作筆記] 技術面試 Q&A：大流量電商系統設計實戰]]>
     </title>
-    <updated>2026-05-10T19:56:29.364Z</updated>
+    <updated>2026-05-21T04:24:07.742Z</updated>
   </entry>
   <entry>
     <author>
@@ -126,7 +144,7 @@
       <![CDATA[<h2 id="前情提要"><a href="#前情提要" class="headerlink" title="前情提要"></a>前情提要</h2><p>在 <a href="/2026/n8n-6-pipeline-output/">個人自動化平台(六)</a> 實作 IG]]>
     </summary>
     <title>[實作筆記] 個人自動化平台(番外) Google OAuth redirect_uri_mismatch 除錯記錄</title>
-    <updated>2026-05-10T19:56:29.364Z</updated>
+    <updated>2026-05-21T04:24:07.742Z</updated>
   </entry>
   <entry>
     <author>
@@ -145,7 +163,7 @@
 <p>這篇記錄處理層：把多筆文章合併，送給 Gemini 整理成 A]]>
     </summary>
     <title>[實作筆記] 個人自動化平台(五) n8n 實作：處理層，Aggregate + Gemini 週報整理</title>
-    <updated>2026-05-10T19:56:29.364Z</updated>
+    <updated>2026-05-21T04:24:07.742Z</updated>
   </entry>
   <entry>
     <author>
@@ -163,7 +181,7 @@
       <![CDATA[<h2 id="前情提要"><a href="#前情提要" class="headerlink" title="前情提要"></a>前情提要</h2><p>收集層（RSS 抓資料）和處理層（Gemini 整理週報）都跑通了，接下來要實作輸出層：把 AI 整理好的內容自動發布到社群]]>
     </summary>
     <title>[實作筆記] 個人自動化平台(六) n8n 實作：輸出層，Instagram API 取得 Token 全記錄</title>
-    <updated>2026-05-10T19:56:29.364Z</updated>
+    <updated>2026-05-21T04:24:07.742Z</updated>
   </entry>
   <entry>
     <author>
@@ -181,7 +199,7 @@
       <![CDATA[<h2 id="前情提要"><a href="#前情提要" class="headerlink" title="前情提要"></a>前情提要</h2><p>2019 年，我在 <a href="https://blog.marsen.me/2019/05/18/2019/aws_]]>
     </summary>
     <title>[產業報告] 從 DeepRacer 到 Robotaxi：Tesla vs Waymo 的無人駕駛現況</title>
-    <updated>2026-05-10T19:56:29.364Z</updated>
+    <updated>2026-05-21T04:24:07.742Z</updated>
   </entry>
   <entry>
     <author>
@@ -200,7 +218,7 @@
 <p>目標是從四個 AI 新聞來源拉資料，輸出]]>
     </summary>
     <title>[實作筆記] 個人自動化平台(四) n8n 實作：收集層，RSS 資料來源</title>
-    <updated>2026-05-10T19:56:29.364Z</updated>
+    <updated>2026-05-21T04:24:07.742Z</updated>
   </entry>
   <entry>
     <author>
@@ -219,7 +237,7 @@
 <p>這篇不急著]]>
     </summary>
     <title>[實作筆記] 個人自動化平台(三) 收集、處理、輸出：三層可插拔管道設計</title>
-    <updated>2026-05-10T19:56:29.364Z</updated>
+    <updated>2026-05-21T04:24:07.742Z</updated>
   </entry>
   <entry>
     <author>
@@ -239,7 +257,7 @@
     <title>
       <![CDATA[[實作筆記] 個人自動化平台(番外) 拆掉重建 GCP VM & Cloudflared Tunnel & Cloudflare Access]]>
     </title>
-    <updated>2026-05-10T19:56:29.364Z</updated>
+    <updated>2026-05-21T04:24:07.742Z</updated>
   </entry>
   <entry>
     <author>
@@ -260,7 +278,7 @@
     <title>
       <![CDATA[個人自動化平台(二) Cloudflare Access & Cloudflare Tunnel]]>
     </title>
-    <updated>2026-05-10T19:56:29.364Z</updated>
+    <updated>2026-05-21T04:24:07.742Z</updated>
   </entry>
   <entry>
     <author>
@@ -281,7 +299,7 @@
     <title>
       <![CDATA[[實作筆記] 個人自動化平台(一) n8n & GCP VM]]>
     </title>
-    <updated>2026-05-10T19:56:29.364Z</updated>
+    <updated>2026-05-21T04:24:07.742Z</updated>
   </entry>
   <entry>
     <author>
@@ -299,7 +317,7 @@
       <![CDATA[<h2 id="前情提要"><a href="#前情提要" class="headerlink" title="前情提要"></a>前情提要</h2><p>Gap year 期間收到一封獵頭的 LinkedIn 邀約，職位是 AI Workflow Tech Lead。  </p]]>
     </summary>
     <title>[生活筆記] 面試記錄 B 社 — AI Workflow Tech Lead</title>
-    <updated>2026-05-10T19:56:29.364Z</updated>
+    <updated>2026-05-21T04:24:07.742Z</updated>
   </entry>
   <entry>
     <author>
@@ -318,7 +336,7 @@
 <p>「系統性剝削」讓財富自動從勞動者流向資產持有者，普通人很難透過努力翻]]>
     </summary>
     <title>[生活筆記] 系統思考打工人生</title>
-    <updated>2026-05-10T19:56:29.364Z</updated>
+    <updated>2026-05-21T04:24:07.742Z</updated>
   </entry>
   <entry>
     <author>
@@ -336,7 +354,7 @@
       <![CDATA[<h2 id="前情提要"><a href="#前情提要" class="headerlink" title="前情提要"></a>前情提要</h2><p>在做韓文注音學習工具時，需要偵測瀏覽器是否支援 <code>speechSynthesis</code>，然後顯示提示訊息。]]>
     </summary>
     <title>[實作筆記] 在 Next.js 安全讀取 window：從 useEffect 到 useSyncExternalStore</title>
-    <updated>2026-05-10T19:56:29.364Z</updated>
+    <updated>2026-05-21T04:24:07.742Z</updated>
   </entry>
   <entry>
     <author>
@@ -355,7 +373,7 @@
 <p>例如「LINE Bot 的 Messaging API]]>
     </summary>
     <title>[實作筆記] 用 Cloudflare Tunnel 讓 LINE Bot Webhook 打到本機</title>
-    <updated>2026-05-10T19:56:29.364Z</updated>
+    <updated>2026-05-21T04:24:07.742Z</updated>
   </entry>
   <entry>
     <author>
@@ -374,25 +392,6 @@
 <figure class="highlight]]>
     </summary>
     <title>[實作筆記] Ghostty 打字出現 [O[27u 亂碼的原因與修正</title>
-    <updated>2026-05-10T19:56:29.364Z</updated>
-  </entry>
-  <entry>
-    <author>
-      <name>Marsen L.</name>
-      <email>admin@marsen.me</email>
-    </author>
-    <category term="工具筆記" scheme="https://blog.marsen.me/tags/%E5%B7%A5%E5%85%B7%E7%AD%86%E8%A8%98/"/>
-    <content>
-      <![CDATA[<h2 id="前情提要"><a href="#前情提要" class="headerlink" title="前情提要"></a>前情提要</h2><p>最近有人問我 Ghostty 跟 iTerm2 哪個比較好，<br>順便聊到還有哪些選手值得比較，就整理一下。</p><h2 id="選手介紹"><a href="#選手介紹" class="headerlink" title="選手介紹"></a>選手介紹</h2><h3 id="iTerm2"><a href="#iTerm2" class="headerlink" title="iTerm2"></a>iTerm2</h3><p>macOS 老牌 terminal，功能多到有點過頭。</p><p>split pane、tmux 整合、Triggers、Shell Integration、Python scripting API 全都有，<br>幾乎是 macOS 工程師的預設選項，做了很多年。</p><p>缺點是比較重，啟動慢一點，只能用在 macOS。</p><h3 id="Ghostty"><a href="#Ghostty" class="headerlink" title="Ghostty"></a>Ghostty</h3><p>2024 底爆紅的新秀，現在已經是很多人的主力工具。</p><p>Rust 的精神，GPU 加速渲染，開箱即用，預設樣式就乾淨好看。<br>支援 Kitty keyboard protocol，Nerd Fonts 圖示正常顯示，光標移動順到不行。</p><p>設定是純文字檔，簡單幾行就搞定：</p><figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br></pre></td><td class="code"><pre><span class="line">font-family = &quot;JetBrainsMono Nerd Font&quot;</span><br><span class="line">font-size = 14</span><br><span class="line">theme = &quot;GruvboxDark&quot;</span><br></pre></td></tr></table></figure><p>macOS + Linux 都支援。</p><h3 id="Warp"><a href="#Warp" class="headerlink" title="Warp"></a>Warp</h3><p>主打 AI 整合，內建 AI 指令輔助，Block-based UI，輸出可以區塊操作。</p><p>Rust 寫成，效能不錯。<br>最大的爭議是需要帳號登入，有隱私疑慮，這點讓不少人卻步。</p><h3 id="Alacritty"><a href="#Alacritty" class="headerlink" title="Alacritty"></a>Alacritty</h3><p>效能派代表，極簡哲學。</p><p>刻意拿掉 Tab、split pane、滑鼠增強，理由是「這些交給 tmux 做就好」。<br>純文字設定（TOML），跨平台（macOS &#x2F; Linux &#x2F; Windows）。</p><p>缺點是預設偏素，要自己調設定，不適合「裝好就好看好用」的需求。</p><h3 id="Kitty"><a href="#Kitty" class="headerlink" title="Kitty"></a>Kitty</h3><p>GPU 加速，原生支援 split pane 和 tab。<br>Kitty keyboard protocol 就是它發明的，Ghostty 後來也採用。<br>macOS + Linux，設定有點多，學習曲線稍高。</p><h3 id="WezTerm"><a href="#WezTerm" class="headerlink" title="WezTerm"></a>WezTerm</h3><p>GPU 加速，Lua 腳本設定，功能豐富。<br>內建 multiplexer，split、tab、session 管理全包，不需要 tmux。<br>跨平台（macOS &#x2F; Linux &#x2F; Windows）。</p><hr><h2 id="快速比較"><a href="#快速比較" class="headerlink" title="快速比較"></a>快速比較</h2><table><thead><tr><th></th><th>iTerm2</th><th>Ghostty</th><th>Warp</th><th>Alacritty</th><th>Kitty</th><th>WezTerm</th></tr></thead><tbody><tr><td>效能</td><td>普通</td><td>快</td><td>快</td><td>極快</td><td>快</td><td>快</td></tr><tr><td>跨平台</td><td>macOS only</td><td>mac+Linux</td><td>mac+Linux</td><td>全平台</td><td>mac+Linux</td><td>全平台</td></tr><tr><td>設定方式</td><td>GUI</td><td>文字</td><td>GUI</td><td>TOML</td><td>conf</td><td>Lua</td></tr><tr><td>AI 功能</td><td>無</td><td>無</td><td>有</td><td>無</td><td>無</td><td>無</td></tr><tr><td>內建 multiplexer</td><td>無</td><td>無</td><td>無</td><td>無</td><td>有</td><td>有</td></tr><tr><td>Nerd Fonts 支援</td><td>✅</td><td>✅</td><td>✅</td><td>✅</td><td>✅</td><td>✅</td></tr><tr><td>成熟度</td><td>高</td><td>新</td><td>中</td><td>高</td><td>高</td><td>中</td></tr></tbody></table><hr><h2 id="補充：tmux-是什麼"><a href="#補充：tmux-是什麼" class="headerlink" title="補充：tmux 是什麼"></a>補充：tmux 是什麼</h2><p>很多文章提到要配合 tmux 使用，稍微說明一下。</p><p>tmux 是 <strong>terminal multiplexer</strong>，在一個 terminal 視窗裡模擬多視窗和分割畫面。<br>最大的賣點是 <strong>session 保持</strong>，關掉視窗程式不會死，SSH 到遠端時特別實用。</p><figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br></pre></td><td class="code"><pre><span class="line">┌─────────────────────────────┐</span><br><span class="line">│  tmux session               │</span><br><span class="line">│  ┌──────────┬──────────┐   │</span><br><span class="line">│  │  vim     │  shell   │   │</span><br><span class="line">│  │          │          │   │</span><br><span class="line">│  ├──────────┴──────────┤   │</span><br><span class="line">│  │  npm run dev        │   │</span><br><span class="line">│  └─────────────────────┘   │</span><br><span class="line">└─────────────────────────────┘</span><br></pre></td></tr></table></figure><p>現代 terminal（Ghostty、WezTerm、iTerm2）內建 split 和 Tab，<br>一般使用不需要特別學 tmux，除非有 SSH session 保持的需求。</p><hr><h2 id="我的建議"><a href="#我的建議" class="headerlink" title="我的建議"></a>我的建議</h2><p>需求很簡單，<strong>好看 + 圖示顯示 + 光標流暢</strong>，直接選 <strong>Ghostty</strong>。</p><p>裝好之後指定一個 Nerd Font，10 分鐘搞定：</p><figure class="highlight bash"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br></pre></td><td class="code"><pre><span class="line">brew install --cask ghostty</span><br><span class="line">brew install --cask font-jetbrains-mono-nerd-font</span><br></pre></td></tr></table></figure><p>Nerd Fonts 常用選擇：</p><table><thead><tr><th>字型</th><th>特色</th></tr></thead><tbody><tr><td>JetBrains Mono NF</td><td>易讀、開發者最愛</td></tr><tr><td>FiraCode NF</td><td>ligature 好看</td></tr><tr><td>Hack NF</td><td>傳統乾淨</td></tr></tbody></table><p>其他場景的建議：</p><ul><li>需要 AI 輔助 → Warp</li><li>要配合 tmux、極致效能 → Alacritty</li><li>要 Lua 腳本、功能完整 → WezTerm</li><li>已經習慣、不想換 → iTerm2 繼續用也沒問題</li></ul><h2 id="小結"><a href="#小結" class="headerlink" title="小結"></a>小結</h2><p>業界風向已經轉向 Ghostty，不是因為它功能最多，<br>而是它把<strong>該有的都做好了</strong>，多餘的不硬塞。</p><p>開箱好看、設定簡單、效能夠快，這樣就夠了。</p><p>(fin)</p>]]>
-    </content>
-    <id>https://blog.marsen.me/2026/03/10/2026/terminal-comparison/</id>
-    <link href="https://blog.marsen.me/2026/03/10/2026/terminal-comparison/"/>
-    <published>2026-03-10T22:05:19.000Z</published>
-    <summary>
-      <![CDATA[<h2 id="前情提要"><a href="#前情提要" class="headerlink" title="前情提要"></a>前情提要</h2><p>最近有人問我 Ghostty 跟 iTerm2 哪個比較好，<br>順便聊到還有哪些選手值得比較，就整理一下。</p>
-<h]]>
-    </summary>
-    <title>[工具筆記] Terminal 工具怎麼選？Ghostty、iTerm2 與其他選手比較</title>
-    <updated>2026-05-10T19:56:29.364Z</updated>
+    <updated>2026-05-21T04:24:07.742Z</updated>
   </entry>
 </feed>
