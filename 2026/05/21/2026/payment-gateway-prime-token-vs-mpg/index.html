@@ -35,15 +35,15 @@ j=d.createElement(s),dl=l!='dataLayer'?'&l='+l:'';j.async=true;j.src=
   
   <title>[工具筆記] Prime Token vs MPG：兩種台灣電商金流模式的本質差異 | Marsen&#39;s Blog</title>
   <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
-  <meta name="description" content="前情提要最近在電商專案要把虛構金流換成真實串接，比較了 TapPay、綠界、藍新三家。比著比著發現一件事：與其問「哪家好」，不如先搞懂兩種模式的差別。  Prime Token 模式：TapPay、Stripe、Braintree MPG 模式：綠界 ECPay、藍新 NewebPay  兩種模式選錯，後面整個訂單系統的設計都會錯。  本質差異就一個問題：卡號從哪走？兩種模式的根本問題只有一個：敏">
+  <meta name="description" content="前情提要最近在電商專案要把虛構金流換成真實串接，比較了 TapPay、綠界、藍新三家。 比著發現原來存在著兩種金流串接的模式。  Prime Token 模式：TapPay、Stripe、Braintree MPG(Merchant Payment Gateway) 模式：綠界 ECPay、藍新 NewebPay  兩種模式選錯，後面整個訂單系統的設計都會錯。  本質差異就一個問題：卡號從哪走？兩">
 <meta property="og:type" content="article">
 <meta property="og:title" content="[工具筆記] Prime Token vs MPG：兩種台灣電商金流模式的本質差異">
 <meta property="og:url" content="https://blog.marsen.me/2026/05/21/2026/payment-gateway-prime-token-vs-mpg/index.html">
 <meta property="og:site_name" content="Marsen&#39;s Blog">
-<meta property="og:description" content="前情提要最近在電商專案要把虛構金流換成真實串接，比較了 TapPay、綠界、藍新三家。比著比著發現一件事：與其問「哪家好」，不如先搞懂兩種模式的差別。  Prime Token 模式：TapPay、Stripe、Braintree MPG 模式：綠界 ECPay、藍新 NewebPay  兩種模式選錯，後面整個訂單系統的設計都會錯。  本質差異就一個問題：卡號從哪走？兩種模式的根本問題只有一個：敏">
+<meta property="og:description" content="前情提要最近在電商專案要把虛構金流換成真實串接，比較了 TapPay、綠界、藍新三家。 比著發現原來存在著兩種金流串接的模式。  Prime Token 模式：TapPay、Stripe、Braintree MPG(Merchant Payment Gateway) 模式：綠界 ECPay、藍新 NewebPay  兩種模式選錯，後面整個訂單系統的設計都會錯。  本質差異就一個問題：卡號從哪走？兩">
 <meta property="og:locale" content="zh_TW">
 <meta property="article:published_time" content="2026-05-21T03:36:44.000Z">
-<meta property="article:modified_time" content="2026-05-28T17:42:37.076Z">
+<meta property="article:modified_time" content="2026-05-29T05:06:56.110Z">
 <meta property="article:author" content="Marsen L.">
 <meta property="article:tag" content="工具筆記">
 <meta name="twitter:card" content="summary">
@@ -128,66 +128,25 @@ j=d.createElement(s),dl=l!='dataLayer'?'&l='+l:'';j.async=true;j.src=
     
     <div class="article-entry" itemprop="articleBody">
       
-        <h2 id="前情提要"><a href="#前情提要" class="headerlink" title="前情提要"></a>前情提要</h2><p>最近在電商專案要把虛構金流換成真實串接，比較了 TapPay、綠界、藍新三家。<br>比著比著發現一件事：與其問「哪家好」，不如先搞懂兩種模式的差別。</p>
+        <h2 id="前情提要"><a href="#前情提要" class="headerlink" title="前情提要"></a>前情提要</h2><p>最近在電商專案要把虛構金流換成真實串接，比較了 TapPay、綠界、藍新三家。</p>
+<p>比著發現原來存在著兩種金流串接的模式。</p>
 <ul>
 <li><strong>Prime Token 模式</strong>：TapPay、Stripe、Braintree</li>
-<li><strong>MPG 模式</strong>：綠界 ECPay、藍新 NewebPay</li>
+<li><strong>MPG(Merchant Payment Gateway) 模式</strong>：綠界 ECPay、藍新 NewebPay</li>
 </ul>
 <p>兩種模式選錯，後面整個訂單系統的設計都會錯。</p>
 <hr>
 <h2 id="本質差異就一個問題：卡號從哪走？"><a href="#本質差異就一個問題：卡號從哪走？" class="headerlink" title="本質差異就一個問題：卡號從哪走？"></a>本質差異就一個問題：卡號從哪走？</h2><p>兩種模式的根本問題只有一個：<strong>敏感卡號（PAN + CVV）的傳遞路徑</strong>。</p>
-<h3 id="Prime-Token"><a href="#Prime-Token" class="headerlink" title="Prime Token"></a>Prime Token</h3><figure class="highlight text"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br></pre></td><td class="code"><pre><span class="line">使用者 → [前端 SDK iframe 直送金流方] → 拿 token</span><br><span class="line">                                       ↓</span><br><span class="line">你的 server 用 token + 商家 key → 打金流方 charge API → 同步拿結果</span><br></pre></td></tr></table></figure>
-
-<h3 id="MPG"><a href="#MPG" class="headerlink" title="MPG"></a>MPG</h3><figure class="highlight text"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br></pre></td><td class="code"><pre><span class="line">你的 server 產表單 + 簽章 → 前端 POST 到金流方頁</span><br><span class="line">                              ↓</span><br><span class="line">                  使用者離站填卡號（在金流方頁面）</span><br><span class="line">                              ↓</span><br><span class="line">              金流方非同步 callback 回你的 server</span><br></pre></td></tr></table></figure>
-
-<p>Prime Token 把「拿卡號」<strong>SDK 化</strong>，UX 由你掌握。<br>MPG 把「拿卡號」<strong>頁面化</strong>，工程量降低但 UX 受限。</p>
+<p>MPG 型金流（綠界、藍新跳轉）對消費者反而更透明——畫面明確跳到金流商的頁面，消費者看得出來自己在哪。</p>
+<p>但是在使用者體驗上，會多一個斷點，以電商來說會有轉換率的問題</p>
+<p>Prime 型（TapPay iframe）的取捨是體驗好但透明度低，信任靠的是商家品牌，不是技術可見性。</p>
+<p>而這是一個取捨。</p>
 <hr>
-<h2 id="安全性：兩種都不用-PCI-DSS，但風險點不同"><a href="#安全性：兩種都不用-PCI-DSS，但風險點不同" class="headerlink" title="安全性：兩種都不用 PCI-DSS，但風險點不同"></a>安全性：兩種都不用 PCI-DSS，但風險點不同</h2><p>兩種模式對開發者都<strong>不需要 PCI-DSS 認證</strong>，因為卡號從未進你的伺服器。<br>但要擔心的事情不一樣：</p>
-<table>
-<thead>
-<tr>
-<th>風險</th>
-<th>Prime Token</th>
-<th>MPG</th>
-</tr>
-</thead>
-<tbody><tr>
-<td>前端 SDK 被換掉（供應鏈攻擊、CSP 設錯）</td>
-<td>⚠️ 卡號可能外流</td>
-<td>不受影響</td>
-</tr>
-<tr>
-<td>Callback 偽造</td>
-<td>不存在</td>
-<td>⚠️ 沒驗章就被偽造付款成功</td>
-</tr>
-<tr>
-<td>Replay attack</td>
-<td>不存在</td>
-<td>⚠️ 需做冪等</td>
-</tr>
-<tr>
-<td>HTTPS 不夠用嗎？</td>
-<td>夠</td>
-<td>必須再加簽章</td>
-</tr>
-</tbody></table>
-<p>MPG 最容易出包的是這三件事：</p>
-<ol>
-<li><strong>簽章寫錯</strong>（綠界用 CheckMacValue &#x2F; 藍新用 AES + SHA256）</li>
-<li><strong>沒做冪等</strong>（同一筆 callback 多次到結果重複出貨）</li>
-<li><strong>相信 ReturnURL 而不等 NotifyURL</strong>（ReturnURL 是給使用者看的，可以被竄改）</li>
-</ol>
-<hr>
-<h2 id="UX-差異：設計語言會不會中斷"><a href="#UX-差異：設計語言會不會中斷" class="headerlink" title="UX 差異：設計語言會不會中斷"></a>UX 差異：設計語言會不會中斷</h2><p>Prime Token 的卡號欄位內嵌結帳頁（實際是 iframe，能改邊框字體但限制多）。<br>整個結帳流程在你自己的頁面，設計語言一致。</p>
-<p>MPG 直接跳到金流方頁面，<strong>你的品牌設計到那一刻全部斷掉</strong>。<br>但好處也很實際：同一個金流頁面能直接接信用卡 + ATM + 超商代碼 + LINE Pay。</p>
-<p>簡單講：</p>
-<ul>
-<li>想做品牌感、UX 要順 → Prime Token</li>
-<li>想接齊台灣常見付款方式 → MPG</li>
-</ul>
-<hr>
-<h2 id="工程量反直覺：MPG-比-Prime-Token-大"><a href="#工程量反直覺：MPG-比-Prime-Token-大" class="headerlink" title="工程量反直覺：MPG 比 Prime Token 大"></a>工程量反直覺：MPG 比 Prime Token 大</h2><p>很多人以為「使用者離站填卡號 &#x3D; 我不用做」，這是錯的。</p>
+<h2 id="實作細節"><a href="#實作細節" class="headerlink" title="實作細節"></a>實作細節</h2><p>Prime Token 的卡號欄位內嵌結帳頁（實際是 iframe，能改邊框字體但限制多）。</p>
+<p>整個結帳流程在你自己的頁面，設計語言、外觀風格一致。</p>
+<p>MPG 直接跳到金流方頁面，<strong>你的品牌設計到那一刻全部斷掉</strong>。</p>
+<p>但好處也很實際：同一個金流頁面能直接接信用卡 + ATM + 超商代碼 + LINE Pay。</p>
+<p>兩者的開發量比較</p>
 <p>Prime Token 你寫的東西：</p>
 <ul>
 <li>前端 SDK 載入 + mount 欄位</li>
@@ -204,68 +163,21 @@ j=d.createElement(s),dl=l!='dataLayer'?'&l='+l:'';j.async=true;j.src=
 <li>對帳邏輯（callback 沒到怎辦？要定時 query 嗎？）</li>
 </ul>
 <p>MPG 看似簡單，實際工程量比 Prime Token 大，<strong>主要是 callback 的 edge case 多</strong>。</p>
-<hr>
-<h2 id="同步-vs-非同步的訂單狀態機"><a href="#同步-vs-非同步的訂單狀態機" class="headerlink" title="同步 vs 非同步的訂單狀態機"></a>同步 vs 非同步的訂單狀態機</h2><p>這是最常被低估的差異。</p>
-<h3 id="Prime-Token（同步）"><a href="#Prime-Token（同步）" class="headerlink" title="Prime Token（同步）"></a>Prime Token（同步）</h3><figure class="highlight text"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">[pending] --charge API--&gt; [paid] / [failed]</span><br></pre></td></tr></table></figure>
-
-<p>單一請求週期內完成，UI 邏輯簡單。</p>
-<h3 id="MPG（非同步）"><a href="#MPG（非同步）" class="headerlink" title="MPG（非同步）"></a>MPG（非同步）</h3><figure class="highlight text"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br></pre></td><td class="code"><pre><span class="line">[pending] → [awaiting_payment]</span><br><span class="line">              ↓</span><br><span class="line">        使用者離站</span><br><span class="line">              ↓</span><br><span class="line">   ┌──────────┼──────────┐</span><br><span class="line">   ↓          ↓          ↓</span><br><span class="line">NotifyURL  使用者關頁面  NotifyURL 沒到</span><br><span class="line">到（驗章 OK）(ReturnURL 沒到) (網路斷)</span><br><span class="line">   ↓          ↓          ↓</span><br><span class="line">[paid]/    [awaiting   [awaiting</span><br><span class="line"> [failed]   _payment]   _payment]</span><br><span class="line">                        ↓</span><br><span class="line">                    需要對帳補完</span><br></pre></td></tr></table></figure>
-
-<p><code>awaiting_payment</code> 這個狀態在 Prime Token 模式不存在，<br>是 MPG 必須補的領域概念。沒處理就會出現「使用者跳走後訂單卡住」的情況。</p>
-<hr>
-<h2 id="選擇心法"><a href="#選擇心法" class="headerlink" title="選擇心法"></a>選擇心法</h2><table>
-<thead>
-<tr>
-<th>情境</th>
-<th>建議</th>
-</tr>
-</thead>
-<tbody><tr>
-<td>只賣信用卡、要做品牌感、UX 優先</td>
-<td>Prime Token（TapPay &#x2F; Stripe）</td>
-</tr>
-<tr>
-<td>台灣 C2C、想接 ATM&#x2F;超商、客單低</td>
-<td>MPG（綠界 &#x2F; 藍新）</td>
-</tr>
-<tr>
-<td>B2B 大額付款、年費月費</td>
-<td>Prime Token + 卡號 tokenize 存起來定期扣</td>
-</tr>
-<tr>
-<td>開發者個人專案、要快</td>
-<td>綠界 MPG（零註冊，公開測試憑證）</td>
-</tr>
-<tr>
-<td>想學金流原理</td>
-<td>兩個都做一遍</td>
-</tr>
-</tbody></table>
-<hr>
-<h2 id="混合策略：兩種一起上才是正解"><a href="#混合策略：兩種一起上才是正解" class="headerlink" title="混合策略：兩種一起上才是正解"></a>混合策略：兩種一起上才是正解</h2><p>認真的台灣電商常常<strong>兩種都接</strong>：</p>
-<ul>
-<li><strong>信用卡</strong>走 Prime Token（自家品牌、UX 順）</li>
-<li><strong>ATM &#x2F; 超商 &#x2F; LINE Pay</strong> 走 MPG（方便、台灣使用者熟悉）</li>
-</ul>
-<p>不是因為要備援，而是<strong>不同付款方式天生適合不同模式</strong>。</p>
-<p>要做成這樣，金流抽象層的 <code>PaymentService</code> port 必須能同時表達兩種流程：</p>
-<figure class="highlight ts"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">type</span> <span class="title class_">PaymentIntent</span> =</span><br><span class="line">  | &#123; <span class="attr">kind</span>: <span class="string">&#x27;sync-result&#x27;</span>; <span class="attr">result</span>: <span class="title class_">PaymentResult</span> &#125;              <span class="comment">// Prime Token</span></span><br><span class="line">  | &#123; <span class="attr">kind</span>: <span class="string">&#x27;redirect&#x27;</span>; <span class="attr">url</span>: <span class="built_in">string</span>; <span class="attr">formFields</span>: <span class="title class_">Record</span> &#125;       <span class="comment">// MPG</span></span><br></pre></td></tr></table></figure>
-
-<p>上層 use case 不用知道是哪家，但能正確處理「同步拿結果」與「轉址等 callback」兩種分支。</p>
+<h2 id="補充-PCI-DSS-是什麼"><a href="#補充-PCI-DSS-是什麼" class="headerlink" title="補充: PCI DSS 是什麼 ?"></a>補充: PCI DSS 是什麼 ?</h2><p>Payment Card Industry Data Security Standard，簡稱 PCI DSS。</p>
+<p>信用卡組織（Visa、Mastercard 等）聯合制定的資安標準，規定任何「碰到卡號」的系統都要符合一堆安全要求。</p>
+<p>核心概念：碰到卡號的範圍越小，你要過的關越少。</p>
+<p>實務上只有金流商或大型電商會去取得這種認証，一般而言小型電商還是透過第三方金流來實現交易。</p>
 <hr>
 <h2 id="小結"><a href="#小結" class="headerlink" title="小結"></a>小結</h2><ul>
 <li>兩種模式的本質差異是卡號的傳遞路徑：Prime Token 走 SDK iframe，MPG 走表單轉址</li>
-<li>兩種都不需 PCI-DSS，但 MPG 多了驗章、冪等、ReturnURL 不可信三件事要顧</li>
-<li>工程量反直覺：MPG 比 Prime Token 大，貴在 callback 的 edge case</li>
-<li>訂單狀態機 MPG 多一個 <code>awaiting_payment</code>，這個概念漏了就會出包</li>
-<li>真正的解法不是二選一，而是設計能同時支撐兩種模式的抽象層</li>
+<li>信任是最難的</li>
 </ul>
 <p>(fin)</p>
 
       
     </div>
     <footer class="article-footer">
-      <a data-url="https://blog.marsen.me/2026/05/21/2026/payment-gateway-prime-token-vs-mpg/" data-id="cuidItfalnZQZ6owTMsMDp8sw" class="article-share-link">Share</a>
+      <a data-url="https://blog.marsen.me/2026/05/21/2026/payment-gateway-prime-token-vs-mpg/" data-id="cuidLNqdt-9M2V3l1pLQc_h7u" class="article-share-link">Share</a>
       
         <a href="https://blog.marsen.me/2026/05/21/2026/payment-gateway-prime-token-vs-mpg/#disqus_thread" class="article-comment-link">留言</a>
       
@@ -317,12 +229,20 @@ j=d.createElement(s),dl=l!='dataLayer'?'&l='+l:'';j.async=true;j.src=
   
   
     <div id="likecoin">
-  <script type="text/javascript">
-    document.write(
-      "<iframe scrolling='no' frameborder='0' sandbox='allow-scripts allow-same-origin allow-popups allow-popups-to-escape-sandbox allow-storage-access-by-user-activation' style='height: 212px; width: 100%;' src='https://button.like.co/in/embed/marsenlin/button?referrer=" +
-      encodeURIComponent(location.href.split("?")[0].split("#")[0]) + "'></iframe>");
-  </script>
+Please enable JavaScript to view the LikeCoin. :P
 </div>
+<script>
+
+  (function(){
+    var ifrm = document.createElement("iframe");
+    ifrm.setAttribute("src", "https://button.like.co/in/embed/marsenlin/button?referrer=https%3A%2F%2Fblog.marsen.me%2F2026%2F05%2F21%2F2026%2Fpayment-gateway-prime-token-vs-mpg%2F");      
+    ifrm.setAttribute("sandbox","allow-scripts allow-same-origin allow-popups allow-popups-to-escape-sandbox");
+    ifrm.frameborder = "0";
+    ifrm.scrolling = "no";
+    (document.getElementById("likecoin").replaceChild(ifrm, document.getElementById("likecoin").childNodes[0]));
+  })();
+
+</script>
   
   <div id="disqus_thread">
     <noscript>Please enable JavaScript to view the <a target="_blank" rel="noopener" href="//disqus.com/?ref_noscript">comments powered by Disqus.</a></noscript>
@@ -455,12 +375,20 @@ This work is licensed under a
 <script src="/js/script.js?v=0.js"></script>
 
 <div id="likecoin">
-  <script type="text/javascript">
-    document.write(
-      "<iframe scrolling='no' frameborder='0' sandbox='allow-scripts allow-same-origin allow-popups allow-popups-to-escape-sandbox allow-storage-access-by-user-activation' style='height: 212px; width: 100%;' src='https://button.like.co/in/embed/marsenlin/button?referrer=" +
-      encodeURIComponent(location.href.split("?")[0].split("#")[0]) + "'></iframe>");
-  </script>
+Please enable JavaScript to view the LikeCoin. :P
 </div>
+<script>
+
+  (function(){
+    var ifrm = document.createElement("iframe");
+    ifrm.setAttribute("src", "https://button.like.co/in/embed/marsenlin/button?referrer=https%3A%2F%2Fblog.marsen.me%2F2026%2F05%2F21%2F2026%2Fpayment-gateway-prime-token-vs-mpg%2F");      
+    ifrm.setAttribute("sandbox","allow-scripts allow-same-origin allow-popups allow-popups-to-escape-sandbox");
+    ifrm.frameborder = "0";
+    ifrm.scrolling = "no";
+    (document.getElementById("likecoin").replaceChild(ifrm, document.getElementById("likecoin").childNodes[0]));
+  })();
+
+</script>
 <script>
 
   var disqus_shortname = 'marsenlin';
