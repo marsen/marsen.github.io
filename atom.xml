@@ -12,7 +12,7 @@
   <rights>All rights reserved 2026, Marsen L.</rights>
   <subtitle>waiting to load</subtitle>
   <title>Marsen's Blog</title>
-  <updated>2026-06-10T15:36:10.949Z</updated>
+  <updated>2026-06-11T07:01:55.068Z</updated>
   <entry>
     <author>
       <name>Marsen L.</name>
@@ -30,7 +30,7 @@
 <h2 id="本周要點"><a href="#本周要點" class="headerlink" title="本周要點"></a>本周要]]>
     </summary>
     <title>[AI生成] 20260610 科技周報</title>
-    <updated>2026-06-10T15:36:10.949Z</updated>
+    <updated>2026-06-11T07:01:55.068Z</updated>
   </entry>
   <entry>
     <author>
@@ -49,7 +49,26 @@
 <h2 id="本周要點"><a href="#本周要點" class="headerlink" title="本周要點"></a>本周要]]>
     </summary>
     <title>[AI生成] 20260605 科技周報</title>
-    <updated>2026-06-10T15:36:10.949Z</updated>
+    <updated>2026-06-11T07:01:55.068Z</updated>
+  </entry>
+  <entry>
+    <author>
+      <name>Marsen L.</name>
+      <email>admin@marsen.me</email>
+    </author>
+    <category term="實作筆記" scheme="https://blog.marsen.me/tags/%E5%AF%A6%E4%BD%9C%E7%AD%86%E8%A8%98/"/>
+    <content>
+      <![CDATA[<h2 id="前情提要"><a href="#前情提要" class="headerlink" title="前情提要"></a>前情提要</h2><p>這幾天整理 Cloudflare 的 DNS，看到幾筆我沒有記憶也不理解的記錄：</p><figure class="highlight text"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">send.marsen.me   MX   feedback-smtp.ap-northeast-1.amazonses.com</span><br></pre></td></tr></table></figure><p>Amazon SES？我什麼時候設過？還在用嗎？敢不敢刪？</p><p>不確定就不要亂刪 DNS——刪錯一筆，輕則信進垃圾桶，重則收不到信。所以乾脆把整個 <code>marsen.me</code> 上的 email 服務盤點一次，搞清楚每一筆 DNS 到底在幹嘛。</p><h2 id="第一步，列出-DNS-Record"><a href="#第一步，列出-DNS-Record" class="headerlink" title="第一步，列出 DNS Record"></a>第一步，列出 DNS Record</h2><p>把 DNS 裡跟 email 有關的記錄抓出來，對應到服務：</p><p>| 服務 | 相關 DNS 記錄 |<br>|　——　|————–|<br>| Cloudflare Email Routing | <code>marsen.me</code> MX（route1-3.mx.cloudflare.net） |<br>| Brevo（原 Sendinblue） | <code>brevo1/2._domainkey</code> CNAME |<br>| Resend | <code>resend._domainkey</code> TXT |<br>| Amazon SES | <code>send.marsen.me</code> MX + SPF |</p><p>四套服務、一堆 DKIM&#x2F;SPF&#x2F;MX，光看 DNS 根本分不出哪些還在使用，用途為何？</p><h2 id="第二步，理解-DNS-Record"><a href="#第二步，理解-DNS-Record" class="headerlink" title="第二步，理解 DNS Record"></a>第二步，理解 DNS Record</h2><p>可以參考文章最末的參考資料，這裡簡單說明 MX 與 SPF，以後有機會再進一步說明</p><p><strong>MX</strong>: 告訴別人「寄到 @你的網域 的信，送去哪台伺服器，  </p><p>你家的<strong>收件信箱地址</strong>，別人寄東西來才送得到。</p><p><strong>SPF &#x2F; DKIM</strong> &#x3D; 你寄信時的<strong>防偽印章和授權書</strong>。</p><p>證明「這封信真的是你（或你授權的服務）寄的」，防止被當垃圾或冒名</p><p>所以一個純發信的服務（像 Brevo、Resend），只需要 DKIM 印章，<strong>根本不需要 MX</strong>。這個觀念是後面判讀的基礎。</p><blockquote><p>補充：SPF 和 DKIM 的內容本體都是 TXT，但 DKIM 有兩種發布方式——<br>一種像 Resend 是把公鑰直接寫成 TXT 給你貼；<br>另一種像 Brevo 則是給你一筆 <strong>CNAME</strong>，把 <code>brevoX._domainkey</code> 委派指向它自家的 DNS，公鑰放在它那邊，方便它自己輪替金鑰。<br>所以上面表格裡 Brevo 是 CNAME、Resend 是 TXT，但做的是同一件事。</p></blockquote><h2 id="寄收信測試"><a href="#寄收信測試" class="headerlink" title="寄收信測試"></a>寄收信測試</h2><p>我們可以查看<strong>郵件 header</strong>——它記錄了一封信實際走過的每一站。</p><p>方法很簡單：寄一封測試信給自己，打開「顯示原始郵件」看 header。</p><p>我用 <code>admin@marsen.me</code> 寄一封信給自已</p><figure class="highlight text"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br></pre></td><td class="code"><pre><span class="line">Message-Id: &lt;...@smtp-relay.sendinblue.com&gt;</span><br><span class="line">Received: from hb.d.sender-sib.com (...)</span><br><span class="line">DKIM-Signature: ... d=marsen.me s=brevo2 ...   → PASS</span><br><span class="line">Feedback-ID: ...:Sendinblue</span><br><span class="line">Return-Path: &lt;...=hb.d.sender-sib.com=bounces-...@marsen.me&gt;</span><br></pre></td></tr></table></figure><p><code>sendinblue</code>、<code>sender-sib</code>（SendInBlue 的縮寫）、<code>s=brevo2</code> 的 DKIM 簽章——這封信百分之百走 Brevo 發出。</p><p><code>s=brevo2</code> 還正好對應到我 DNS 裡的 <code>brevo2._domainkey</code>。<strong>Brevo 確認在用。</strong></p><h3 id="同一封信，還證明了收信端"><a href="#同一封信，還證明了收信端" class="headerlink" title="同一封信，還證明了收信端"></a>同一封信，還證明了收信端</h3><p>更妙的是，這封我寄給 <code>tester@marsen.me</code> 的信，被轉發回我 Gmail，header 把收信路徑也記下來了：</p><figure class="highlight text"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br></pre></td><td class="code"><pre><span class="line">Received: by cloudflare-email.net       → Cloudflare Email Routing 收到</span><br><span class="line">X-Forwarded-To: me@gmail.com</span><br><span class="line">X-Forwarded-For: tester@marsen.me me@gmail.com</span><br><span class="line">Delivered-To: me@gmail.com</span><br></pre></td></tr></table></figure><p>一封信同時驗證了兩端：<strong>Brevo 發信</strong> → <strong>Cloudflare Email Routing 收信並轉發</strong> → 進 Gmail。</p><h2 id="那「收信」到底是怎麼運作的？"><a href="#那「收信」到底是怎麼運作的？" class="headerlink" title="那「收信」到底是怎麼運作的？"></a>那「收信」到底是怎麼運作的？</h2><p>順著 header 就看懂了，我的收信是 <strong>Cloudflare Email Routing</strong>：</p><figure class="highlight text"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br></pre></td><td class="code"><pre><span class="line">別人寄到 xxx@marsen.me</span><br><span class="line">  → marsen.me 的 MX 指向 Cloudflare（route1-3.mx.cloudflare.net）</span><br><span class="line">  → Cloudflare Email Routing 收到</span><br><span class="line">  → 依轉發規則（Routes）轉寄</span><br><span class="line">  → 我的真實 Gmail</span><br></pre></td></tr></table></figure><p>重點：Cloudflare Email Routing 是<strong>轉發</strong>，不是信箱。</p><p>它不存信，收到就立刻轉寄到你真正的 Gmail。所以 <code>@marsen.me</code> 沒有獨立的信箱空間，所有信最終都進同一個 Gmail。</p><p>整套自訂網域信箱長這樣：</p><figure class="highlight text"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br></pre></td><td class="code"><pre><span class="line">            ┌─ 收信 → Cloudflare Email Routing（MX）→ 轉發 ┐</span><br><span class="line">@marsen.me ─┤                                              ├→ Gmail</span><br><span class="line">            └─ 寄信 ← Brevo SMTP relay ← Gmail「以 admin@ 寄」┘</span><br></pre></td></tr></table></figure><p>用免費服務，把 Gmail 變成 <code>@marsen.me</code> 的網域信箱。</p><p>這就是我免費達成私有 domain 信件寄收的作法，但是要注意 Brevo 有每日 300 封信的使用上限</p><h2 id="盤點結果"><a href="#盤點結果" class="headerlink" title="盤點結果"></a>盤點結果</h2><p>三重交叉查證（程式碼 grep、n8n 備份、郵件 header）之後：</p><p>| 服務 | 狀態 | 證據 |<br>|　——|——|——|<br>| Cloudflare Email Routing | ✅ 在用 | header 轉發路徑 |<br>| Brevo | ✅ 在用 | header 的 sendinblue &#x2F; brevo2 簽章 |<br>| Resend | ✅ 在用 | 電商專案發訂單信，程式碼有引用 |<br>| <strong>Amazon SES</strong> | ❌ <strong>殘留</strong> | 任何地方都找不到使用，連 SES 驗證記錄都沒有 |</p><p>SES 是當初設定網域信箱時評估過的備選方案（按量計費、便宜但設定複雜），最後選了 Brevo，</p><p>但 AWS 用的　<code>send.marsen.me</code> 的 MAIL FROM 記錄留下來沒清。</p><h2 id="為什麼在用的-Brevo-沒有-MX，沒用的-SES-反而有？"><a href="#為什麼在用的-Brevo-沒有-MX，沒用的-SES-反而有？" class="headerlink" title="為什麼在用的 Brevo 沒有 MX，沒用的 SES 反而有？"></a>為什麼在用的 Brevo 沒有 MX，沒用的 SES 反而有？</h2><p>這題剛好回扣前面「收信才用 MX」的觀念，但有個例外：</p><ul><li><strong>Brevo</strong>：純發信，靠 DKIM + SPF 驗證授權，<strong>不需要 MX</strong>。所以它在用，卻沒有 MX。</li><li><strong>SES</strong>：那個 <code>send.marsen.me</code> 的 MX <strong>不是收一般信</strong>，而是 SES 的「custom MAIL FROM」機制要求的，用來接收<strong>退信&#x2F;投訴回報</strong>（bounce&#x2F;complaint）。</li></ul><p>諷刺的是：沒在用的 SES 因為特殊機制留了 MX，在用的 Brevo 因為純發信反而沒有 MX。</p><p>光看「有沒有 MX」完全判斷不出哪個在用。</p><h2 id="安全清理"><a href="#安全清理" class="headerlink" title="安全清理"></a>安全清理</h2><p>確認 SES 是殘留後，要刪的只有兩筆（name 都是 <code>send.marsen.me</code>）。</p><p><strong>刪之前先把完整內容記下來</strong>——理論上它一定沒用了，但留個底，萬一哪天要恢復可以照著重建：</p><figure class="highlight ini"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment"># ── 被刪除的 SES 殘留記錄（刪除日：2026-06-04，留供日後恢復）──</span></span><br><span class="line"></span><br><span class="line"><span class="comment"># 第一筆：SES custom MAIL FROM 的 bounce 接收</span></span><br><span class="line"><span class="attr">Type</span>     = MX</span><br><span class="line"><span class="attr">Name</span>     = send.marsen.me</span><br><span class="line"><span class="attr">Content</span>  = feedback-smtp.ap-northeast-<span class="number">1</span>.amazonses.com</span><br><span class="line"><span class="attr">Priority</span> = <span class="number">10</span></span><br><span class="line"><span class="attr">Proxy</span>    = DNS <span class="literal">on</span>ly</span><br><span class="line"><span class="attr">TTL</span>      = <span class="number">1</span> hour</span><br><span class="line"></span><br><span class="line"><span class="comment"># 第二筆：SES 的 SPF</span></span><br><span class="line"><span class="attr">Type</span>     = TXT</span><br><span class="line"><span class="attr">Name</span>     = send.marsen.me</span><br><span class="line"><span class="attr">Content</span>  = <span class="string">&quot;v=spf1 include:amazonses.com ~all&quot;</span></span><br><span class="line"><span class="attr">Proxy</span>    = DNS <span class="literal">on</span>ly</span><br><span class="line"><span class="attr">TTL</span>      = <span class="number">1</span> hour</span><br></pre></td></tr></table></figure><blockquote><p>註：若真要復原 Amazon SES 寄信，光補這兩筆 DNS 不夠，還得回 AWS Console（<code>ap-northeast-1</code> 東京）重新驗證 identity 與 custom MAIL FROM。這兩筆只是當時設定留下的 DNS 半成品。</p></blockquote><h2 id="小結"><a href="#小結" class="headerlink" title="小結"></a>小結</h2><p>盤點 email DNS 殘留，兩個心法：</p><ol><li><strong>分清收信和發信</strong>——MX 是收信，SPF&#x2F;DKIM 是發信驗證。看到一筆記錄先問它管的是收還是發。</li><li><strong>用郵件 header 當偵探</strong>——dashboard 會騙人，header 不會。寄封測試信，原始 header 裡寫得清清楚楚這封走了哪些服務。記得用<strong>網域地址</strong>寄，別用個人信箱，不然測了個寂寞。</li></ol><p>殘留通常來自「評估過但沒採用的方案」——設定設了一半，淘汰後忘了清。盤點一次，把死記錄清掉，DNS 才乾淨。</p><h2 id="補充：DNS-記錄類型速查"><a href="#補充：DNS-記錄類型速查" class="headerlink" title="補充：DNS 記錄類型速查"></a>補充：DNS 記錄類型速查</h2><table><thead><tr><th>記錄</th><th>說明</th></tr></thead><tbody><tr><td><strong>MX</strong></td><td>收信路由。告訴外部郵件伺服器「寄到這個網域的信，應該送到哪台 SMTP 伺服器」，數字優先度越小越優先，可設多筆做備援</td></tr><tr><td><strong>TXT</strong></td><td>純文字記錄，DNS 裡的萬用槽。SPF、DKIM 公鑰、網域所有權驗證都塞這裡</td></tr><tr><td><strong>CNAME</strong></td><td>別名記錄。把一個 subdomain 指向另一個 hostname，由對方那端負責最終解析。根網域（<code>marsen.me</code> 本身）不能用</td></tr><tr><td><strong>SPF</strong></td><td>發信授權白名單，格式寫在 TXT 裡（<code>v=spf1 ...</code>）。聲明哪些 IP 或服務有資格以這個網域寄信，收件方用來驗發件 IP</td></tr><tr><td><strong>DKIM</strong></td><td>郵件防偽簽章。發信服務用私鑰簽章，公鑰掛在 DNS（TXT 或 CNAME 委派），收件方取公鑰驗簽，確認內容未被竄改</td></tr><tr><td><strong>A</strong></td><td>最基本的記錄。把網域直接對應到一個 IPv4 位址</td></tr><tr><td><strong>AAAA</strong></td><td>同 A，對應的是 IPv6 位址</td></tr><tr><td><strong>NS</strong></td><td>管轄聲明。指定這個網域的 DNS 問題，由哪幾台 Name Server 負責回答</td></tr></tbody></table><h2 id="參考"><a href="#參考" class="headerlink" title="參考"></a>參考</h2><ul><li><a href="/2025/08/27/2025/brevo_smtp/">怎麼建立一個網站？(四) - 自訂網域 EMail 收寄信（使用 Cloudflare 與 Brevo）</a></li></ul><p>(fin)</p>]]>
+    </content>
+    <id>https://blog.marsen.me/2026/06/03/2026/email-dns-audit-cleanup/</id>
+    <link href="https://blog.marsen.me/2026/06/03/2026/email-dns-audit-cleanup/"/>
+    <published>2026-06-03T16:11:18.000Z</published>
+    <summary>
+      <![CDATA[<h2 id="前情提要"><a href="#前情提要" class="headerlink" title="前情提要"></a>前情提要</h2><p>這幾天整理 Cloudflare 的 DNS，看到幾筆我沒有記憶也不理解的記錄：</p>
+<figure class="hi]]>
+    </summary>
+    <title>[實作筆記] 盤點與清理自訂網域的 Email DNS 殘留（用郵件 header 當偵探）</title>
+    <updated>2026-06-11T07:01:55.068Z</updated>
   </entry>
   <entry>
     <author>
@@ -68,7 +87,7 @@
 <fi]]>
     </summary>
     <title>[實作筆記] 更新自架在 GCP VM 上的 n8n（Docker 版）</title>
-    <updated>2026-06-10T15:36:10.949Z</updated>
+    <updated>2026-06-11T07:01:55.068Z</updated>
   </entry>
   <entry>
     <author>
@@ -87,7 +106,7 @@
 <p>比著發現原來存在著兩種金流串接]]>
     </summary>
     <title>[工具筆記] Prime Token vs MPG：兩種台灣電商金流模式的本質差異</title>
-    <updated>2026-06-10T15:36:10.949Z</updated>
+    <updated>2026-06-11T07:01:55.068Z</updated>
   </entry>
   <entry>
     <author>
@@ -105,7 +124,7 @@
       <![CDATA[<h2 id="前情提要"><a href="#前情提要" class="headerlink" title="前情提要"></a>前情提要</h2><p>用 LINE Bot 做系統通知，結果某天發現通知完全停了，重啟也沒用。<br>查了一圈才發現根本原因不是程式問題，這篇記錄]]>
     </summary>
     <title>[實作筆記] LINE Messaging API 用量查詢：免費額度怎麼看，以及為什麼通知會停止</title>
-    <updated>2026-06-10T15:36:10.949Z</updated>
+    <updated>2026-06-11T07:01:55.068Z</updated>
   </entry>
   <entry>
     <author>
@@ -124,7 +143,7 @@
 <li><a href="https://www.theverge.com/ai-artificial-intellig]]>
     </summary>
     <title>[AI生成]20260505 周報</title>
-    <updated>2026-06-10T15:36:10.949Z</updated>
+    <updated>2026-06-11T07:01:55.068Z</updated>
   </entry>
   <entry>
     <author>
@@ -143,7 +162,7 @@
 <li><a href="https://www.theverge.com/ai-artificial-intellig]]>
     </summary>
     <title>[AI生成]20260504 周報</title>
-    <updated>2026-06-10T15:36:10.949Z</updated>
+    <updated>2026-06-11T07:01:55.068Z</updated>
   </entry>
   <entry>
     <author>
@@ -162,7 +181,7 @@
 <li><a href="https://www.briefs.co/news/uber-torches-entire-]]>
     </summary>
     <title>[AI生成]20260502 周報</title>
-    <updated>2026-06-10T15:36:10.948Z</updated>
+    <updated>2026-06-11T07:01:55.067Z</updated>
   </entry>
   <entry>
     <author>
@@ -181,7 +200,7 @@
 <p>VM 重開機沒問題，但容器砍掉重建、或換]]>
     </summary>
     <title>[實作筆記] 個人自動化平台(七) n8n 備份自動化：workflow + credentials → GitHub</title>
-    <updated>2026-06-10T15:36:10.949Z</updated>
+    <updated>2026-06-11T07:01:55.068Z</updated>
   </entry>
   <entry>
     <author>
@@ -202,7 +221,7 @@
     <title>
       <![CDATA[[實作筆記] 技術面試 Q&A：大流量電商系統設計實戰]]>
     </title>
-    <updated>2026-06-10T15:36:10.949Z</updated>
+    <updated>2026-06-11T07:01:55.068Z</updated>
   </entry>
   <entry>
     <author>
@@ -220,7 +239,7 @@
       <![CDATA[<h2 id="前情提要"><a href="#前情提要" class="headerlink" title="前情提要"></a>前情提要</h2><p>在 <a href="/2026/n8n-6-pipeline-output/">個人自動化平台(六)</a> 實作 IG]]>
     </summary>
     <title>[實作筆記] 個人自動化平台(番外) Google OAuth redirect_uri_mismatch 除錯記錄</title>
-    <updated>2026-06-10T15:36:10.949Z</updated>
+    <updated>2026-06-11T07:01:55.068Z</updated>
   </entry>
   <entry>
     <author>
@@ -239,7 +258,7 @@
 <p>這篇記錄處理層：把多筆文章合併，送給 Gemini 整理成 A]]>
     </summary>
     <title>[實作筆記] 個人自動化平台(五) n8n 實作：處理層，Aggregate + Gemini 週報整理</title>
-    <updated>2026-06-10T15:36:10.949Z</updated>
+    <updated>2026-06-11T07:01:55.068Z</updated>
   </entry>
   <entry>
     <author>
@@ -257,7 +276,7 @@
       <![CDATA[<h2 id="前情提要"><a href="#前情提要" class="headerlink" title="前情提要"></a>前情提要</h2><p>收集層（RSS 抓資料）和處理層（Gemini 整理週報）都跑通了，接下來要實作輸出層：把 AI 整理好的內容自動發布到社群]]>
     </summary>
     <title>[實作筆記] 個人自動化平台(六) n8n 實作：輸出層，Instagram API 取得 Token 全記錄</title>
-    <updated>2026-06-10T15:36:10.949Z</updated>
+    <updated>2026-06-11T07:01:55.068Z</updated>
   </entry>
   <entry>
     <author>
@@ -275,7 +294,7 @@
       <![CDATA[<h2 id="前情提要"><a href="#前情提要" class="headerlink" title="前情提要"></a>前情提要</h2><p>2019 年，我在 <a href="https://blog.marsen.me/2019/05/18/2019/aws_]]>
     </summary>
     <title>[產業報告] 從 DeepRacer 到 Robotaxi：Tesla vs Waymo 的無人駕駛現況</title>
-    <updated>2026-06-10T15:36:10.949Z</updated>
+    <updated>2026-06-11T07:01:55.068Z</updated>
   </entry>
   <entry>
     <author>
@@ -294,7 +313,7 @@
 <p>目標是從四個 AI 新聞來源拉資料，輸出]]>
     </summary>
     <title>[實作筆記] 個人自動化平台(四) n8n 實作：收集層，RSS 資料來源</title>
-    <updated>2026-06-10T15:36:10.949Z</updated>
+    <updated>2026-06-11T07:01:55.068Z</updated>
   </entry>
   <entry>
     <author>
@@ -313,7 +332,7 @@
 <p>這篇不急著]]>
     </summary>
     <title>[實作筆記] 個人自動化平台(三) 收集、處理、輸出：三層可插拔管道設計</title>
-    <updated>2026-06-10T15:36:10.949Z</updated>
+    <updated>2026-06-11T07:01:55.068Z</updated>
   </entry>
   <entry>
     <author>
@@ -333,7 +352,7 @@
     <title>
       <![CDATA[[實作筆記] 個人自動化平台(番外) 拆掉重建 GCP VM & Cloudflared Tunnel & Cloudflare Access]]>
     </title>
-    <updated>2026-06-10T15:36:10.949Z</updated>
+    <updated>2026-06-11T07:01:55.068Z</updated>
   </entry>
   <entry>
     <author>
@@ -354,7 +373,7 @@
     <title>
       <![CDATA[個人自動化平台(二) Cloudflare Access & Cloudflare Tunnel]]>
     </title>
-    <updated>2026-06-10T15:36:10.949Z</updated>
+    <updated>2026-06-11T07:01:55.068Z</updated>
   </entry>
   <entry>
     <author>
@@ -375,24 +394,6 @@
     <title>
       <![CDATA[[實作筆記] 個人自動化平台(一) n8n & GCP VM]]>
     </title>
-    <updated>2026-06-10T15:36:10.949Z</updated>
-  </entry>
-  <entry>
-    <author>
-      <name>Marsen L.</name>
-      <email>admin@marsen.me</email>
-    </author>
-    <category term="生活筆記" scheme="https://blog.marsen.me/tags/%E7%94%9F%E6%B4%BB%E7%AD%86%E8%A8%98/"/>
-    <content>
-      <![CDATA[<h2 id="前情提要"><a href="#前情提要" class="headerlink" title="前情提要"></a>前情提要</h2><p>Gap year 期間收到一封獵頭的 LinkedIn 邀約，職位是 AI Workflow Tech Lead。  </p><p>獵頭來自一家 HR Consulting 公司，背後的客戶公司（以下稱 B 社）資訊目前尚未公開。</p><hr><h2 id="獵頭提供的基本資訊"><a href="#獵頭提供的基本資訊" class="headerlink" title="獵頭提供的基本資訊"></a>獵頭提供的基本資訊</h2><ul><li><strong>職稱</strong>：AI Workflow Tech Lead</li><li><strong>產業</strong>：台北軟體公司，提供決策營運優化工具，協助品牌提升轉換率與營收</li><li><strong>薪資</strong>：年薪 2-4M（依經驗而定）</li><li><strong>工作型態</strong>：混合遠距辦公（比例未確認）</li><li><strong>團隊規模</strong>：帶領 3-5 人工程團隊</li></ul><hr><h2 id="JD-重點"><a href="#JD-重點" class="headerlink" title="JD 重點"></a>JD 重點</h2><p>這個角色的核心是替公司內部建立 AI 驅動的開發流程與自動化系統。</p><p>主要工作包含：</p><ul><li>評估與導入 AI 工具（Claude、Codex 等 LLM &#x2F; Agent 平台）</li><li>建立 AI 輔助 workflow：code generation、code review、文件知識檢索、任務 orchestration</li><li>架構設計：LLM + API + 自動化工具 + human-in-the-loop</li><li>跨團隊識別瓶頸，轉化成 AI 解決方案</li><li>建立 prompt design、workflow 可靠性、治理等最佳實踐</li><li>mentor 團隊成員</li></ul><p>值得注意的是，JD 描述偏向「內部 AI 工具建設者」，但獵頭口頭說的比較像帶產品團隊的 Tech Lead。  </p><p>兩者定位有落差，預計在 meet 時釐清。  </p><hr><h2 id="目前已知-未知"><a href="#目前已知-未知" class="headerlink" title="目前已知 &#x2F; 未知"></a>目前已知 &#x2F; 未知</h2><table><thead><tr><th>項目</th><th>狀態</th></tr></thead><tbody><tr><td>薪資範圍</td><td>已知（2-4M，標準未知）</td></tr><tr><td>工作型態</td><td>混合遠距，比例未確認</td></tr><tr><td>公司名稱</td><td>未公開</td></tr><tr><td>公司規模與穩定性</td><td>未知</td></tr><tr><td>角色定位（產品 vs 內部工具）</td><td>待確認</td></tr><tr><td>直屬主管</td><td>未知</td></tr><tr><td>團隊現況</td><td>未知</td></tr></tbody></table><hr><h2 id="自我梳理"><a href="#自我梳理" class="headerlink" title="自我梳理"></a>自我梳理</h2><p>對方特別在意兩件事：n8n 以外的 AI workflow 工具廣度，以及 AI Agent 系統設計的實際深度。</p><p>這讓我重新整理了一下自己在這塊的積累。</p><p>技術工具不是重點，思路才是。我做 AI 相關系統時，習慣先把任務拆成多個 step，</p><p>用 workflow 控制整個流程，而不是只寫一段 prompt 然後祈禱它跑對。</p><p>具體做過的事：</p><ul><li><strong>RAG 系統</strong>：使用者上傳法律合約（PDF &#x2F; 圖片轉文字）→ Qdrant 向量搜尋 → LLM 回答問題，<br>應用在專利法規與公司內部產品知識，有實際賣給 SONY 和電子廠的商業案例</li><li><strong>Edge deployment</strong>：因為客戶要求本地部署，處理過 Ollama（本地模型）與 API 模型的整合與切換</li><li><strong>工程架構</strong>：Python + Node.js 拆服務，queue &#x2F; worker 處理流程，<br>加上 cache 與模型分級使用，控制成本與效能</li></ul><p>核心原則只有一個：讓 AI 真正整合進既有流程，提升效率，不只是做 demo。</p><hr><h2 id="小結"><a href="#小結" class="headerlink" title="小結"></a>小結</h2><p>技術面的吻合度高，AI Agent 系統設計、RAG、導入 AI 開發流程都是近期實際做過的事。</p><p>主要的疑慮是角色定位的模糊，以及混合遠距的實際彈性。  </p><p>這兩點是一面時的優先確認項目。</p><p>(fin)</p>]]>
-    </content>
-    <id>https://blog.marsen.me/2026/04/01/2026/interview-b-company-ai-workflow-tech-lead/</id>
-    <link href="https://blog.marsen.me/2026/04/01/2026/interview-b-company-ai-workflow-tech-lead/"/>
-    <published>2026-04-01T05:57:05.000Z</published>
-    <summary>
-      <![CDATA[<h2 id="前情提要"><a href="#前情提要" class="headerlink" title="前情提要"></a>前情提要</h2><p>Gap year 期間收到一封獵頭的 LinkedIn 邀約，職位是 AI Workflow Tech Lead。  </p]]>
-    </summary>
-    <title>[生活筆記] 面試記錄 B 社 — AI Workflow Tech Lead</title>
-    <updated>2026-06-10T15:36:10.949Z</updated>
+    <updated>2026-06-11T07:01:55.068Z</updated>
   </entry>
 </feed>
