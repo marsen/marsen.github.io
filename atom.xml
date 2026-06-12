@@ -12,7 +12,26 @@
   <rights>All rights reserved 2026, Marsen L.</rights>
   <subtitle>waiting to load</subtitle>
   <title>Marsen's Blog</title>
-  <updated>2026-06-12T09:37:46.205Z</updated>
+  <updated>2026-06-12T11:37:08.401Z</updated>
+  <entry>
+    <author>
+      <name>Marsen L.</name>
+      <email>admin@marsen.me</email>
+    </author>
+    <category term="實作筆記" scheme="https://blog.marsen.me/tags/%E5%AF%A6%E4%BD%9C%E7%AD%86%E8%A8%98/"/>
+    <content>
+      <![CDATA[<h2 id="前情提要"><a href="#前情提要" class="headerlink" title="前情提要"></a>前情提要</h2><p>做形象站，Hero 要放一支滿版自動播放的背景影片，第一個冒出來的問題是「影片放哪裡」。</p><p>這個問題帶出了前端靜態資源的兩種擺法：<code>public/</code> 和 <code>src/assets/</code>。對一般人看起來只是資料夾名字不同，但對工程師來說，兩者的機制差很多。</p><blockquote><p>做形象站 Hero 背景影片的前置研究。完整的流量估算與播放器選型，見<a href="/2026/hero-background-video-hosting/">下一篇</a>。</p></blockquote><h2 id="素材放哪：public-vs-src-assets"><a href="#素材放哪：public-vs-src-assets" class="headerlink" title="素材放哪：public&#x2F; vs src&#x2F;assets"></a>素材放哪：public&#x2F; vs src&#x2F;assets</h2><p>對一般人來說看起來只是資料夾名字不同，但對這裡有蠻多的細節，我們來逐一分析。</p><p>首先要了解兩個時間點：</p><ul><li><strong>編譯期（Build Time）</strong>：網站還沒上線前，可以將一些資源優化打包減少不必要的流量，或是使用雜湊命名來避免快取問題。</li><li><strong>執行期（Runtime）</strong>：網站上線後，使用者實際使用的期間。程式在這個階段才真正執行，才能動態取得資源、回應使用者的操作。</li></ul><h3 id="src-assets-—-打包工具接管"><a href="#src-assets-—-打包工具接管" class="headerlink" title="src&#x2F;assets&#x2F; — 打包工具接管"></a>src&#x2F;assets&#x2F; — 打包工具接管</h3><p>現代主流網站打包工具（Vite &#x2F; Webpack）會在編譯期處理這些檔案：</p><ul><li><strong>雜湊檔名</strong>：輸出 <code>bg.a1b2c3d4.mp4</code>，URL 跟著內容變，瀏覽器可以放心永久 cache（<code>Cache-Control: immutable</code>）——改了檔案雜湊就換，訪客自動抓新的</li><li><strong>可能優化</strong>：圖片壓縮、小檔案 inline 成 base64 等</li><li><strong>追蹤依賴</strong>：沒有被 import 的檔案，build 產出裡就不會出現</li></ul><p><strong>限制一</strong>：<code>import</code> 是編譯期的靜態行為，URL 在 build 時就決定了，沒辦法在 runtime 動態組字串——更不可能從資料庫讀一個 URL 出來用。</p><p><strong>限制二</strong>：打包工具適合處理 JS、CSS、小圖，遇到影片這種大檔案，build 時間拉長，而且影片可壓縮或優化的效果有限，過一手只是浪費。</p><h3 id="public-—-繞過打包工具"><a href="#public-—-繞過打包工具" class="headerlink" title="public&#x2F; — 繞過打包工具"></a>public&#x2F; — 繞過打包工具</h3><p>這裡的資源不會被打包工具處理，本質跟早期 Apache &#x2F; Nginx 放一個靜態資料夾直接 serve 檔案是同一件事——收到請求，原樣回傳。快取責任落在「伺服器那層」：早期要自己設 cache header，現代部署平台（Vercel、Netlify、Cloudflare Pages）會自動推到 Edge Network 幫你卸載流量——但這是<strong>平台</strong>做的，不是框架。</p><p>URL 永遠是 <code>/你放的路徑</code>，開發時字串直接用不用 <code>import</code>：</p><figure class="highlight text"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br></pre></td><td class="code"><pre><span class="line">&lt;video src=&quot;/hero.mp4&quot; /&gt;     ← 寫死字串</span><br><span class="line">&lt;video src=&#123;dbValue&#125; /&gt;       ← 從資料庫來的字串，也走得通</span><br></pre></td></tr></table></figure><blockquote><p>Next.js 本身真正在 framework 層處理靜態資源的是 <code>next/image</code>：server side 做圖片壓縮、格式轉換、依裝置裁切，回傳正確的 cache header。<code>public/</code> 它不碰。</p></blockquote><h3 id="判斷比較"><a href="#判斷比較" class="headerlink" title="判斷比較"></a>判斷比較</h3><p>| | <code>src/assets/</code> | <code>public/</code> |<br>|　—　|　—　|　—　|<br>| 引用方式 | <code>import</code>，編譯期靜態 | 字串 URL，runtime 動態 |<br>| 快取 | 自動雜湊，可放心 <code>immutable</code> | 手動管理，或靠部署平台預設值 |<br>| 大檔案 | 不適合（影片、字型） | 適合 |<br>| 適合 | Icon、logo、小圖 | 後台可換的媒體、使用者貼的 URL |</p><blockquote><p>我們的例子是背景影片，幾乎都是「後台可換、runtime 才知道 URL」的需求 → 判斷上選擇 <code>public/</code> 較為適合。</p></blockquote><h2 id="參考"><a href="#參考" class="headerlink" title="參考"></a>參考</h2><ul><li><a href="/2026/hero-background-video-hosting/">形象站滿版背景影片（二）：流量、CDN 與播放器選型</a></li></ul><h2 id="小結"><a href="#小結" class="headerlink" title="小結"></a>小結</h2><ul><li><code>src/assets/</code> 交給打包工具管，享有自動雜湊快取，但只能靜態 <code>import</code>、不適合大檔案。</li><li><code>public/</code> 繞過打包工具，直接 serve，URL 是字串、runtime 拿來用都沒問題。</li><li>影片、字型這類大媒體放 <code>public/</code>；icon、logo 等小圖用 <code>src/assets/</code>。</li><li>換 CDN 只需換 URL 字串，不用動程式碼。</li></ul><p>(fin)</p>]]>
+    </content>
+    <id>https://blog.marsen.me/2026/06/12/2026/frontend-static-assets-public-vs-src-assets/</id>
+    <link href="https://blog.marsen.me/2026/06/12/2026/frontend-static-assets-public-vs-src-assets/"/>
+    <published>2026-06-12T11:24:23.000Z</published>
+    <summary>
+      <![CDATA[<h2 id="前情提要"><a href="#前情提要" class="headerlink" title="前情提要"></a>前情提要</h2><p>做形象站，Hero 要放一支滿版自動播放的背景影片，第一個冒出來的問題是「影片放哪裡」。</p>
+<p>這個問題帶出了前端靜]]>
+    </summary>
+    <title>[實作筆記] 形象站滿版背景影片（一）：前端靜態資源放哪裡</title>
+    <updated>2026-06-12T11:37:08.401Z</updated>
+  </entry>
   <entry>
     <author>
       <name>Marsen L.</name>
@@ -30,7 +49,7 @@
 <h2 id="本周要點"><a href="#本周要點" class="headerlink" title="本周要點"></a>本周要]]>
     </summary>
     <title>[AI生成] 20260612 科技周報</title>
-    <updated>2026-06-12T09:37:46.205Z</updated>
+    <updated>2026-06-12T11:37:08.401Z</updated>
   </entry>
   <entry>
     <author>
@@ -49,7 +68,27 @@
 <h2 id="本周要點"><a href="#本周要點" class="headerlink" title="本周要點"></a>本周要]]>
     </summary>
     <title>[AI生成] 20260610 科技周報</title>
-    <updated>2026-06-12T09:37:46.205Z</updated>
+    <updated>2026-06-12T11:37:08.401Z</updated>
+  </entry>
+  <entry>
+    <author>
+      <name>Marsen L.</name>
+      <email>admin@marsen.me</email>
+    </author>
+    <category term="實作筆記" scheme="https://blog.marsen.me/tags/%E5%AF%A6%E4%BD%9C%E7%AD%86%E8%A8%98/"/>
+    <content>
+      <![CDATA[<h2 id="前情提要"><a href="#前情提要" class="headerlink" title="前情提要"></a>前情提要</h2><p>Hero 要放一支滿版自動播放的背景影片。</p><blockquote><p>Hero 區塊是網頁最頂部的全版區塊，通常含標題、說明文字與背景，是訪客進站看到的第一眼。</p></blockquote><p>素材要放哪，已在<a href="/2026/frontend-static-assets-public-vs-src-assets/">上一篇</a>整理好了，結論是放 <code>public/</code>，URL 字串直接用。</p><p>這篇專注在另外兩個問題：</p><ol><li><strong>流量控管</strong>：滿版自動播放背景影片是首頁最吃流量的東西，怎麼估、怎麼省？</li><li><strong>UI 體驗</strong>：背景影片要無控制列、自動播放、靜音、循環——原生 <code>&lt;video&gt;</code> 還是嵌入 YouTube／Vimeo？</li></ol><h2 id="自存影片：會吃多少流量？"><a href="#自存影片：會吃多少流量？" class="headerlink" title="自存影片：會吃多少流量？"></a>自存影片：會吃多少流量？</h2><p>會，而且<strong>滿版自動播放的背景影片，是整頁最吃流量的東西</strong>。</p><p>粗估一下：一支壓到 SD 的背景影片約 3.5MB，每個訪客每次載入首頁就抓一次（瀏覽器會快取，回訪者不重抓）。</p><figure class="highlight text"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">3.5MB × 10,000 次造訪/月 ≈ 35GB/月</span><br></pre></td></tr></table></figure><p>對小型品牌站通常還在額度內，但要注意兩件事：</p><ol><li>行動裝置上，這 3.5MB 是吃<strong>訪客自己</strong>的行動數據，UX 不友善。</li><li>影片越大支越可怕，HD 1080p 動輒 12MB 起跳。</li></ol><h3 id="重點觀念：走-CDN-≠-不算流量"><a href="#重點觀念：走-CDN-≠-不算流量" class="headerlink" title="重點觀念：走 CDN ≠ 不算流量"></a>重點觀念：走 CDN ≠ 不算流量</h3><p>很多人以為「丟到平台、平台有 CDN」就沒事了。</p><p>以主流部署平台來說，<code>public/</code> 的靜態檔確實會由它的 Edge Network（CDN）快取分送——<strong>但傳輸量仍然計入你的方案額度</strong>。</p><p>CDN 解決的是「分送速度與快取」，不是「免費流量」。要真正卸載流量，得換 host。</p><h2 id="要省流量：CDN-影音-host-比較"><a href="#要省流量：CDN-影音-host-比較" class="headerlink" title="要省流量：CDN &#x2F; 影音 host 比較"></a>要省流量：CDN &#x2F; 影音 host 比較</h2><p>影片放在 <code>public/</code> 的話，流量算在部署平台的額度裡。</p><p>以我們用的平台　Vercel 免費方案只有 100GB&#x2F;月，一支背景影片流量大的時候很快就吃光。</p><p>解法是把影片搬到外部 host，讓別人的伺服器去扛流量。</p><p>好消息是，只要程式碼只用 URL 字串引用影片，換 host 就是換那個字串，<strong>不用改程式碼</strong>：</p><figure class="highlight text"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br></pre></td><td class="code"><pre><span class="line">// 原本放 public/</span><br><span class="line">&lt;video src=&quot;/hero.mp4&quot; /&gt;</span><br><span class="line"></span><br><span class="line">// 搬到 R2 後，只改這一行</span><br><span class="line">&lt;video src=&quot;https://pub-xxx.r2.dev/hero.mp4&quot; /&gt;</span><br></pre></td></tr></table></figure><p>兩條路線：</p><h3 id="路線一：自己存，外部-CDN-來送（Cloudflare-R2"><a href="#路線一：自己存，外部-CDN-來送（Cloudflare-R2" class="headerlink" title="路線一：自己存，外部 CDN 來送（Cloudflare R2"></a>路線一：自己存，外部 CDN 來送（Cloudflare R2</h3><p>把影片傳到 R2，egress（流出流量）免費，只付儲存費（$0.015&#x2F;GB&#x2F;月）。一支 5MB 影片幾乎是 $0，部署平台那邊完全不計這筆流量。</p><h3 id="路線二：讓別人的平台吸收（Vimeo-Youtube）"><a href="#路線二：讓別人的平台吸收（Vimeo-Youtube）" class="headerlink" title="路線二：讓別人的平台吸收（Vimeo&#x2F;Youtube）"></a>路線二：讓別人的平台吸收（Vimeo&#x2F;Youtube）</h3><p>影片上傳到 Vimeo，你的伺服器完全不出流量，由 Vimeo 負責送給訪客。代價是多了第三方依賴，免費方案有上傳量限制。</p><table><thead><tr><th>方案</th><th>流量誰扛</th><th>備註</th></tr></thead><tbody><tr><td>Cloudflare R2</td><td>R2（egress 免費）</td><td>自己管檔案，換 URL 即可</td></tr><tr><td>Cloudflare Stream &#x2F; Mux</td><td>平台</td><td>專業影音串流，自動轉檔、自適應位元率</td></tr><tr><td>Cloudinary</td><td>平台</td><td>媒體優化 + CDN</td></tr><tr><td>Vimeo</td><td>Vimeo</td><td>免費方案有上傳限制，背景模式乾淨</td></tr><tr><td>YouTube 嵌入</td><td>YouTube（完全免費）</td><td>有播放器外觀問題（下節詳述）</td></tr></tbody></table><p>形象站的滿版背景，<strong>通常不會用 YouTube</strong>，原因看下面。</p><h2 id="YouTube-當「無播放器」背景？hack-與代價"><a href="#YouTube-當「無播放器」背景？hack-與代價" class="headerlink" title="YouTube 當「無播放器」背景？hack 與代價"></a>YouTube 當「無播放器」背景？hack 與代價</h2><p>YouTube 這麼主流，能不能拿來當乾淨背景？</p><p><strong>沒有官方乾淨方案</strong>，主流做法都是 hack，而且 YouTube 近年反而把「藏品牌」收得更緊。</p><p>做法是 IFrame Player API + 參數 + CSS：</p><figure class="highlight text"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">autoplay=1&amp;mute=1&amp;loop=1&amp;playlist=VIDEO_ID&amp;controls=0&amp;playsinline=1&amp;rel=0&amp;disablekb=1&amp;iv_load_policy=3</span><br></pre></td></tr></table></figure><figure class="highlight css"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment">/* 把 iframe 放大超出視窗、置中裁切，藏掉黑邊與殘留 UI */</span></span><br><span class="line"><span class="selector-class">.bg-wrap</span> &#123; <span class="attribute">position</span>: absolute; inset: <span class="number">0</span>; <span class="attribute">overflow</span>: hidden; &#125;</span><br><span class="line"><span class="selector-class">.bg-wrap</span> <span class="selector-tag">iframe</span> &#123;</span><br><span class="line">  <span class="attribute">position</span>: absolute; <span class="attribute">top</span>: <span class="number">50%</span>; <span class="attribute">left</span>: <span class="number">50%</span>;</span><br><span class="line">  <span class="attribute">width</span>: <span class="number">150vw</span>; <span class="attribute">height</span>: <span class="number">150vh</span>;        <span class="comment">/* 刻意超出 */</span></span><br><span class="line">  <span class="attribute">transform</span>: <span class="built_in">translate</span>(-<span class="number">50%</span>, -<span class="number">50%</span>);</span><br><span class="line">  <span class="attribute">pointer-events</span>: none;                <span class="comment">/* 防止點到跳出控制列 */</span></span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure><p>代價很實際：</p><ul><li><code>modestbranding</code> 已被 YouTube 淡化／移除，載入、暫停、結束仍可能<strong>閃一下 logo／標題</strong>。</li><li>單片循環要用 <code>loop=1&amp;playlist=ID</code> 的 trick，<strong>接點會黑屏跳一下</strong>（要用 API <code>seekTo(0)</code> 才順）。</li><li>16:9 硬裁成滿版 → <strong>邊緣被切掉</strong>。</li><li>比原生 <code>&lt;video&gt;</code> <strong>重很多</strong>（要載播放器 JS、追蹤 cookie，除非用 <code>youtube-nocookie</code>）。</li><li><strong>手機（尤其 iOS）自動播放不穩</strong>。</li><li>「完全藏品牌」本身遊走在 ToS 邊緣。</li></ul><h2 id="真正乾淨的主流解"><a href="#真正乾淨的主流解" class="headerlink" title="真正乾淨的主流解"></a>真正乾淨的主流解</h2><h3 id="1-Vimeo-背景模式"><a href="#1-Vimeo-背景模式" class="headerlink" title="1. Vimeo 背景模式"></a>1. Vimeo 背景模式</h3><p>Vimeo 的嵌入支援 <code>background=1</code> 參數，這是<strong>官方為背景影片設計</strong>的模式：自動播放、循環、靜音、<strong>全程無控制列、無品牌</strong>。</p><figure class="highlight text"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">https://player.vimeo.com/video/VIDEO_ID?background=1&amp;muted=1&amp;autoplay=1&amp;loop=1</span><br></pre></td></tr></table></figure><p>要 iframe 又要乾淨，這才是該選的，比 YouTube hack 乾淨太多。</p><h3 id="2-影音-CDN-的-mp4-原生-video"><a href="#2-影音-CDN-的-mp4-原生-video" class="headerlink" title="2. 影音 CDN 的 mp4 + 原生 video"></a>2. 影音 CDN 的 mp4 + 原生 video</h3><p>把影片放 Stream &#x2F; Mux &#x2F; R2，拿到真正的 mp4／HLS URL，用原生 <code>&lt;video&gt;</code> 播。</p><p>最乾淨、最可控，也最好做手機降級（poster、<code>preload</code>、小螢幕只給圖）。</p><h2 id="架構建議：媒體以-URL-為主"><a href="#架構建議：媒體以-URL-為主" class="headerlink" title="架構建議：媒體以 URL 為主"></a>架構建議：媒體以 URL 為主</h2><p>把這些湊起來，得到一個簡單原則：<strong>渲染層不要綁死 host。</strong></p><ul><li>媒體只存一個 URL 字串（哪來的都行：自家 <code>public/</code>、R2、Mux、Vimeo iframe）。</li><li>範例／預設素材放 <code>public/</code>，跟使用者貼的網址走同一條路徑。</li><li>正式上線要換成 CDN？<strong>貼上新 URL 即可，不用改程式碼。</strong></li><li>要支援 iframe 型（Vimeo／YouTube）就多開一種「媒體類型」，渲染分流到 iframe，原生影片仍走 <code>&lt;video&gt;</code>。</li></ul><p>這樣早期可以自存 demo、之後無痛換成專業影音 CDN，決策成本最低。</p><h2 id="參考"><a href="#參考" class="headerlink" title="參考"></a>參考</h2><ul><li><a href="/2026/frontend-static-assets-public-vs-src-assets/">形象站滿版背景影片（一）：前端靜態資源放哪裡</a></li></ul><h2 id="小結"><a href="#小結" class="headerlink" title="小結"></a>小結</h2><ul><li>滿版自動播放背景影片最吃流量；CDN 加速 ≠ 免費流量，傳輸仍算額度。</li><li>省流量靠換 host：R2（egress 免費）&#x2F; Stream &#x2F; Mux &#x2F; Cloudinary。</li><li>YouTube 無播放器背景只能 hack，缺點一堆；要 iframe 乾淨解請用 <strong>Vimeo <code>background=1</code></strong>。</li><li>最乾淨：影音 CDN 的 mp4 + 原生 <code>&lt;video&gt;</code>。</li><li>架構上讓媒體「只認 URL」，換 host 就是換字串，不用動程式碼。</li></ul><p>(fin)</p>]]>
+    </content>
+    <id>https://blog.marsen.me/2026/06/07/2026/hero-background-video-hosting/</id>
+    <link href="https://blog.marsen.me/2026/06/07/2026/hero-background-video-hosting/"/>
+    <published>2026-06-07T16:27:00.000Z</published>
+    <summary>
+      <![CDATA[<h2 id="前情提要"><a href="#前情提要" class="headerlink" title="前情提要"></a>前情提要</h2><p>Hero 要放一支滿版自動播放的背景影片。</p>
+<blockquote>
+<p>Hero 區塊是網頁最頂部的全版區塊，通]]>
+    </summary>
+    <title>[實作筆記] 形象站滿版背景影片（二）：流量、CDN 與播放器選型</title>
+    <updated>2026-06-12T11:37:08.401Z</updated>
   </entry>
   <entry>
     <author>
@@ -68,7 +107,7 @@
 <h2 id="本周要點"><a href="#本周要點" class="headerlink" title="本周要點"></a>本周要]]>
     </summary>
     <title>[AI生成] 20260605 科技周報</title>
-    <updated>2026-06-12T09:37:46.205Z</updated>
+    <updated>2026-06-12T11:37:08.401Z</updated>
   </entry>
   <entry>
     <author>
@@ -87,7 +126,7 @@
 <figure class="hi]]>
     </summary>
     <title>[實作筆記] 盤點與清理自訂網域的 Email DNS 殘留（用郵件 header 當偵探）</title>
-    <updated>2026-06-12T09:37:46.205Z</updated>
+    <updated>2026-06-12T11:37:08.401Z</updated>
   </entry>
   <entry>
     <author>
@@ -106,7 +145,7 @@
 <fi]]>
     </summary>
     <title>[實作筆記] 更新自架在 GCP VM 上的 n8n（Docker 版）</title>
-    <updated>2026-06-12T09:37:46.205Z</updated>
+    <updated>2026-06-12T11:37:08.401Z</updated>
   </entry>
   <entry>
     <author>
@@ -125,7 +164,7 @@
 <p>比著發現原來存在著兩種金流串接]]>
     </summary>
     <title>[工具筆記] Prime Token vs MPG：兩種台灣電商金流模式的本質差異</title>
-    <updated>2026-06-12T09:37:46.205Z</updated>
+    <updated>2026-06-12T11:37:08.401Z</updated>
   </entry>
   <entry>
     <author>
@@ -143,7 +182,7 @@
       <![CDATA[<h2 id="前情提要"><a href="#前情提要" class="headerlink" title="前情提要"></a>前情提要</h2><p>用 LINE Bot 做系統通知，結果某天發現通知完全停了，重啟也沒用。<br>查了一圈才發現根本原因不是程式問題，這篇記錄]]>
     </summary>
     <title>[實作筆記] LINE Messaging API 用量查詢：免費額度怎麼看，以及為什麼通知會停止</title>
-    <updated>2026-06-12T09:37:46.205Z</updated>
+    <updated>2026-06-12T11:37:08.401Z</updated>
   </entry>
   <entry>
     <author>
@@ -162,7 +201,7 @@
 <li><a href="https://www.theverge.com/ai-artificial-intellig]]>
     </summary>
     <title>[AI生成]20260505 周報</title>
-    <updated>2026-06-12T09:37:46.205Z</updated>
+    <updated>2026-06-12T11:37:08.401Z</updated>
   </entry>
   <entry>
     <author>
@@ -181,7 +220,7 @@
 <li><a href="https://www.theverge.com/ai-artificial-intellig]]>
     </summary>
     <title>[AI生成]20260504 周報</title>
-    <updated>2026-06-12T09:37:46.205Z</updated>
+    <updated>2026-06-12T11:37:08.401Z</updated>
   </entry>
   <entry>
     <author>
@@ -200,7 +239,7 @@
 <li><a href="https://www.briefs.co/news/uber-torches-entire-]]>
     </summary>
     <title>[AI生成]20260502 周報</title>
-    <updated>2026-06-12T09:37:46.203Z</updated>
+    <updated>2026-06-12T11:37:08.400Z</updated>
   </entry>
   <entry>
     <author>
@@ -219,7 +258,7 @@
 <p>VM 重開機沒問題，但容器砍掉重建、或換]]>
     </summary>
     <title>[實作筆記] 個人自動化平台(七) n8n 備份自動化：workflow + credentials → GitHub</title>
-    <updated>2026-06-12T09:37:46.205Z</updated>
+    <updated>2026-06-12T11:37:08.401Z</updated>
   </entry>
   <entry>
     <author>
@@ -240,7 +279,7 @@
     <title>
       <![CDATA[[實作筆記] 技術面試 Q&A：大流量電商系統設計實戰]]>
     </title>
-    <updated>2026-06-12T09:37:46.205Z</updated>
+    <updated>2026-06-12T11:37:08.401Z</updated>
   </entry>
   <entry>
     <author>
@@ -258,7 +297,7 @@
       <![CDATA[<h2 id="前情提要"><a href="#前情提要" class="headerlink" title="前情提要"></a>前情提要</h2><p>在 <a href="/2026/n8n-6-pipeline-output/">個人自動化平台(六)</a> 實作 IG]]>
     </summary>
     <title>[實作筆記] 個人自動化平台(番外) Google OAuth redirect_uri_mismatch 除錯記錄</title>
-    <updated>2026-06-12T09:37:46.205Z</updated>
+    <updated>2026-06-12T11:37:08.401Z</updated>
   </entry>
   <entry>
     <author>
@@ -277,7 +316,7 @@
 <p>這篇記錄處理層：把多筆文章合併，送給 Gemini 整理成 A]]>
     </summary>
     <title>[實作筆記] 個人自動化平台(五) n8n 實作：處理層，Aggregate + Gemini 週報整理</title>
-    <updated>2026-06-12T09:37:46.205Z</updated>
+    <updated>2026-06-12T11:37:08.401Z</updated>
   </entry>
   <entry>
     <author>
@@ -295,7 +334,7 @@
       <![CDATA[<h2 id="前情提要"><a href="#前情提要" class="headerlink" title="前情提要"></a>前情提要</h2><p>收集層（RSS 抓資料）和處理層（Gemini 整理週報）都跑通了，接下來要實作輸出層：把 AI 整理好的內容自動發布到社群]]>
     </summary>
     <title>[實作筆記] 個人自動化平台(六) n8n 實作：輸出層，Instagram API 取得 Token 全記錄</title>
-    <updated>2026-06-12T09:37:46.205Z</updated>
+    <updated>2026-06-12T11:37:08.401Z</updated>
   </entry>
   <entry>
     <author>
@@ -313,7 +352,7 @@
       <![CDATA[<h2 id="前情提要"><a href="#前情提要" class="headerlink" title="前情提要"></a>前情提要</h2><p>2019 年，我在 <a href="https://blog.marsen.me/2019/05/18/2019/aws_]]>
     </summary>
     <title>[產業報告] 從 DeepRacer 到 Robotaxi：Tesla vs Waymo 的無人駕駛現況</title>
-    <updated>2026-06-12T09:37:46.205Z</updated>
+    <updated>2026-06-12T11:37:08.401Z</updated>
   </entry>
   <entry>
     <author>
@@ -332,7 +371,7 @@
 <p>目標是從四個 AI 新聞來源拉資料，輸出]]>
     </summary>
     <title>[實作筆記] 個人自動化平台(四) n8n 實作：收集層，RSS 資料來源</title>
-    <updated>2026-06-12T09:37:46.205Z</updated>
+    <updated>2026-06-12T11:37:08.401Z</updated>
   </entry>
   <entry>
     <author>
@@ -351,47 +390,6 @@
 <p>這篇不急著]]>
     </summary>
     <title>[實作筆記] 個人自動化平台(三) 收集、處理、輸出：三層可插拔管道設計</title>
-    <updated>2026-06-12T09:37:46.205Z</updated>
-  </entry>
-  <entry>
-    <author>
-      <name>Marsen L.</name>
-      <email>admin@marsen.me</email>
-    </author>
-    <category term="實作筆記" scheme="https://blog.marsen.me/tags/%E5%AF%A6%E4%BD%9C%E7%AD%86%E8%A8%98/"/>
-    <content>
-      <![CDATA[<h2 id="前情提要"><a href="#前情提要" class="headerlink" title="前情提要"></a>前情提要</h2><p>前兩篇把 GCP 免費 VM + n8n + cloudflared tunnel + Cloudflare Access 都設好了。</p><p>但整個過程是邊做邊踩坑，步驟不一定是最乾淨的順序。<br>這篇把環境完整清理掉，再照前兩篇的步驟重建一次，驗證文章可以重現。</p><hr><h2 id="清理步驟"><a href="#清理步驟" class="headerlink" title="清理步驟"></a>清理步驟</h2><p>清理順序：從外到內，先 Cloudflare 再 GCP。</p><h3 id="步驟一：刪除-Cloudflare-Access-Application"><a href="#步驟一：刪除-Cloudflare-Access-Application" class="headerlink" title="步驟一：刪除 Cloudflare Access Application"></a>步驟一：刪除 Cloudflare Access Application</h3><p>進 Cloudflare 主控台 → <strong>Zero Trust</strong> → <strong>Access → Applications</strong></p><p>找到 <code>butler.marsen.me</code> 的 application，刪除。</p><p><strong>驗證</strong>：開瀏覽器試 <code>https://butler.marsen.me</code>，如果 Access 已清除，不會再看到驗證頁面。</p><h3 id="步驟二：刪除-Cloudflare-Tunnel"><a href="#步驟二：刪除-Cloudflare-Tunnel" class="headerlink" title="步驟二：刪除 Cloudflare Tunnel"></a>步驟二：刪除 Cloudflare Tunnel</h3><p>SSH 進 VM，先停 cloudflared service，再刪 tunnel：</p><figure class="highlight bash"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br></pre></td><td class="code"><pre><span class="line">sudo systemctl stop cloudflared</span><br><span class="line">cloudflared tunnel delete butler</span><br></pre></td></tr></table></figure><p><strong>驗證</strong>：</p><figure class="highlight bash"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">cloudflared tunnel list</span><br></pre></td></tr></table></figure><p><code>butler</code> 不在列表裡就是刪成功了。</p><blockquote><p>也可以在 UI 刪：<strong>Zero Trust → Networks → Tunnels</strong> → 找 <code>butler</code> → 刪除。<br>但要先確認 tunnel 已停止（cloudflared service 停掉或 VM 已關機）。</p></blockquote><h3 id="步驟三：刪除-DNS-記錄"><a href="#步驟三：刪除-DNS-記錄" class="headerlink" title="步驟三：刪除 DNS 記錄"></a>步驟三：刪除 DNS 記錄</h3><p>進 Cloudflare 主控台 → <strong>marsen.me → DNS</strong></p><p>找到 <code>butler.marsen.me</code> 的 CNAME 記錄（<code>4ba20fc4-...cfargotunnel.com</code>），刪除。</p><p><strong>驗證</strong>：開瀏覽器，出現 <code>DNS_PROBE_FINISHED_NXDOMAIN</code> 就是清除成功。</p><blockquote><p>DNS 記錄目前只能透過 UI 刪除，或使用 Cloudflare API（需要 API Token）。</p></blockquote><h3 id="步驟四：刪除-GCP-VM"><a href="#步驟四：刪除-GCP-VM" class="headerlink" title="步驟四：刪除 GCP VM"></a>步驟四：刪除 GCP VM</h3><figure class="highlight bash"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br></pre></td><td class="code"><pre><span class="line">gcloud compute instances delete ai-butler-vm00 \</span><br><span class="line">  --zone=us-east1-b \</span><br><span class="line">  --project=YOUR_PROJECT_ID</span><br></pre></td></tr></table></figure><p>確認後輸入 <code>Y</code>，VM 和磁碟都會一起移除。</p><h2 id="參考"><a href="#參考" class="headerlink" title="參考"></a>參考</h2><p>清理完成後，照以下兩篇文章重建</p><ul><li><a href="/2026/n8n-1-in-gcp-free-tier-vm/">個人自動化平台(一) n8n &amp; GCP VM</a></li><li><a href="/2026/n8n-2-cloudflared-and-tunnel/">個人自動化平台(二) Cloudflare Access &amp; Cloudflare Tunnel</a></li><li><a href="/2026/n8n-3-pipeline-overview/">個人自動化平台(三) 收集、處理、輸出：三層可插拔管道設計</a></li><li><a href="/2026/n8n-4-pipeline-fetch/">個人自動化平台(四) n8n 實作：收集層，RSS 資料來源</a></li><li><a href="/2026/n8n-5-pipeline-process/">個人自動化平台(五) n8n 實作：處理層，Aggregate + Gemini 週報整理</a></li><li><a href="/2026/n8n-6-pipeline-output/">個人自動化平台(六) n8n 實作：輸出層，Instagram API 取得 Token 全記錄</a></li></ul><h2 id="小結"><a href="#小結" class="headerlink" title="小結"></a>小結</h2><ul><li>清理順序：從外到內，先 Cloudflare 再 GCP，避免 tunnel 刪除時出現狀態不一致</li><li>刪 VM 時磁碟會一起移除，n8n 資料不保留</li></ul><p>(fin)</p>]]>
-    </content>
-    <id>https://blog.marsen.me/2026/04/18/2026/n8n-3.1-rebuild-infromation/</id>
-    <link href="https://blog.marsen.me/2026/04/18/2026/n8n-3.1-rebuild-infromation/"/>
-    <published>2026-04-18T03:29:53.000Z</published>
-    <summary>
-      <![CDATA[<h2 id="前情提要"><a href="#前情提要" class="headerlink" title="前情提要"></a>前情提要</h2><p>前兩篇把 GCP 免費 VM + n8n + cloudflared tunnel + Cloudflare Access]]>
-    </summary>
-    <title>
-      <![CDATA[[實作筆記] 個人自動化平台(番外) 拆掉重建 GCP VM & Cloudflared Tunnel & Cloudflare Access]]>
-    </title>
-    <updated>2026-06-12T09:37:46.205Z</updated>
-  </entry>
-  <entry>
-    <author>
-      <name>Marsen L.</name>
-      <email>admin@marsen.me</email>
-    </author>
-    <category term="實作筆記" scheme="https://blog.marsen.me/tags/%E5%AF%A6%E4%BD%9C%E7%AD%86%E8%A8%98/"/>
-    <content>
-      <![CDATA[<h2 id="前情提要"><a href="#前情提要" class="headerlink" title="前情提要"></a>前情提要</h2><p>上一篇在 GCP 免費 VM 上把 n8n 跑起來了，但還沒辦法從外部存取。</p><p>這篇用 cloudflared tunnel 解決這個問題。</p><p>好處是：</p><ul><li>不用改 GCP 防火牆，不暴露任何 port</li><li>自動 HTTPS</li><li>可以加 Cloudflare Access（Google 帳號驗證）擋在前面</li></ul><hr><h2 id="架構概觀"><a href="#架構概觀" class="headerlink" title="架構概觀"></a>架構概觀</h2><p>這篇要做的事情分兩層：</p><h3 id="第一層：cloudflared-tunnel"><a href="#第一層：cloudflared-tunnel" class="headerlink" title="第一層：cloudflared tunnel"></a>第一層：cloudflared tunnel</h3><p>在 VM 裡跑一個 cloudflared process，它會主動連到 Cloudflare 的網路，建立一條加密的隧道。<br>外部流量進來的路徑是：</p><figure class="highlight text"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">使用者瀏覽器 → Cloudflare → cloudflared tunnel（VM 內）→ n8n（127.0.0.1:5678）</span><br></pre></td></tr></table></figure><p>VM 不需要開任何防火牆 port，因為連線是由 VM 內部主動發起的。</p><h3 id="第二層：Cloudflare-Access（Zero-Trust）"><a href="#第二層：Cloudflare-Access（Zero-Trust）" class="headerlink" title="第二層：Cloudflare Access（Zero Trust）"></a>第二層：Cloudflare Access（Zero Trust）</h3><p>cloudflared tunnel 只負責轉流量，本身不做身份驗證，任何人都能連進來。<br>Cloudflare Access 是加在 tunnel 前面的門禁：</p><figure class="highlight text"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">使用者瀏覽器 → Cloudflare Access（驗證身份）→ cloudflared tunnel → n8n</span><br></pre></td></tr></table></figure><p>只有通過驗證（這裡用 email OTP）的人才能到達 n8n。<br>這就是「Zero Trust」的概念：不信任任何人，每次都要驗證身份。</p><h2 id="這篇的步驟順序"><a href="#這篇的步驟順序" class="headerlink" title="這篇的步驟順序"></a>這篇的步驟順序</h2><ol><li>安裝 cloudflared</li><li>登入 Cloudflare、建立 tunnel、設定 config、新增 DNS</li><li>設定 Cloudflare Access（<strong>先做，tunnel 上線前就有門禁</strong>）</li><li>設定 systemd 並啟動 tunnel</li></ol><hr><h2 id="步驟零：安裝-cloudflared"><a href="#步驟零：安裝-cloudflared" class="headerlink" title="步驟零：安裝 cloudflared"></a>步驟零：安裝 cloudflared</h2><p>在 VM 上執行：</p><figure class="highlight bash"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br></pre></td><td class="code"><pre><span class="line">curl -fsSL https://pkg.cloudflare.com/cloudflare-main.gpg | sudo <span class="built_in">tee</span> /usr/share/keyrings/cloudflare-main.gpg &gt;/dev/null</span><br><span class="line"><span class="built_in">echo</span> <span class="string">&#x27;deb [signed-by=/usr/share/keyrings/cloudflare-main.gpg] https://pkg.cloudflare.com/cloudflared bookworm main&#x27;</span> | sudo <span class="built_in">tee</span> /etc/apt/sources.list.d/cloudflared.list</span><br><span class="line">sudo apt update &amp;&amp; sudo apt install cloudflared</span><br></pre></td></tr></table></figure><p>看到 <code>Setting up cloudflared</code> 就安裝成功了。</p><hr><h2 id="命名決策"><a href="#命名決策" class="headerlink" title="命名決策"></a>命名決策</h2><p>這台 VM 不只跑 n8n，之後可能還有其他自動化服務。<br>所以 tunnel 和 subdomain 都以機器用途命名，而不是以某個服務命名。</p><p>以這篇為例，選 <code>butler</code>（管家），因為這台機器的定位是「幫你自動處理事情的後台」。</p><ul><li><code>&lt;TUNNEL_NAME&gt;</code> &#x3D; <code>butler</code></li><li><code>&lt;YOUR_DOMAIN&gt;</code> &#x3D; <code>marsen.me</code></li><li>對外網址：<code>butler.marsen.me</code></li></ul><p>之後如果加新服務，在 config 裡多加一條 ingress 規則就好。</p><hr><h2 id="步驟一：登入-Cloudflare"><a href="#步驟一：登入-Cloudflare" class="headerlink" title="步驟一：登入 Cloudflare"></a>步驟一：登入 Cloudflare</h2><p>在 VM 上跑：</p><figure class="highlight bash"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">cloudflared tunnel login</span><br></pre></td></tr></table></figure><p>它會印出一個 URL，複製到瀏覽器，選你要授權的 domain（這裡是 <code>&lt;YOUR_DOMAIN&gt;</code>）。</p><p>授權完成後 cert 會自動存到：</p><figure class="highlight text"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">~/.cloudflared/cert.pem</span><br></pre></td></tr></table></figure><hr><h2 id="步驟二：建立-Tunnel"><a href="#步驟二：建立-Tunnel" class="headerlink" title="步驟二：建立 Tunnel"></a>步驟二：建立 Tunnel</h2><figure class="highlight bash"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">cloudflared tunnel create &lt;TUNNEL_NAME&gt;</span><br></pre></td></tr></table></figure><p>成功後會顯示 tunnel ID（UUID 格式），同時在 <code>~/.cloudflared/</code> 產生一個 credentials JSON 檔。</p><figure class="highlight text"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br></pre></td><td class="code"><pre><span class="line">Tunnel credentials written to /home/USER/.cloudflared/&lt;tunnel-id&gt;.json</span><br><span class="line">Created tunnel &lt;TUNNEL_NAME&gt; with id &lt;tunnel-id&gt;</span><br></pre></td></tr></table></figure><p>把 tunnel ID 記下來，後面要用。</p><hr><h2 id="步驟三：建立-config-檔"><a href="#步驟三：建立-config-檔" class="headerlink" title="步驟三：建立 config 檔"></a>步驟三：建立 config 檔</h2><figure class="highlight bash"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br></pre></td><td class="code"><pre><span class="line"><span class="built_in">cat</span> &gt; ~/.cloudflared/config.yml &lt;&lt; <span class="string">&#x27;EOF&#x27;</span></span><br><span class="line">tunnel: &lt;your-tunnel-id&gt;</span><br><span class="line">credentials-file: /home/&lt;USER&gt;/.cloudflared/&lt;your-tunnel-id&gt;.json</span><br><span class="line"></span><br><span class="line">ingress:</span><br><span class="line">  - hostname: &lt;TUNNEL_NAME&gt;.&lt;YOUR_DOMAIN&gt;</span><br><span class="line">    service: http://127.0.0.1:5678</span><br><span class="line">  - service: http_status:404</span><br><span class="line">EOF</span><br></pre></td></tr></table></figure><p>注意最後的 <code>EOF</code> 必須從行首開始，前面不能有任何空格。</p><blockquote><p><strong>為什麼用 <code>127.0.0.1</code> 而不是 <code>localhost</code>？</strong><br><code>localhost</code> 在某些環境會被解析成 IPv6 的 <code>[::1]</code>，但 n8n 預設只監聽 IPv4。<br>直接寫 <code>127.0.0.1</code> 避免這個問題。</p></blockquote><p>其中 <code>5678</code> 是 n8n 在 Docker 容器裡對外暴露的 port。</p><p>可以用以下指令驗證 config 是否正確：</p><figure class="highlight bash"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">cloudflared tunnel ingress validate</span><br></pre></td></tr></table></figure><p>看到 <code>OK</code> 就是正確。</p><hr><h2 id="步驟四：新增-DNS-記錄"><a href="#步驟四：新增-DNS-記錄" class="headerlink" title="步驟四：新增 DNS 記錄"></a>步驟四：新增 DNS 記錄</h2><figure class="highlight bash"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">cloudflared tunnel route dns &lt;TUNNEL_NAME&gt; &lt;TUNNEL_NAME&gt;.&lt;YOUR_DOMAIN&gt;</span><br></pre></td></tr></table></figure><p>這會在 Cloudflare DNS 自動加一筆 CNAME，指向你的 tunnel。</p><hr><h2 id="步驟五：設定-Cloudflare-Access"><a href="#步驟五：設定-Cloudflare-Access" class="headerlink" title="步驟五：設定 Cloudflare Access"></a>步驟五：設定 Cloudflare Access</h2><p><strong>在啟動 tunnel 之前先設好 Access</strong>，這樣 n8n 上線的那一刻就已經有門禁，不會有公開暴露的空窗期。</p><blockquote><p><strong>注意：不要用 Onboarding 精靈。</strong> Zero Trust 首次進入會有引導精靈，精靈的「指派 Tunnel」步驟需要 tunnel 已在執行中才能選取。我們要先設 Access 再啟動 tunnel，所以改用手動建立 Application。</p></blockquote><p>進 Cloudflare 主控台 → <strong>Zero Trust</strong> → <strong>Access → Applications</strong> → <strong>+ Add an application</strong> → 選 <strong>Self-hosted</strong>。</p><p>第一次進入 Zero Trust 需要選擇團隊名稱（之後可以改），Free 方案 50 人以下免費。</p><p>填入應用程式資訊：</p><table><thead><tr><th>欄位</th><th>填什麼</th></tr></thead><tbody><tr><td>Application name</td><td><code>&lt;APP_NAME&gt;</code></td></tr><tr><td>Subdomain</td><td><code>&lt;TUNNEL_NAME&gt;</code></td></tr><tr><td>Domain</td><td><code>&lt;YOUR_DOMAIN&gt;</code></td></tr></tbody></table><p>下一步設定 Policy：</p><table><thead><tr><th>欄位</th><th>填什麼</th></tr></thead><tbody><tr><td>Policy name</td><td><code>allow</code></td></tr><tr><td>Action</td><td>Allow</td></tr><tr><td>Selector</td><td>Emails</td></tr><tr><td>值</td><td><code>&lt;YOUR_EMAIL&gt;</code></td></tr></tbody></table><p>存檔。Access 現在保護 <code>&lt;TUNNEL_NAME&gt;.&lt;YOUR_DOMAIN&gt;</code>，只有通過驗證的 email 才能進去。</p><figure class="highlight text"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br></pre></td><td class="code"><pre><span class="line">使用者瀏覽器</span><br><span class="line">    ↓ HTTPS</span><br><span class="line">Cloudflare Access（驗證身份）</span><br><span class="line">    ↓ 通過後</span><br><span class="line">cloudflared tunnel（在 VM 裡跑）</span><br><span class="line">    ↓ 本機連線</span><br><span class="line">127.0.0.1:5678（n8n）</span><br></pre></td></tr></table></figure><h3 id="為什麼要在-tunnel-啟動前先做？"><a href="#為什麼要在-tunnel-啟動前先做？" class="headerlink" title="為什麼要在 tunnel 啟動前先做？"></a>為什麼要在 tunnel 啟動前先做？</h3><p>你一開 n8n 就會看到「Set up owner account」頁面，這個頁面是公開的。<br>如果沒有 Access 保護，任何人都能搶先填、搶走 owner 帳號。</p><hr><h2 id="步驟六：設定開機自動啟動並啟動-Tunnel"><a href="#步驟六：設定開機自動啟動並啟動-Tunnel" class="headerlink" title="步驟六：設定開機自動啟動並啟動 Tunnel"></a>步驟六：設定開機自動啟動並啟動 Tunnel</h2><p>讓 cloudflared 在 VM 重開機後自動啟動，不用每次手動跑。</p><p><code>cloudflared service install</code> 需要知道 config 在哪，但用 <code>sudo</code> 跑時 home 會變成 root 的，<br>所以要明確指定路徑。安裝後 systemd 會把 config 複製到 <code>/etc/cloudflared/config.yml</code>：</p><figure class="highlight bash"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br></pre></td><td class="code"><pre><span class="line">sudo cloudflared --config /home/&lt;USER&gt;/.cloudflared/config.yml service install</span><br><span class="line">sudo systemctl start cloudflared</span><br><span class="line">sudo systemctl status cloudflared</span><br></pre></td></tr></table></figure><p>把 <code>&lt;USER&gt;</code> 換成你的 OS Login 用戶名稱（Gmail 帳號把 <code>.</code> 和 <code>@</code> 換成 <code>_</code>，例如 <code>yourname_gmail_com</code>）。</p><p>看到 <code>active (running)</code> 就完成了。</p><p>這時開 <code>https://&lt;TUNNEL_NAME&gt;.&lt;YOUR_DOMAIN&gt;</code>，應該會先看到 Cloudflare Access 的驗證頁面。</p><p>之後 VM 重開機，cloudflared 和 n8n 都會自動恢復。</p><hr><h2 id="踩坑紀錄"><a href="#踩坑紀錄" class="headerlink" title="踩坑紀錄"></a>踩坑紀錄</h2><h3 id="踩坑一：瀏覽器顯示連線錯誤"><a href="#踩坑一：瀏覽器顯示連線錯誤" class="headerlink" title="踩坑一：瀏覽器顯示連線錯誤"></a>踩坑一：瀏覽器顯示連線錯誤</h3><p><strong>症狀</strong>：tunnel 連上了（看到 <code>Registered tunnel connection</code>），但開瀏覽器只看到錯誤頁面。</p><p>瀏覽器的連線錯誤原因很多，不要猜。先查 n8n log：</p><figure class="highlight bash"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">sudo docker logs n8n --<span class="built_in">tail</span> 20</span><br></pre></td></tr></table></figure><p>根據 log 的錯誤訊息再對症下藥。</p><hr><h3 id="踩坑二：n8n-啟動失敗（permission-denied）"><a href="#踩坑二：n8n-啟動失敗（permission-denied）" class="headerlink" title="踩坑二：n8n 啟動失敗（permission denied）"></a>踩坑二：n8n 啟動失敗（permission denied）</h3><p><strong>出現時機</strong>：<code>docker logs</code> 看到 <code>EACCES: permission denied</code>。</p><p><strong>原因</strong>：<code>docker run</code> 之前沒有預先建立 <code>~/.n8n</code>，Docker 自動用 root 身份建立這個目錄。<br>n8n 容器裡的 <code>node</code> 用戶（UID 1000）不是 root，沒有寫入權限，n8n 啟動就 crash。</p><p><strong>解法</strong>：把目錄 owner 改成 UID 1000，再重建容器：</p><figure class="highlight bash"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br></pre></td><td class="code"><pre><span class="line">sudo <span class="built_in">chown</span> -R 1000:1000 ~/.n8n</span><br><span class="line">sudo docker <span class="built_in">rm</span> -f n8n</span><br><span class="line">sudo docker run -d \</span><br><span class="line">  --name n8n \</span><br><span class="line">  --restart unless-stopped \</span><br><span class="line">  -p 5678:5678 \</span><br><span class="line">  -v ~/.n8n:/home/node/.n8n \</span><br><span class="line">  -e N8N_SECURE_COOKIE=<span class="literal">false</span> \</span><br><span class="line">  docker.n8n.io/n8nio/n8n</span><br></pre></td></tr></table></figure><p><strong>預防</strong>：照第一篇步驟五，<code>docker run</code> 前先執行 <code>mkdir -p ~/.n8n &amp;&amp; sudo chown 1000:1000 ~/.n8n</code>，就不會踩到這個坑。</p><p>n8n 映像檔本來就用非 root 的 <code>node</code> 用戶執行，不需要加 <code>--user</code>。</p><hr><h2 id="參考"><a href="#參考" class="headerlink" title="參考"></a>參考</h2><ul><li><a href="/2026/n8n-1-in-gcp-free-tier-vm/">個人自動化平台(一) n8n &amp; GCP VM</a></li><li><a href="/2026/n8n-3-pipeline-overview/">個人自動化平台(三) 收集、處理、輸出：三層可插拔管道設計</a></li><li><a href="/2026/n8n-3.1-rebuild-infromation/">個人自動化平台(番外) 拆掉重建 GCP VM &amp; Cloudflared Tunnel &amp; Cloudflare Access</a></li><li><a href="/2026/n8n-4-pipeline-fetch/">個人自動化平台(四) n8n 實作：收集層，RSS 資料來源</a></li><li><a href="/2026/n8n-5-pipeline-process/">個人自動化平台(五) n8n 實作：處理層，Aggregate + Gemini 週報整理</a></li><li><a href="/2026/n8n-6-pipeline-output/">個人自動化平台(六) n8n 實作：輸出層，Instagram API 取得 Token 全記錄</a></li></ul><h2 id="小結"><a href="#小結" class="headerlink" title="小結"></a>小結</h2><ul><li>cloudflared tunnel 讓 n8n 對外，不用開 GCP 防火牆、不暴露任何 port</li><li>Cloudflare Access 擋在前面，只有通過驗證的 email 才能進到 n8n</li><li>cloudflared 設成 systemd service，VM 重開機自動恢復，不需要手動啟動</li><li>整條鏈路：瀏覽器 → Cloudflare Access（驗證）→ cloudflared tunnel → n8n</li></ul><p>(fin)</p>]]>
-    </content>
-    <id>https://blog.marsen.me/2026/04/17/2026/n8n-2-cloudflared-and-tunnel/</id>
-    <link href="https://blog.marsen.me/2026/04/17/2026/n8n-2-cloudflared-and-tunnel/"/>
-    <published>2026-04-17T06:54:04.000Z</published>
-    <summary>
-      <![CDATA[<h2 id="前情提要"><a href="#前情提要" class="headerlink" title="前情提要"></a>前情提要</h2><p>上一篇在 GCP 免費 VM 上把 n8n 跑起來了，但還沒辦法從外部存取。</p>
-<p>這篇用 cloudflared]]>
-    </summary>
-    <title>
-      <![CDATA[個人自動化平台(二) Cloudflare Access & Cloudflare Tunnel]]>
-    </title>
-    <updated>2026-06-12T09:37:46.205Z</updated>
+    <updated>2026-06-12T11:37:08.401Z</updated>
   </entry>
 </feed>
