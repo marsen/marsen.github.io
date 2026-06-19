@@ -103,6 +103,570 @@ j=d.createElement(s),dl=l!='dataLayer'?'&l='+l:'';j.async=true;j.src=
       <div class="outer">
         <section id="main">
   
+    <article id="post-2022/gcp_static_site_with_cloud_storage_and_loading_balancing" class="article article-type-post" itemscope itemprop="blogPost">
+  <div class="article-meta">
+    <a href="/2022/03/09/2022/gcp_static_site_with_cloud_storage_and_loading_balancing/" class="article-date">
+  <time datetime="2022-03-09T02:53:48.000Z" itemprop="datePublished">2022-03-09</time>
+</a>
+    
+  </div>
+  <div class="article-inner">
+    
+    
+      <header class="article-header">
+        
+  
+    <h1 itemprop="name">
+      <a class="article-title" href="/2022/03/09/2022/gcp_static_site_with_cloud_storage_and_loading_balancing/"> [實作筆記] 靜態網站部署整合 GCP (二) --- Load Balancing &amp; Cloud Storage</a>
+    </h1>
+  
+
+      </header>
+    
+    <div class="article-entry" itemprop="articleBody">
+      
+        <h2 id="前請提要"><a href="#前請提要" class="headerlink" title="前請提要"></a>前請提要</h2><p>去年有記錄一篇有關 GCP 部署靜態網站時遇到情境與問題，<br>不過比較偏像流水帳，不同的部署策略都在同一篇文章，另外有一些問題也得到解決，<br>除了更新原有文章外，這篇的目的是為了將 Load Balancing 與 Cloud Storage 抽出，<br>並加以潤飾。</p>
+<h2 id="概要"><a href="#概要" class="headerlink" title="概要"></a>概要</h2><ul>
+<li>在 Cloud Storage 建立一個 Bucket</li>
+<li>在 Network Service 建立一個 Load Balancing</li>
+<li>設定 Load Balancing 的 Backend 綁定到 Bucket</li>
+<li>作為網站，需要允許所有人讀取 Bucket 的內容</li>
+</ul>
+<h2 id="必要條件"><a href="#必要條件" class="headerlink" title="必要條件"></a>必要條件</h2><p>GCP 平台的帳戶與足夠的權限，並且已建立專案</p>
+<h2 id="在-Cloud-Storage-建立一個-Bucket"><a href="#在-Cloud-Storage-建立一個-Bucket" class="headerlink" title="在 Cloud Storage 建立一個 Bucket"></a>在 Cloud Storage 建立一個 Bucket</h2><p>第一步前往<a target="_blank" rel="noopener" href="https://console.cloud.google.com/storage/browser">Cloud Storage</a>，<br>點擊 +CREATE BUCKET，<br>在 Choose where to store your data 的區塊，<br>Location type 有三種</p>
+<ul>
+<li>multi-region</li>
+<li>dual-region</li>
+<li>region</li>
+</ul>
+<p>這是地理位置與高可用性的相關設定，越後面的設定成本越便宜，但是可用性也越低。<br>即使如此 google 仍保証了 SLA: 99.95% 的高可用性。</p>
+<p>接下來是 Choose a default storage class for your data 的區塊，有</p>
+<ul>
+<li>Standard</li>
+<li>Nearline</li>
+<li>Coldline</li>
+<li>Archive</li>
+</ul>
+<p>等四種不同的設定，<br>與檔案的使用頻率有關，對於網站來說建議使用 Standard 。<br>收費可以參考下表</p>
+<table>
+<thead>
+<tr>
+<th></th>
+<th>Standard</th>
+<th>Nearline</th>
+<th>Coldline</th>
+<th>Archive</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>Storage(per GB-Month)</td>
+<td>$0.026</td>
+<td>$0.01</td>
+<td>$0.007</td>
+<td>$0.004</td>
+</tr>
+<tr>
+<td>retrieval(per GB-Month)</td>
+<td>Free</td>
+<td>$0.01</td>
+<td>$0.02</td>
+<td>$0.05</td>
+</tr>
+<tr>
+<td>Class A Operations(per 1000ops)</td>
+<td>$0.005</td>
+<td>$0.01</td>
+<td>$0.01</td>
+<td>$0.05</td>
+</tr>
+<tr>
+<td>Class B Operations(per 1000 ops)</td>
+<td>$0.0004</td>
+<td>$0.001</td>
+<td>$0.005</td>
+<td>$0.05</td>
+</tr>
+<tr>
+<td>SLA</td>
+<td>99.95%</td>
+<td>99.9%</td>
+<td>99.9%</td>
+<td>99.9%</td>
+</tr>
+</tbody></table>
+<p>接下來是 Choose how to control access to objects 的設定，<br>不要勾選 Enforce public access prevention on this bucket，<br>Access control 選擇 Uniform ， 這裡的設定是為了避免從 internet 存取 bucket 的資料，<br>但是我們的目的是放置靜態網站的資料，所以不需設定。</p>
+<p>再來是 Choose how to protect object data<br>這是保護資料的策略，有版本(versioning)與備份(retention)兩種策略，<br>我們不需要所以選擇 None</p>
+<p>按下 Create 以建立 Bucket，<br>接下來為了讓 web 存取我們選擇 more action(3 個點的 Icon ) &gt; Edit Access<br>New Principals &gt; 選擇 allUsers &gt; Storage Object Viewer.<br>接下來可以上傳你的靜態網站的資源了，這裡我們多作一個設定，通常我們要指定網站的首頁為何，<br>約定成俗是 index.html，一樣 more action(3 個點的 Icon ) &gt; edit website configuration<br>將 Index (main) page suffix 設定為 index.html(記得 bucket 裡要有這個檔)</p>
+<h2 id="Load-Balancing-相關設定"><a href="#Load-Balancing-相關設定" class="headerlink" title="Load Balancing 相關設定"></a>Load Balancing 相關設定</h2><p>接下來設定 Load Balancing，<br>這只需要設定一次，在目前的實作未涉及 VPC、CDN、Path Rules 等相關議題，<br>實務上需要的話，請再加上去考量。</p>
+<ol>
+<li>GCP &gt; Network Service &gt; Load Balancing</li>
+<li>Create Load Balancer</li>
+<li>Backend configuration &gt; Create A Backend Bucket<ul>
+<li>自已取一個 Backend Bucket name</li>
+<li>Cloud Storage Bucket &gt; Browse &gt; 選取之前所建立的 Bucket</li>
+<li>不勾選 Enable Cloud CDN， 相關的設定與應用程式的應用有關， 較為複雜之後再進行處理</li>
+</ul>
+</li>
+<li>Host and path rules &gt; Simple host and path rule</li>
+<li>Frontend IP and PORT &gt; Add Frontend IP And Port<ul>
+<li>Protocol &gt; HTTP (正常應使用 HTTPS， 這次為了求快而未作相關設定)</li>
+<li>Network Service Tier &gt; Premium</li>
+</ul>
+</li>
+</ol>
+<p>可以參考 GCP 的教學與我們實作上的細微差異</p>
+<ul>
+<li>Create a bucket. → 手動建立只需要處理一次</li>
+<li>Upload and share your site’s files. → CI 執行</li>
+<li>Set up a load balancer and SSL certificate. → 手動建立只需要處理一次</li>
+<li>Connect your load balancer to your bucket. → 手動建立只需要處理一次</li>
+<li>Point your domain to your load balancer using an A record. → 未處理</li>
+<li>Test the website.</li>
+</ul>
+<h2 id="CI-CD-的相關設定-已過時"><a href="#CI-CD-的相關設定-已過時" class="headerlink" title="CI&#x2F;CD 的相關設定　(已過時)"></a>CI&#x2F;CD 的相關設定　(已過時)</h2><p>參考以下部份的 .gitlab-ci.yml 檔<br>非常簡單，只需要 <code>gsutil rsync -R</code> 將前一個 job 建置的檔案推到 Cloud Storage 即可</p>
+<figure class="highlight yml"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br></pre></td><td class="code"><pre><span class="line"><span class="attr">deploy-job:</span> <span class="comment"># This job runs in the deploy stage.</span></span><br><span class="line">  <span class="attr">stage:</span> <span class="string">deploy</span> <span class="comment"># It only runs when *both* jobs in the test stage complete successfully.</span></span><br><span class="line">  <span class="attr">image:</span> <span class="string">google/cloud-sdk</span></span><br><span class="line">  <span class="attr">needs:</span></span><br><span class="line">    <span class="bullet">-</span> <span class="attr">job:</span> <span class="string">build-job</span></span><br><span class="line">      <span class="attr">artifacts:</span> <span class="literal">true</span></span><br><span class="line">  <span class="attr">script:</span></span><br><span class="line">    <span class="comment"># - gcloud auth list # Show the ACTIVE  ACCOUNT *</span></span><br><span class="line">    <span class="bullet">-</span> <span class="string">gsutil</span> <span class="string">rsync</span> <span class="string">-R</span> <span class="string">build</span> <span class="string">gs://your_bucket_name</span></span><br><span class="line">    <span class="bullet">-</span> <span class="string">echo</span> <span class="string">&quot;Application successfully deployed.&quot;</span></span><br></pre></td></tr></table></figure>
+
+<h2 id="其它（已過時）"><a href="#其它（已過時）" class="headerlink" title="其它（已過時）"></a>其它（已過時）</h2><p>這裡仍有一個未知的設定，gsutil 命令會需要權限才能對 Cloud Storage 寫入，<br>如何讓 Gitlab-Runner 底下的 Container 擁有指定的 GCP 權限呢 ?<br>試著下 <code>gcloud auth list</code> 會發現確實有一個可工作的 Account 所以一定有相關的設定要處理，<br>因為沒有實作到，故不作記錄，但未來再有機會不要忘了這一段的工程。</p>
+<p>大部份的工作只需要設定一次，未來只需要 CI 將新版的靜態網站上傳到 Cloud Storage 網站就會更新。</p>
+<h2 id="參考"><a href="#參考" class="headerlink" title="參考"></a>參考</h2><ul>
+<li><a target="_blank" rel="noopener" href="https://cloud.google.com/storage/docs/hosting-static-website">https://cloud.google.com/storage/docs/hosting-static-website</a></li>
+<li><a target="_blank" rel="noopener" href="https://cloud.google.com/load-balancing/docs/https/ext-load-balancer-backend-buckets">https://cloud.google.com/load-balancing/docs/https/ext-load-balancer-backend-buckets</a></li>
+</ul>
+<p>(fin)</p>
+
+      
+    </div>
+    <footer class="article-footer">
+      <a data-url="https://blog.marsen.me/2022/03/09/2022/gcp_static_site_with_cloud_storage_and_loading_balancing/" data-id="cuidAPLh3UqHpGfcob5d2P372" class="article-share-link">Share</a>
+      
+        <a href="https://blog.marsen.me/2022/03/09/2022/gcp_static_site_with_cloud_storage_and_loading_balancing/#disqus_thread" class="article-comment-link">留言</a>
+      
+      
+  <ul class="article-tag-list" itemprop="keywords"><li class="article-tag-list-item"><a class="article-tag-list-link" href="/tags/%E5%AF%A6%E4%BD%9C%E7%AD%86%E8%A8%98/" rel="tag">實作筆記</a></li></ul>
+
+    </footer>
+  </div>
+  
+</article>
+
+
+  
+    <article id="post-2022/CATS_at_Weiwuying" class="article article-type-post" itemscope itemprop="blogPost">
+  <div class="article-meta">
+    <a href="/2022/03/06/2022/CATS_at_Weiwuying/" class="article-date">
+  <time datetime="2022-03-06T03:08:53.000Z" itemprop="datePublished">2022-03-06</time>
+</a>
+    
+  </div>
+  <div class="article-inner">
+    
+    
+      <header class="article-header">
+        
+  
+    <h1 itemprop="name">
+      <a class="article-title" href="/2022/03/06/2022/CATS_at_Weiwuying/"> [生活筆記] 2022 貓劇感想</a>
+    </h1>
+  
+
+      </header>
+    
+    <div class="article-entry" itemprop="articleBody">
+      
+        <p>第一次看到貓劇是在高中音樂課上，老師所播放了 DVD 的片段，<br>具體的內容也記不清了——當時的老師常常放影片上課，<br>比如說用廚具演奏的樂團、貓劇等，——<br>當初只覺得特別，甚至有點詭異，並沒有什麼感觸。</p>
+<p>大學畢業後，等待當兵的時間，不知道在什麼時間點，我再次接觸了貓劇。<br>這次就陷入狂熱(FEVER)，一開始是在網路上找片段看，後來也買了 DVD，<br>整個部片應該看了不下 30 次，甚至是可以聽著音樂睡覺。<br>我最喜歡的是看每隻貓咪的互動與細節。從那個時候開始，我就希望可以前往看貓劇的演出。</p>
+<p>我已經不確定當時有沒有確認過停演資訊，但是我知道倫敦是貓的首演場地，<br>所以我心中一直想去倫敦參觀(更多的部份是阿森納)<br>而目前知道倫敦已經沒有演出了，順代一提，歌詞有偷婊熱刺的部份 XDD</p>
+<figure class="highlight text"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br></pre></td><td class="code"><pre><span class="line">Grizabella, The Glamour Cat</span><br><span class="line"></span><br><span class="line">She haunted many a low resort</span><br><span class="line">Near the grimy road of Tottenham Court</span><br></pre></td></tr></table></figure>
+
+<p>2018 年我開始學習 Lindy Dance 與聽爵士樂，2020 在課堂上認識了一些朋友有在看音樂劇，<br>聊天過後，再次激起心中的火花。2021 雖然歷經疫情，但是台灣國內的狀況一直相對穩定，<br>所以開售當天馬上買了票，在朋友的推薦下，大手筆直接買了衛武營 5800 的票，<br>結果疫情爆發，就拖到了 2022 年。<br>雖然票價不便宜，但是這次的體驗真的值得。</p>
+<p>好的初體驗，第一次看音樂劇就是史上有名的劇，位置在前排中間的位置;<br>先說說硬體設施，前排是看不到字幕的，不過貓不是一部需要字幕的戲劇，<br>特別是我以前看過無數次的前提下，除了 Growltiger 的部份沒有看過外，<br>其它的部份我都相當的熟悉，加上文本本身是詩集的原因，所以其實並不需要太過依賴字幕，<br>如果英聽夠好的話更是不需要。</p>
+<p>第一排的好處是可以看到細節，這點非常適合貓劇，比起劇情與主要出場貓咪的表演來說，<br>更重要的是散落在背景的貓咪表情、肢體其實正在無時無刻演出，有時他們的互動會讓我誤以為是演員在聊天，<br>但是隨著演員的動作，才會發現即時聚光燈不在他們身上，他們也仍然在演出，只要在舞台上就是戲的一部份。<br>而這個距離也可以看到布景的細節<br>聲音部份是真的可以聽到人聲，不是透過音響的聲音，可以感覺到人聲的媚力，<br>這次我的位置聽 Cassandra 聲音真得超清楚(聽說麥克風是藏在他們的頭上，<br>但是他們會互相撥頭時也不會有聲音，所以收音對我來說還是個迷)</p>
+<ul>
+<li>會被演員當 Target Point Out ，被點到時真得很有觸電感</li>
+<li>終場 Rum Tum Tugger 會超近</li>
+</ul>
+<p>但是也是有缺點的部份，首先是視覺的角度較低，在</p>
+<ul>
+<li>衛武營第一排有時會被燈箱(或是風扇、提詞機)或貓檔住</li>
+<li>當貓咪圍成圈的時候也會被檔住</li>
+<li>側面進場的貓咪要轉頭才知道，沒有機會互動</li>
+</ul>
+<p>下次看建議的位子是可以平&#x2F;俯視舞台的地方，靠走道有機會互動</p>
+<p>這次補上更多細節是 DVD 沒有的</p>
+<ul>
+<li>三大母貓的舞蹈很多也很好看(dvd 看不到完整的)<ul>
+<li>Demeter &gt;&gt; Munkustrap</li>
+<li>Bombalurina  &gt;&gt; Rum Tum Tugger</li>
+<li>Jellylorum &gt;&gt; Gus(Growltiger &gt;&gt; Griddlebone)</li>
+</ul>
+</li>
+<li>JennyAnyDots 有一大段的 TAP 表演（有點像火焰之舞）在  DVD 是刪減版</li>
+<li>群舞時有很多三層次的編排在 DVD 看不出來，太近也會看不清楚</li>
+<li>Mungojerrie And Rumpelteazer 的排舞有點像馬戲團的表演，不太確定舞蹈風格</li>
+<li>Growltiger &gt;&gt; Griddlebone 的表演像義大利歌劇</li>
+<li>Tantomile &amp; Coricopat 通常會率先作出反應</li>
+<li>Victoria 在 Old Deuteronomy 歌詞中 Victoria’s accession 被提到時會被 Munkustrap Cue 一下這點很可愛<ul>
+<li>常在 C 位</li>
+<li>solo 的部份我覺得更像體操或芭蕾</li>
+<li>舞會 spotlight 的部份搭配的是 Plato&#x2F;George&#x2F;Admetus(名字不一定)</li>
+</ul>
+</li>
+<li>Jemima 才是第一個用唱歌的方式回應 Grizabella 的小貓，一直記錯成 Victoria (Victoria 是用肢體接觸)，初演是 Sarah Brightman 飾演的角色，這次有一段用中文演唱(但是我其實希望他能唱原文就好…中文讓人出戲)</li>
+<li>Mistoffelees 是芭蕾的表演，特別是連續轉圈(The Conjuring Turn)</li>
+<li>我以為演員會讓我認不出來，但是化裝真的很厲害，就像是有臉譜一樣，跟 DVD 版本沒有什麼差別</li>
+<li>Grizabella 被趕走的時候讓我想到取消文化與 <a target="_blank" rel="noopener" href="http://www.yehoodi.com/blog/2017/4/18/max-pitruzzella-accused-of-sexual-assault-by-5-women">Lindy Dancer Max</a> 的事件</li>
+<li>2019 電影版是邪典加悲劇，我反而希望可以買到 DVD 版本的數位檔</li>
+<li>2022 年在台灣有幫 Old Deuteronomy 脫口罩(好像是 Alonzo), 有一種現實的可愛無奈</li>
+</ul>
+<h2 id="參考"><a href="#參考" class="headerlink" title="參考"></a>參考</h2><p>-<a target="_blank" rel="noopener" href="https://leticiaschic.com/cats-musical-actor-part1/">https://leticiaschic.com/cats-musical-actor-part1/</a></p>
+<p>(fin)</p>
+
+      
+    </div>
+    <footer class="article-footer">
+      <a data-url="https://blog.marsen.me/2022/03/06/2022/CATS_at_Weiwuying/" data-id="cuidBE_pQjpP51ly6lACSlACP" class="article-share-link">Share</a>
+      
+        <a href="https://blog.marsen.me/2022/03/06/2022/CATS_at_Weiwuying/#disqus_thread" class="article-comment-link">留言</a>
+      
+      
+    </footer>
+  </div>
+  
+</article>
+
+
+  
+    <article id="post-2022/sonarcloud_dotnet_6" class="article article-type-post" itemscope itemprop="blogPost">
+  <div class="article-meta">
+    <a href="/2022/02/15/2022/sonarcloud_dotnet_6/" class="article-date">
+  <time datetime="2022-02-15T02:00:57.000Z" itemprop="datePublished">2022-02-15</time>
+</a>
+    
+  </div>
+  <div class="article-inner">
+    
+    
+      <header class="article-header">
+        
+  
+    <h1 itemprop="name">
+      <a class="article-title" href="/2022/02/15/2022/sonarcloud_dotnet_6/"> [實作筆記] SonarCloud with .NET 6.0.x</a>
+    </h1>
+  
+
+      </header>
+    
+    <div class="article-entry" itemprop="articleBody">
+      
+        <h2 id="前情提要"><a href="#前情提要" class="headerlink" title="前情提要"></a>前情提要</h2><p><a href="https://blog.marsen.me/2022/02/03/2022/CI_update_with_stryker_1.3.1/">承上篇</a>,在升級了 .NET 6.0.x 後發現,<br>SonarCloud 的測試含概率不知何時變成 0 ,<br>相對應的 Code Smell 也沒有作檢查, 加上原本的 github&#x2F;workflow 並沒特別分門別類,<br>所以真正的錯誤原因已經不可考, 修復 SonarCloud 的過程中特別撰文記錄.</p>
+<h2 id="實作"><a href="#實作" class="headerlink" title="實作"></a>實作</h2><p>第一件事是在升級 .NET 6.0 後, 試著在本地環境上執行檢查並上傳到 SonarCloud.</p>
+<h3 id="前置條件"><a href="#前置條件" class="headerlink" title="前置條件"></a>前置條件</h3><ul>
+<li>使用的電腦為 MacBook Pro (M1 晶片)</li>
+<li>安裝 <a target="_blank" rel="noopener" href="https://dotnet.microsoft.com/en-us/download/dotnet/6.0">.NET 6.0.x</a> 以後的版本</li>
+<li>安裝 <a target="_blank" rel="noopener" href="https://www.oracle.com/java/technologies/downloads/">Java 11</a></li>
+<li>安裝 <a target="_blank" rel="noopener" href="https://www.nuget.org/packages/dotnet-sonarscanner/">dotnet-sonarscanner</a></li>
+<li><a target="_blank" rel="noopener" href="https://sonarcloud.io/projects/create">註冊 sonarcloud.io 並建立專案</a></li>
+</ul>
+<h3 id="本機的執行步驟"><a href="#本機的執行步驟" class="headerlink" title="本機的執行步驟"></a>本機的執行步驟</h3><ul>
+<li><p>dotnet sonarscanner begin</p>
+<figure class="highlight shell"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br></pre></td><td class="code"><pre><span class="line">dotnet sonarscanner begin \</span><br><span class="line">/o:&quot;marsen-github&quot; \</span><br><span class="line">/k:&quot;Marsen.NetCore.Dojo&quot; \</span><br><span class="line">/n:&quot;Marsen.NetCore.Dojo&quot; \</span><br><span class="line">/d:sonar.host.url=&quot;https://sonarcloud.io&quot; \</span><br><span class="line">/d:sonar.cs.opencover.reportsPaths=&quot;./test/_/TestResults/_/coverage.opencover.xml&quot; \</span><br><span class="line">/d:sonar.login=&quot;****&quot;</span><br></pre></td></tr></table></figure>
+
+<p>參數說明<br><code>/o</code>: Organization Key<br><code>/k</code>: Project Key<br><code>/n</code>: Project Name<br><code>/d:sonar.host.url</code>: sonar server url<br><code>/d:sonar.cs.opencover.reportsPaths</code>: OpenCover coverage report<br><code>/d:sonar.login</code>: 登入 sonar server 的 token</p>
+</li>
+<li><p>dotnet build</p>
+<figure class="highlight shell"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">dotnet build Marsen.NetCore.Dojo.sln</span><br></pre></td></tr></table></figure>
+</li>
+<li><p>dotnet test</p>
+<figure class="highlight shell"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br></pre></td><td class="code"><pre><span class="line">dotnet test Marsen.NetCore.Dojo.sln \</span><br><span class="line">--logger trx --collect:&quot;XPlat Code Coverage&quot; \</span><br><span class="line">-- DataCollectionRunSettings.DataCollectors.DataCollector.Configuration.Format=opencover</span><br></pre></td></tr></table></figure>
+</li>
+<li><p>dotnet sonarscanner end</p>
+<figure class="highlight shell"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">dotnet-sonarscanner end /d:sonar.login=&quot;****&quot;</span><br></pre></td></tr></table></figure></li>
+</ul>
+<h3 id="Github-Workflow-的設定"><a href="#Github-Workflow-的設定" class="headerlink" title="Github Workflow 的設定"></a>Github Workflow 的設定</h3><p>目前並沒有<a target="_blank" rel="noopener" href="https://github.com/SonarSource/sonarcloud-github-action">官方</a>的解決方案 ,<br>我們使用 <a target="_blank" rel="noopener" href="https://github.com/highbyte/sonarscan-dotnet">SonarScanner for .NET</a> 來執行 workflow ,<br>這個專案十分簡潔，可以快速看一下內容，了解到怎麼實作一個 workflow ,<br>因為非官方解決方案，所以我 <a target="_blank" rel="noopener" href="https://github.com/marsen/sonarscan-dotnet">fork 這個方案</a>避免意外發生.</p>
+<p>而在 workflow 中設定的也是使用 fork 的方案<br>設定參考如下</p>
+<figure class="highlight yml"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br></pre></td><td class="code"><pre><span class="line"><span class="bullet">-</span> <span class="attr">name:</span> <span class="string">SonarCloud</span> <span class="string">Scan</span></span><br><span class="line">  <span class="attr">uses:</span> <span class="string">marsen/sonarscan-dotnet@v2.1.2</span></span><br><span class="line">  <span class="attr">with:</span></span><br><span class="line">    <span class="comment"># The key of the SonarQube project</span></span><br><span class="line">    <span class="attr">sonarProjectKey:</span> <span class="string">Marsen.NetCore.Dojo</span></span><br><span class="line">    <span class="comment"># The name of the SonarQube project</span></span><br><span class="line">    <span class="attr">sonarProjectName:</span> <span class="string">Marsen.NetCore.Dojo</span></span><br><span class="line">    <span class="comment"># The name of the SonarQube Organization</span></span><br><span class="line">    <span class="attr">sonarOrganization:</span> <span class="string">marsen-github</span></span><br><span class="line">    <span class="comment"># Optional extra command arguments the the SonarScanner &#x27;begin&#x27; command</span></span><br><span class="line">    <span class="attr">sonarBeginArguments:</span> <span class="string">/d:sonar.cs.opencover.reportsPaths=&quot;./test/*/TestResults/*/coverage.opencover.xml&quot;</span></span><br><span class="line">    <span class="comment"># Optional. Set to 1 or true to not run &#x27;dotnet test&#x27; command</span></span><br><span class="line">    <span class="comment"># dotnetDisableTests: true</span></span><br><span class="line">    <span class="attr">dotnetTestArguments:</span> <span class="string">Marsen.NetCore.Dojo.Integration.Test.sln</span> <span class="string">--logger</span> <span class="string">trx</span> <span class="string">-p:CoverletOutputFormat=&quot;opencover&quot;</span> <span class="string">--collect:&quot;XPlat</span> <span class="string">Code</span> <span class="string">Coverage&quot;</span> <span class="string">--</span> <span class="string">DataCollectionRunSettings.DataCollectors.DataCollector.Configuration.Format=opencover</span></span><br><span class="line">    <span class="attr">dotnetBuildArguments:</span> <span class="string">Marsen.NetCore.Dojo.sln</span></span><br></pre></td></tr></table></figure>
+
+<h2 id="其它"><a href="#其它" class="headerlink" title="其它"></a>其它</h2><p>注意到 <a target="_blank" rel="noopener" href="https://github.com/OpenCover/opencover">opencover</a> 的開發者已經不再維護(2021 年 6 月)，並建議使用 <a target="_blank" rel="noopener" href="https://www.nuget.org/packages/altcover/">AltCover</a>.<br>但是 sonarcloud 並未支援 altcover 的報表, 這裡有相關的 <a target="_blank" rel="noopener" href="https://community.sonarsource.com/t/add-support-for-altcover/56208">issue</a> 追蹤中.</p>
+<h2 id="參考"><a href="#參考" class="headerlink" title="參考"></a>參考</h2><ul>
+<li><a target="_blank" rel="noopener" href="https://github.com/highbyte/sonarscan-dotnet">sonarscan-dotnet</a></li>
+<li><a target="_blank" rel="noopener" href="https://docs.microsoft.com/en-us/dotnet/core/testing/unit-testing-code-coverage?tabs=linux">Use code coverage for unit testing</a></li>
+<li><a target="_blank" rel="noopener" href="https://techblost.com/how-to-setup-sonarqube-locally-on-mac/">How to Setup SonarQube</a></li>
+<li><a target="_blank" rel="noopener" href="https://www.nuget.org/packages/dotnet-sonarscanner/">dotnet-sonarscanner</a></li>
+</ul>
+<p>(fin)</p>
+
+      
+    </div>
+    <footer class="article-footer">
+      <a data-url="https://blog.marsen.me/2022/02/15/2022/sonarcloud_dotnet_6/" data-id="cuidpIWXbY4t1Es97ddyJGHIU" class="article-share-link">Share</a>
+      
+        <a href="https://blog.marsen.me/2022/02/15/2022/sonarcloud_dotnet_6/#disqus_thread" class="article-comment-link">留言</a>
+      
+      
+  <ul class="article-tag-list" itemprop="keywords"><li class="article-tag-list-item"><a class="article-tag-list-link" href="/tags/%E5%AF%A6%E4%BD%9C%E7%AD%86%E8%A8%98/" rel="tag">實作筆記</a></li></ul>
+
+    </footer>
+  </div>
+  
+</article>
+
+
+  
+    <article id="post-2022/CI_update_with_stryker_1.3.1" class="article article-type-post" itemscope itemprop="blogPost">
+  <div class="article-meta">
+    <a href="/2022/02/03/2022/CI_update_with_stryker_1.3.1/" class="article-date">
+  <time datetime="2022-02-03T12:48:54.000Z" itemprop="datePublished">2022-02-03</time>
+</a>
+    
+  </div>
+  <div class="article-inner">
+    
+    
+      <header class="article-header">
+        
+  
+    <h1 itemprop="name">
+      <a class="article-title" href="/2022/02/03/2022/CI_update_with_stryker_1.3.1/"> [實作筆記] Stryker 升級與 CI 調整</a>
+    </h1>
+  
+
+      </header>
+    
+    <div class="article-entry" itemprop="articleBody">
+      
+        <h2 id="前情提要"><a href="#前情提要" class="headerlink" title="前情提要"></a>前情提要</h2><p>最近換了工作，一頭栽進了前端的領域，<br>生活又開始忙錄了起來，過年檢視了一下自已的 Side Project ，<br>意外發生 CI 竟然壞了一陣子，<br>這是我使用的變異測試工具 Stryker 從原本的 0.17 升級到了 1.3.1 版本<br>這是一個蠻大幅度的升版，所以設定上相當的不一樣。</p>
+<p>我的 OS 是 macOS Monterey 12.1<br>安裝了 .NET 6.0</p>
+<h2 id="Local-環境"><a href="#Local-環境" class="headerlink" title="Local 環境"></a>Local 環境</h2><p>首先全域安裝 dotnet-stryker</p>
+<blockquote>
+<p>dotnet tool install -g dotnet-stryker</p>
+</blockquote>
+<p>接下安裝 tool-manifest</p>
+<blockquote>
+<p>dotnet new tool-manifest</p>
+</blockquote>
+<p>這時在你專案底下應該會建立一個 .config 資料夾，<br>內含 dotnet-tools.json 檔，內容如下</p>
+<figure class="highlight json"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br></pre></td><td class="code"><pre><span class="line"><span class="punctuation">&#123;</span></span><br><span class="line">  <span class="attr">&quot;version&quot;</span><span class="punctuation">:</span> <span class="number">1</span><span class="punctuation">,</span></span><br><span class="line">  <span class="attr">&quot;isRoot&quot;</span><span class="punctuation">:</span> <span class="literal"><span class="keyword">true</span></span><span class="punctuation">,</span></span><br><span class="line">  <span class="attr">&quot;tools&quot;</span><span class="punctuation">:</span> <span class="punctuation">&#123;</span></span><br><span class="line">    <span class="attr">&quot;dotnet-stryker&quot;</span><span class="punctuation">:</span> <span class="punctuation">&#123;</span></span><br><span class="line">      <span class="attr">&quot;version&quot;</span><span class="punctuation">:</span> <span class="string">&quot;1.3.1&quot;</span><span class="punctuation">,</span></span><br><span class="line">      <span class="attr">&quot;commands&quot;</span><span class="punctuation">:</span> <span class="punctuation">[</span><span class="string">&quot;dotnet-stryker&quot;</span><span class="punctuation">]</span></span><br><span class="line">    <span class="punctuation">&#125;</span></span><br><span class="line">  <span class="punctuation">&#125;</span></span><br><span class="line"><span class="punctuation">&#125;</span></span><br></pre></td></tr></table></figure>
+
+<p>下一步，在專案資料下執行以下命令</p>
+<blockquote>
+<p>dotnet tool install dotnet-stryker</p>
+</blockquote>
+<p>建立 stryker-config.json 檔案<br>最後設定你的 config 檔 stryker-config.json</p>
+<figure class="highlight json"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br></pre></td><td class="code"><pre><span class="line"><span class="punctuation">&#123;</span></span><br><span class="line">  <span class="attr">&quot;stryker-config&quot;</span><span class="punctuation">:</span> <span class="punctuation">&#123;</span></span><br><span class="line">    <span class="attr">&quot;project&quot;</span><span class="punctuation">:</span> <span class="string">&quot;Marsen.NetCore.Dojo.csproj&quot;</span><span class="punctuation">,</span></span><br><span class="line">    <span class="attr">&quot;test-projects&quot;</span><span class="punctuation">:</span> <span class="punctuation">[</span></span><br><span class="line">      <span class="string">&quot;./test/Marsen.NetCore.Dojo.Tests/Marsen.NetCore.Dojo.Tests.csproj&quot;</span><span class="punctuation">,</span></span><br><span class="line">      <span class="string">&quot;./test/Marsen.NetCore.Dojo.Integration.Tests/Marsen.NetCore.Dojo.Integration.Tests.csproj&quot;</span></span><br><span class="line">    <span class="punctuation">]</span><span class="punctuation">,</span></span><br><span class="line">    <span class="attr">&quot;reporters&quot;</span><span class="punctuation">:</span> <span class="punctuation">[</span><span class="string">&quot;progress&quot;</span><span class="punctuation">,</span> <span class="string">&quot;json&quot;</span><span class="punctuation">,</span> <span class="string">&quot;dashboard&quot;</span><span class="punctuation">]</span><span class="punctuation">,</span></span><br><span class="line">    <span class="attr">&quot;project-info&quot;</span><span class="punctuation">:</span> <span class="punctuation">&#123;</span></span><br><span class="line">      <span class="attr">&quot;name&quot;</span><span class="punctuation">:</span> <span class="string">&quot;github.com/marsen/Marsen.NetCore.Dojo&quot;</span><span class="punctuation">,</span></span><br><span class="line">      <span class="attr">&quot;version&quot;</span><span class="punctuation">:</span> <span class="string">&quot;main&quot;</span></span><br><span class="line">    <span class="punctuation">&#125;</span></span><br><span class="line">  <span class="punctuation">&#125;</span></span><br><span class="line"><span class="punctuation">&#125;</span></span><br></pre></td></tr></table></figure>
+
+<p>與之前最大的不同是，大部份的參數你都可以設定在 stryker-config 之中，<br>而不用在執行命令中傳入，不僅可以為其提供版本控制，更能有序的組織你的設定檔，<br>使其更好閱讀。<br>如果你的 <code>reporters</code> 中有設定 <code>dashboard</code> 需要額外加上 <code>--dashboard-api-key</code><br>ex:</p>
+<blockquote>
+<p>dotnet stryker –dashboard-api-key&#x3D;$STRYKER_DASHBOARD_API_KEY</p>
+</blockquote>
+<h2 id="參考"><a href="#參考" class="headerlink" title="參考"></a>參考</h2><ul>
+<li><a target="_blank" rel="noopener" href="https://stryker-mutator.io/blog/2021-30-10-announcing-stryker-net-1.md/">Announcing Stryker.NET 1.0</a></li>
+<li><a target="_blank" rel="noopener" href="https://stryker-mutator.io/docs/stryker-net/getting-started">Install prerequisites</a></li>
+</ul>
+<p>(fin)</p>
+
+      
+    </div>
+    <footer class="article-footer">
+      <a data-url="https://blog.marsen.me/2022/02/03/2022/CI_update_with_stryker_1.3.1/" data-id="cuid1vuPit2wnJ69M81RXflDj" class="article-share-link">Share</a>
+      
+        <a href="https://blog.marsen.me/2022/02/03/2022/CI_update_with_stryker_1.3.1/#disqus_thread" class="article-comment-link">留言</a>
+      
+      
+  <ul class="article-tag-list" itemprop="keywords"><li class="article-tag-list-item"><a class="article-tag-list-link" href="/tags/%E5%AF%A6%E4%BD%9C%E7%AD%86%E8%A8%98/" rel="tag">實作筆記</a></li></ul>
+
+    </footer>
+  </div>
+  
+</article>
+
+
+  
+    <article id="post-2022/react_practice_firebase_login" class="article article-type-post" itemscope itemprop="blogPost">
+  <div class="article-meta">
+    <a href="/2022/01/27/2022/react_practice_firebase_login/" class="article-date">
+  <time datetime="2022-01-27T09:57:59.000Z" itemprop="datePublished">2022-01-27</time>
+</a>
+    
+  </div>
+  <div class="article-inner">
+    
+    
+      <header class="article-header">
+        
+  
+    <h1 itemprop="name">
+      <a class="article-title" href="/2022/01/27/2022/react_practice_firebase_login/"> [實作筆記] React Practice (一) Firebase 與 React Login</a>
+    </h1>
+  
+
+      </header>
+    
+    <div class="article-entry" itemprop="articleBody">
+      
+        <h2 id="前情提要"><a href="#前情提要" class="headerlink" title="前情提要"></a>前情提要</h2><p>本文不會介紹 <a target="_blank" rel="noopener" href="https://firebase.google.com/">Firebase</a> 與 <a target="_blank" rel="noopener" href="https://reactjs.org/">React</a>.<br>依照這篇文章完成後，你會</p>
+<ul>
+<li>透過 <a target="_blank" rel="noopener" href="https://create-react-app.dev/">CRA</a> 建立一個專案</li>
+<li>透過 <a target="_blank" rel="noopener" href="https://mui.com/">MUI</a> 建立符合 <a target="_blank" rel="noopener" href="https://material.io/design">Material Design</a> 的登入畫面</li>
+<li>建立 Firsbase 專案並且透過 Firsbase 完成登入登出的功能</li>
+<li>建立登入後才能瀏覽的頁面，並且實作登入／登出功能，登出後將無法瀏覽</li>
+</ul>
+<h2 id="Firebase-設定"><a href="#Firebase-設定" class="headerlink" title="Firebase 設定"></a>Firebase 設定</h2><h3 id="建立-Firebase-專案"><a href="#建立-Firebase-專案" class="headerlink" title="建立 Firebase 專案"></a>建立 Firebase 專案</h3><p>這裡的操作非常簡單，可以直接參考下面的影片。</p>
+<div class="video-container"><iframe src="https://www.youtube.com/embed/6juww5Lmvgo" frameborder="0" loading="lazy" allowfullscreen></iframe></div>
+
+<p>詳細的步驟如下</p>
+<ol>
+<li>進入 <a target="_blank" rel="noopener" href="https://console.firebase.google.com/">firebase console</a></li>
+<li>選擇建立專案(Add Project)，並且為你的專案取一個名字</li>
+<li>進入剛剛建立的專案後，選擇建立應用程式(Add App)，<br>在這裡我們選擇 Web 類型的應用程式<br>建立完成後我們會得到一個範例檔如下, 部份機敏資料先上遮罩</li>
+</ol>
+<figure class="highlight typescript"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment">// Import the functions you need from the SDKs you need</span></span><br><span class="line"><span class="keyword">import</span> &#123; initializeApp &#125; <span class="keyword">from</span> <span class="string">&quot;firebase/app&quot;</span>;</span><br><span class="line"><span class="keyword">import</span> &#123; getAnalytics &#125; <span class="keyword">from</span> <span class="string">&quot;firebase/analytics&quot;</span>;</span><br><span class="line"><span class="comment">// <span class="doctag">TODO:</span> Add SDKs for Firebase products that you want to use</span></span><br><span class="line"><span class="comment">// https://firebase.google.com/docs/web/setup#available-libraries</span></span><br><span class="line"></span><br><span class="line"><span class="comment">// Your web app&#x27;s Firebase configuration</span></span><br><span class="line"><span class="comment">// For Firebase JS SDK v7.20.0 and later, measurementId is optional</span></span><br><span class="line"><span class="keyword">const</span> firebaseConfig = &#123;</span><br><span class="line">  <span class="attr">apiKey</span>: <span class="string">&quot;A****************&quot;</span>,</span><br><span class="line">  <span class="attr">authDomain</span>: <span class="string">&quot;******.firebaseapp.com&quot;</span>,</span><br><span class="line">  <span class="attr">projectId</span>: <span class="string">&quot;******&quot;</span>,</span><br><span class="line">  <span class="attr">storageBucket</span>: <span class="string">&quot;******.appspot.com&quot;</span>,</span><br><span class="line">  <span class="attr">messagingSenderId</span>: <span class="string">&quot;******&quot;</span>,</span><br><span class="line">  <span class="attr">appId</span>: <span class="string">&quot;1:******:web:******&quot;</span>,</span><br><span class="line">  <span class="attr">measurementId</span>: <span class="string">&quot;G-*********&quot;</span>,</span><br><span class="line">&#125;;</span><br><span class="line"></span><br><span class="line"><span class="comment">// Initialize Firebase</span></span><br><span class="line"><span class="keyword">const</span> app = <span class="title function_">initializeApp</span>(firebaseConfig);</span><br><span class="line"><span class="keyword">const</span> analytics = <span class="title function_">getAnalytics</span>(app);</span><br></pre></td></tr></table></figure>
+
+<h4 id="抽出環境變數"><a href="#抽出環境變數" class="headerlink" title="抽出環境變數"></a>抽出環境變數</h4><p>在 React 當中的機敏資料,建議的作法是使用環境變數,<br>我們可以建立一個<code>.env.local</code>提供給開發測試用,<br>而 Production 環境請直接設定在環境變數中, 相關資料不會進版控.<br>以下幾點注意事項</p>
+<ul>
+<li>必需使用 <code>REACT_APP_*</code> 開頭才可讓 REACT APP 使用 ex:<code>REACT_APP_APIKEY</code></li>
+<li>一般的建議是全大寫</li>
+<li>環境變數的更新不適用 Hot Reload，請重啟環境</li>
+</ul>
+<h3 id="啟用-Firebase-認証-Authentication"><a href="#啟用-Firebase-認証-Authentication" class="headerlink" title="啟用 Firebase 認証(Authentication)"></a>啟用 Firebase 認証(Authentication)</h3><ol>
+<li>首先要建立 Sign-in method &gt; 原生供應商 &gt; 電子郵件&#x2F;密碼</li>
+<li>建立第一個使用者 Users &gt; Add User</li>
+</ol>
+<h2 id="React"><a href="#React" class="headerlink" title="React"></a>React</h2><h3 id="Create-React-Application"><a href="#Create-React-Application" class="headerlink" title="Create React Application"></a>Create React Application</h3><p>我們透過 TypeScript 建立 React 專案</p>
+<figure class="highlight shell"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">npx create-react-app my-app --template typescript</span><br></pre></td></tr></table></figure>
+
+<p>我們可以試著啟動專案看一下，</p>
+<figure class="highlight shell"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">cd my-app</span><br></pre></td></tr></table></figure>
+
+<figure class="highlight shell"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">npm i</span><br></pre></td></tr></table></figure>
+
+<figure class="highlight shell"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">npm start</span><br></pre></td></tr></table></figure>
+
+<h3 id="安裝相關的套件"><a href="#安裝相關的套件" class="headerlink" title="安裝相關的套件"></a>安裝相關的套件</h3><h4 id="emotion-相關"><a href="#emotion-相關" class="headerlink" title="emotion 相關"></a>emotion 相關</h4><figure class="highlight shell"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">npm i @emotion/react @emotion/styled</span><br></pre></td></tr></table></figure>
+
+<h4 id="material-相關"><a href="#material-相關" class="headerlink" title="material 相關"></a>material 相關</h4><figure class="highlight shell"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">npm i @mui/material @mui/icons-material</span><br></pre></td></tr></table></figure>
+
+<h4 id="firebase-相關"><a href="#firebase-相關" class="headerlink" title="firebase 相關"></a>firebase 相關</h4><figure class="highlight shell"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">npm i firebase react-firebase-hooks</span><br></pre></td></tr></table></figure>
+
+<h4 id="react-router-dom-相關"><a href="#react-router-dom-相關" class="headerlink" title="react-router-dom 相關"></a>react-router-dom 相關</h4><figure class="highlight shell"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">npm i react-router-dom@6</span><br></pre></td></tr></table></figure>
+
+<h3 id="建立登入頁面"><a href="#建立登入頁面" class="headerlink" title="建立登入頁面"></a>建立登入頁面</h3><h4 id="登入頁面與路由"><a href="#登入頁面與路由" class="headerlink" title="登入頁面與路由"></a>登入頁面與路由</h4><p>在 src 中建立 <code>pages</code> 資料夾，<br>之後我們再建立 <code>Login.tsx</code> 檔案如下</p>
+<figure class="highlight jsx"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">import</span> <span class="title class_">React</span> <span class="keyword">from</span> <span class="string">&quot;react&quot;</span>;</span><br><span class="line"></span><br><span class="line"><span class="keyword">export</span> <span class="keyword">const</span> <span class="title function_">Login</span> = (<span class="params"></span>) =&gt; &#123;</span><br><span class="line">  <span class="keyword">return</span> <span class="language-xml"><span class="tag">&lt;&gt;</span>Login Page<span class="tag">&lt;/&gt;</span></span>;</span><br><span class="line">&#125;;</span><br></pre></td></tr></table></figure>
+
+<p>接下來我們要透過 react-router-dom 來建立路由<br>開啟 <code>index.tsx</code> 如下</p>
+<figure class="highlight jsx"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">import</span> <span class="title class_">React</span> <span class="keyword">from</span> <span class="string">&#x27;react&#x27;</span>;</span><br><span class="line"><span class="keyword">import</span> <span class="title class_">ReactDOM</span> <span class="keyword">from</span> <span class="string">&#x27;react-dom&#x27;</span>;</span><br><span class="line"><span class="keyword">import</span> <span class="string">&#x27;./index.css&#x27;</span>;</span><br><span class="line"><span class="keyword">import</span> <span class="title class_">App</span> <span class="keyword">from</span> <span class="string">&#x27;./App&#x27;</span>;</span><br><span class="line"><span class="keyword">import</span> reportWebVitals <span class="keyword">from</span> <span class="string">&#x27;./reportWebVitals&#x27;</span>;</span><br><span class="line"></span><br><span class="line"><span class="title class_">ReactDOM</span>.<span class="title function_">render</span>(</span><br><span class="line">  <span class="language-xml"><span class="tag">&lt;<span class="name">React.StrictMode</span>&gt;</span></span></span><br><span class="line"><span class="language-xml">    <span class="tag">&lt;<span class="name">App</span> /&gt;</span></span></span><br><span class="line"><span class="language-xml">  <span class="tag">&lt;/<span class="name">React.StrictMode</span>&gt;</span></span>,</span><br><span class="line">  <span class="variable language_">document</span>.<span class="title function_">getElementById</span>(<span class="string">&#x27;root&#x27;</span>)</span><br><span class="line">);</span><br><span class="line"></span><br><span class="line"><span class="comment">// If you want to start measuring performance in your app, pass a function</span></span><br><span class="line"><span class="comment">// to log results (for example: reportWebVitals(console.log))</span></span><br><span class="line"><span class="comment">// or send to an analytics endpoint. Learn more: https://bit.ly/CRA-vitals</span></span><br><span class="line"><span class="title function_">reportWebVitals</span>();</span><br><span class="line"></span><br></pre></td></tr></table></figure>
+
+<p>修改如下</p>
+<figure class="highlight jsx"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">import</span> <span class="title class_">React</span> <span class="keyword">from</span> <span class="string">&quot;react&quot;</span>;</span><br><span class="line"><span class="keyword">import</span> <span class="title class_">ReactDOM</span> <span class="keyword">from</span> <span class="string">&quot;react-dom&quot;</span>;</span><br><span class="line"><span class="keyword">import</span> <span class="string">&quot;./index.css&quot;</span>;</span><br><span class="line"><span class="keyword">import</span> <span class="title class_">App</span> <span class="keyword">from</span> <span class="string">&quot;./App&quot;</span>;</span><br><span class="line"><span class="keyword">import</span> reportWebVitals <span class="keyword">from</span> <span class="string">&quot;./reportWebVitals&quot;</span>;</span><br><span class="line"><span class="keyword">import</span> &#123; <span class="title class_">BrowserRouter</span>, <span class="title class_">Route</span>, <span class="title class_">Routes</span> &#125; <span class="keyword">from</span> <span class="string">&quot;react-router-dom&quot;</span>;</span><br><span class="line"><span class="keyword">import</span> &#123; <span class="title class_">Login</span> &#125; <span class="keyword">from</span> <span class="string">&quot;./pages/Login&quot;</span>;</span><br><span class="line"></span><br><span class="line"><span class="title class_">ReactDOM</span>.<span class="title function_">render</span>(</span><br><span class="line">  <span class="language-xml"><span class="tag">&lt;<span class="name">React.StrictMode</span>&gt;</span></span></span><br><span class="line"><span class="language-xml">    <span class="tag">&lt;<span class="name">BrowserRouter</span>&gt;</span></span></span><br><span class="line"><span class="language-xml">      <span class="tag">&lt;<span class="name">Routes</span>&gt;</span></span></span><br><span class="line"><span class="language-xml">        <span class="tag">&lt;<span class="name">Route</span> <span class="attr">path</span>=<span class="string">&quot;&quot;</span> <span class="attr">element</span>=<span class="string">&#123;</span>&lt;<span class="attr">App</span> /&gt;</span>&#125; /&gt;</span></span><br><span class="line"><span class="language-xml">        <span class="tag">&lt;<span class="name">Route</span> <span class="attr">path</span>=<span class="string">&quot;login&quot;</span> <span class="attr">element</span>=<span class="string">&#123;</span>&lt;<span class="attr">Login</span> /&gt;</span>&#125; /&gt;</span></span><br><span class="line"><span class="language-xml">      <span class="tag">&lt;/<span class="name">Routes</span>&gt;</span></span></span><br><span class="line"><span class="language-xml">    <span class="tag">&lt;/<span class="name">BrowserRouter</span>&gt;</span></span></span><br><span class="line"><span class="language-xml">  <span class="tag">&lt;/<span class="name">React.StrictMode</span>&gt;</span></span>,</span><br><span class="line">  <span class="variable language_">document</span>.<span class="title function_">getElementById</span>(<span class="string">&quot;root&quot;</span>)</span><br><span class="line">);</span><br><span class="line"></span><br><span class="line"><span class="comment">// If you want to start measuring performance in your app, pass a function</span></span><br><span class="line"><span class="comment">// to log results (for example: reportWebVitals(console.log))</span></span><br><span class="line"><span class="comment">// or send to an analytics endpoint. Learn more: https://bit.ly/CRA-vitals</span></span><br><span class="line"><span class="title function_">reportWebVitals</span>();</span><br></pre></td></tr></table></figure>
+
+<p>重新啟動專案，在瀏覽器輸入不同的網址將會看到不同的畫面，如此我們完成了頁面的路由。</p>
+<h4 id="快速建立符合-MUI-的登入頁面"><a href="#快速建立符合-MUI-的登入頁面" class="headerlink" title="快速建立符合 MUI 的登入頁面"></a>快速建立符合 MUI 的登入頁面</h4><p>我們可以透過 MUI 提供的 <a target="_blank" rel="noopener" href="https://mui.com/getting-started/templates/">Template</a> 來建立 <a target="_blank" rel="noopener" href="https://mui.com/getting-started/templates/sign-in-side/">Login</a> 頁面<br>實作細節如下:</p>
+<ul>
+<li>參考 <a target="_blank" rel="noopener" href="https://github.com/mui-org/material-ui/tree/master/docs/src/pages/getting-started/templates/sign-in-side">Source Code</a> 建立 <code>src/components/SigninSide</code> 組件</li>
+<li>修改 <code>src/pages/Login.tsx</code> 如下:</li>
+</ul>
+<figure class="highlight jsx"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">import</span> <span class="title class_">SignInSide</span> <span class="keyword">from</span> <span class="string">&quot;../components/SignInSide&quot;</span>;</span><br><span class="line"></span><br><span class="line"><span class="keyword">export</span> <span class="keyword">const</span> <span class="title function_">Login</span> = (<span class="params"></span>) =&gt; &#123;</span><br><span class="line">  <span class="keyword">return</span> <span class="language-xml"><span class="tag">&lt;<span class="name">SignInSide</span> /&gt;</span></span>;</span><br><span class="line">&#125;;</span><br></pre></td></tr></table></figure>
+
+<p>重新瀏覽登入畫面，就可以看到一個美觀的登入頁 .</p>
+<h4 id="實作登入功能"><a href="#實作登入功能" class="headerlink" title="實作登入功能"></a>實作登入功能</h4><p>首先請花點時間看一下 <a target="_blank" rel="noopener" href="https://firebase.google.com/docs/auth/web/password-auth#sign_in_a_user_with_an_email_address_and_password">Firebase 帳號密碼登入的文件</a>。<br>接下來我們將依照文件的解釋修改我們的 SigninSide 組件。<br>打開 SigninSide 組件，找到<code>handleSubmit</code> 函數如下：</p>
+<figure class="highlight jsx"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">const</span> <span class="title function_">handleSubmit</span> = (<span class="params">event: React.FormEvent&lt;HTMLFormElement&gt;</span>) =&gt; &#123;</span><br><span class="line">  event.<span class="title function_">preventDefault</span>();</span><br><span class="line">  <span class="keyword">const</span> data = <span class="keyword">new</span> <span class="title class_">FormData</span>(event.<span class="property">currentTarget</span>);</span><br><span class="line">  <span class="comment">// eslint-disable-next-line no-console</span></span><br><span class="line">  <span class="variable language_">console</span>.<span class="title function_">log</span>(&#123;</span><br><span class="line">    <span class="attr">email</span>: data.<span class="title function_">get</span>(<span class="string">&quot;email&quot;</span>),</span><br><span class="line">    <span class="attr">password</span>: data.<span class="title function_">get</span>(<span class="string">&quot;password&quot;</span>),</span><br><span class="line">  &#125;);</span><br><span class="line">&#125;;</span><br></pre></td></tr></table></figure>
+
+<p>修改如下</p>
+<figure class="highlight jsx"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">import</span> &#123; getAuth, signInWithEmailAndPassword &#125; <span class="keyword">from</span> <span class="string">&quot;firebase/auth&quot;</span>;</span><br><span class="line"><span class="keyword">import</span> &#123; app &#125; <span class="keyword">from</span> <span class="string">&quot;../firebase-config&quot;</span>;</span><br><span class="line">....</span><br><span class="line"><span class="keyword">const</span> <span class="title function_">handleSubmit</span> = (<span class="params">event: React.FormEvent&lt;HTMLFormElement&gt;</span>) =&gt; &#123;</span><br><span class="line">  event.<span class="title function_">preventDefault</span>();</span><br><span class="line">  <span class="keyword">const</span> data = <span class="keyword">new</span> <span class="title class_">FormData</span>(event.<span class="property">currentTarget</span>);</span><br><span class="line">  <span class="keyword">const</span> auth = <span class="title function_">getAuth</span>(app);</span><br><span class="line">  <span class="title function_">signInWithEmailAndPassword</span>(</span><br><span class="line">    auth,</span><br><span class="line">    data.<span class="title function_">get</span>(<span class="string">&quot;email&quot;</span>)!.<span class="title function_">toString</span>(),</span><br><span class="line">    data.<span class="title function_">get</span>(<span class="string">&quot;password&quot;</span>)!.<span class="title function_">toString</span>()</span><br><span class="line">  )</span><br><span class="line">    .<span class="title function_">then</span>(<span class="function">(<span class="params">userCredential</span>) =&gt;</span> &#123;</span><br><span class="line">      <span class="comment">// Signed in</span></span><br><span class="line">      <span class="keyword">const</span> user = userCredential.<span class="property">user</span>;</span><br><span class="line">      <span class="variable language_">console</span>.<span class="title function_">log</span>(<span class="string">&quot;user&quot;</span>, userCredential.<span class="property">user</span>);</span><br><span class="line">      <span class="comment">// ...</span></span><br><span class="line">    &#125;)</span><br><span class="line">    .<span class="title function_">catch</span>(<span class="function">(<span class="params">error</span>) =&gt;</span> &#123;</span><br><span class="line">      <span class="keyword">const</span> errorCode = error.<span class="property">code</span>;</span><br><span class="line">      <span class="keyword">const</span> errorMessage = error.<span class="property">message</span>;</span><br><span class="line">      <span class="variable language_">console</span>.<span class="title function_">log</span>(<span class="string">&quot;error&quot;</span>, error);</span><br><span class="line">    &#125;);</span><br><span class="line">&#125;;</span><br></pre></td></tr></table></figure>
+
+<blockquote>
+<p>題外話，<strong>data.get(“email”)!.toString()</strong><br>當中的 <code>!.</code> 運算子可以<a target="_blank" rel="noopener" href="https://www.typescriptlang.org/docs/handbook/release-notes/typescript-2-0.html#non-null-assertion-operator">參考 TypeScript Non-null assertion operator 的說明</a></p>
+</blockquote>
+<p>用之前在 firebase 建立的帳密登入，登入成功的話可以在 Console 看到類似以下的資訊</p>
+<figure class="highlight console"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br></pre></td><td class="code"><pre><span class="line">UserImpl &#123;providerId: &#x27;firebase&#x27;, emailVerified: false, isAnonymous:</span><br><span class="line">false, tenantId: null, providerData: Array(1), …&#125;</span><br></pre></td></tr></table></figure>
+
+<h4 id="實作登入後進頁面的跳轉"><a href="#實作登入後進頁面的跳轉" class="headerlink" title="實作登入後進頁面的跳轉"></a>實作登入後進頁面的跳轉</h4><p>這裡要使用 <code>react-dom-router</code> 提供的 hook <code>useNavigate</code>,<br>注意 React Hook 的使用限制</p>
+<ul>
+<li><a target="_blank" rel="noopener" href="https://reactjs.org/docs/hooks-rules.html#only-call-hooks-at-the-top-level">只在最上層呼叫 Hook—不要在迴圈、條件式或是巢狀的 function 內呼叫 Hook。</a></li>
+<li><a target="_blank" rel="noopener" href="https://reactjs.org/docs/hooks-rules.html#only-call-hooks-from-react-functions">只在 React Function 中呼叫 Hook—別在一般的 JavaScript function 中呼叫 Hook。</a></li>
+</ul>
+<p>CRA 建立專案時同時會幫我們安裝檢查用的 Lint 所以不用太擔心。<br>同時我們把 <code>getAuth(app)</code> 也提取到 <code>SignInSide</code> Component 之外</p>
+<figure class="highlight jsx"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment">////getAuth 可以不用寫在 handleSubmit 中</span></span><br><span class="line"><span class="keyword">const</span> auth = <span class="title function_">getAuth</span>(app);</span><br><span class="line"></span><br><span class="line"><span class="keyword">export</span> <span class="keyword">default</span> <span class="keyword">function</span> <span class="title function_">SignInSide</span>(<span class="params"></span>) &#123;</span><br><span class="line">  <span class="comment">////遵循 React Hook 的規則在最上層呼叫 Hook</span></span><br><span class="line">  <span class="keyword">const</span> navigate = <span class="title function_">useNavigate</span>();<span class="comment">//取得 navigate</span></span><br><span class="line">  <span class="keyword">const</span> <span class="title function_">handleSubmit</span> = (<span class="params">event: React.FormEvent&lt;HTMLFormElement&gt;</span>) =&gt; &#123;</span><br><span class="line">    event.<span class="title function_">preventDefault</span>();</span><br><span class="line">    <span class="keyword">const</span> data = <span class="keyword">new</span> <span class="title class_">FormData</span>(event.<span class="property">currentTarget</span>);</span><br><span class="line">    <span class="title function_">signInWithEmailAndPassword</span>(</span><br><span class="line">      auth,</span><br><span class="line">      data.<span class="title function_">get</span>(<span class="string">&quot;email&quot;</span>)!.<span class="title function_">toString</span>(),</span><br><span class="line">      data.<span class="title function_">get</span>(<span class="string">&quot;password&quot;</span>)!.<span class="title function_">toString</span>()</span><br><span class="line">    )</span><br><span class="line">      .<span class="title function_">then</span>(<span class="function">(<span class="params">userCredential</span>) =&gt;</span> &#123;</span><br><span class="line">        <span class="comment">// Signed in</span></span><br><span class="line">        <span class="comment">// console.log(&quot;user&quot;, userCredential.user);</span></span><br><span class="line">        <span class="title function_">navigate</span>(<span class="string">&quot;/&quot;</span>);<span class="comment">// navigate 到首頁</span></span><br></pre></td></tr></table></figure>
+
+<h3 id="實作登出的功能"><a href="#實作登出的功能" class="headerlink" title="實作登出的功能"></a>實作登出的功能</h3><p>調整 <code>App.tsx</code> 如下，移除不相關的程式，建立一個 Button 並準備好 onClick 事件</p>
+<figure class="highlight jsx"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">import</span> &#123; <span class="title class_">Button</span> &#125; <span class="keyword">from</span> <span class="string">&quot;@mui/material&quot;</span>;</span><br><span class="line"><span class="keyword">import</span> <span class="string">&quot;./App.css&quot;</span>;</span><br><span class="line"><span class="keyword">function</span> <span class="title function_">App</span>(<span class="params"></span>) &#123;</span><br><span class="line">  <span class="keyword">return</span> (</span><br><span class="line">    <span class="language-xml"><span class="tag">&lt;<span class="name">div</span> <span class="attr">className</span>=<span class="string">&quot;App&quot;</span>&gt;</span></span></span><br><span class="line"><span class="language-xml">      <span class="tag">&lt;<span class="name">Button</span> <span class="attr">variant</span>=<span class="string">&quot;outlined&quot;</span> <span class="attr">onClick</span>=<span class="string">&#123;()</span> =&gt;</span> &#123;&#125;&#125;&gt;</span></span><br><span class="line"><span class="language-xml">        LOGOUT</span></span><br><span class="line"><span class="language-xml">      <span class="tag">&lt;/<span class="name">Button</span>&gt;</span></span></span><br><span class="line"><span class="language-xml">    <span class="tag">&lt;/<span class="name">div</span>&gt;</span></span></span><br><span class="line">  );</span><br><span class="line">&#125;</span><br><span class="line"></span><br><span class="line"><span class="keyword">export</span> <span class="keyword">default</span> <span class="title class_">App</span>;</span><br></pre></td></tr></table></figure>
+
+<h4 id="路由設定，只有登入者才能看的頁面"><a href="#路由設定，只有登入者才能看的頁面" class="headerlink" title="路由設定，只有登入者才能看的頁面"></a>路由設定，只有登入者才能看的頁面</h4><p>透過 getAuth().currentUser 取得目前的登入者資料, 如果沒有登入者轉導到 Login 頁面,</p>
+<figure class="highlight jsx"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">import</span> &#123; getAuth &#125; <span class="keyword">from</span> <span class="string">&quot;firebase/auth&quot;</span>;</span><br><span class="line">....</span><br><span class="line">&lt;<span class="title class_">React</span>.<span class="property">StrictMode</span>&gt;</span><br><span class="line">  <span class="language-xml"><span class="tag">&lt;<span class="name">BrowserRouter</span>&gt;</span></span></span><br><span class="line"><span class="language-xml">    <span class="tag">&lt;<span class="name">Routes</span>&gt;</span></span></span><br><span class="line"><span class="language-xml">      <span class="tag">&lt;<span class="name">Route</span></span></span></span><br><span class="line"><span class="tag"><span class="language-xml">      <span class="attr">path</span>=<span class="string">&quot;&quot;</span></span></span></span><br><span class="line"><span class="tag"><span class="language-xml">      <span class="attr">element</span>=<span class="string">&#123;getAuth().currentUser</span> ? &lt;<span class="attr">App</span> /&gt;</span> : <span class="tag">&lt;<span class="name">Navigate</span> <span class="attr">to</span>=<span class="string">&quot;/login&quot;</span> /&gt;</span> &#125;</span></span><br><span class="line"><span class="language-xml">      /&gt;</span></span><br><span class="line"><span class="language-xml">      <span class="tag">&lt;<span class="name">Route</span> <span class="attr">path</span>=<span class="string">&quot;login&quot;</span> <span class="attr">element</span>=<span class="string">&#123;</span>&lt;<span class="attr">Login</span> /&gt;</span>&#125; /&gt;</span></span><br><span class="line"><span class="language-xml">    <span class="tag">&lt;/<span class="name">Routes</span>&gt;</span></span></span><br><span class="line"><span class="language-xml">  <span class="tag">&lt;/<span class="name">BrowserRouter</span>&gt;</span></span></span><br><span class="line">&lt;/<span class="title class_">React</span>.<span class="property">StrictMode</span>&gt;</span><br></pre></td></tr></table></figure>
+
+<p>不過這樣的作法會有問題，<br>getAuth().currentUser 是非同步取得的資訊，<br>所以你很有可能都會拿到 null 值，<br>在官方的建議作法是透過 <a target="_blank" rel="noopener" href="https://firebase.google.com/docs/auth/web/manage-users#get_a_users_profile">onAuthStateChanged</a> 註冊 Observer, <code>index.tsx</code> 會類似下面這樣</p>
+<figure class="highlight jsx"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">const</span> auth = <span class="title function_">getAuth</span>();</span><br><span class="line"></span><br><span class="line"><span class="title function_">onAuthStateChanged</span>(auth, <span class="function">(<span class="params">user</span>) =&gt;</span> &#123;</span><br><span class="line">  <span class="title class_">ReactDOM</span>.<span class="title function_">render</span>(</span><br><span class="line">    <span class="language-xml"><span class="tag">&lt;<span class="name">React.StrictMode</span>&gt;</span></span></span><br><span class="line"><span class="language-xml">      <span class="tag">&lt;<span class="name">BrowserRouter</span>&gt;</span></span></span><br><span class="line"><span class="language-xml">        <span class="tag">&lt;<span class="name">Routes</span>&gt;</span></span></span><br><span class="line"><span class="language-xml">          <span class="tag">&lt;<span class="name">Route</span> <span class="attr">path</span>=<span class="string">&quot;&quot;</span> <span class="attr">element</span>=<span class="string">&#123;user</span> ? &lt;<span class="attr">App</span> /&gt;</span> : <span class="tag">&lt;<span class="name">Navigate</span> <span class="attr">to</span>=<span class="string">&quot;login&quot;</span> /&gt;</span>&#125; /&gt;</span></span><br><span class="line"><span class="language-xml">          <span class="tag">&lt;<span class="name">Route</span> <span class="attr">path</span>=<span class="string">&quot;login&quot;</span> <span class="attr">element</span>=<span class="string">&#123;</span>&lt;<span class="attr">Login</span> /&gt;</span>&#125; /&gt;</span></span><br><span class="line"><span class="language-xml">        <span class="tag">&lt;/<span class="name">Routes</span>&gt;</span></span></span><br><span class="line"><span class="language-xml">      <span class="tag">&lt;/<span class="name">BrowserRouter</span>&gt;</span></span></span><br><span class="line"><span class="language-xml">    <span class="tag">&lt;/<span class="name">React.StrictMode</span>&gt;</span></span>,</span><br><span class="line">    <span class="variable language_">document</span>.<span class="title function_">getElementById</span>(<span class="string">&quot;root&quot;</span>)</span><br><span class="line">  );</span><br><span class="line"></span><br><span class="line">  <span class="comment">// If you want to start measuring performance in your app, pass a function</span></span><br><span class="line">  <span class="comment">// to log results (for example: reportWebVitals(console.log))</span></span><br><span class="line">  <span class="comment">// or send to an analytics endpoint. Learn more: https://bit.ly/CRA-vitals</span></span><br><span class="line">  <span class="title function_">reportWebVitals</span>();</span><br><span class="line">&#125;);</span><br></pre></td></tr></table></figure>
+
+<h2 id="Todo"><a href="#Todo" class="headerlink" title="Todo"></a>Todo</h2><ul>
+<li>Firebase Email link(passwordless sign-in)</li>
+<li>Firebase Host Project</li>
+<li>PageNotFound</li>
+<li>管理 Routes</li>
+<li>more…</li>
+</ul>
+<p>(つづく)</p>
+
+      
+    </div>
+    <footer class="article-footer">
+      <a data-url="https://blog.marsen.me/2022/01/27/2022/react_practice_firebase_login/" data-id="cuidwUSfGSyF2j8WeqGDs00q2" class="article-share-link">Share</a>
+      
+        <a href="https://blog.marsen.me/2022/01/27/2022/react_practice_firebase_login/#disqus_thread" class="article-comment-link">留言</a>
+      
+      
+  <ul class="article-tag-list" itemprop="keywords"><li class="article-tag-list-item"><a class="article-tag-list-link" href="/tags/Firebase/" rel="tag">Firebase</a></li><li class="article-tag-list-item"><a class="article-tag-list-link" href="/tags/React/" rel="tag">React</a></li><li class="article-tag-list-item"><a class="article-tag-list-link" href="/tags/%E5%AF%A6%E4%BD%9C%E7%AD%86%E8%A8%98/" rel="tag">實作筆記</a></li></ul>
+
+    </footer>
+  </div>
+  
+</article>
+
+
+  
+    <article id="post-2022/javascript_function" class="article article-type-post" itemscope itemprop="blogPost">
+  <div class="article-meta">
+    <a href="/2022/01/13/2022/javascript_function/" class="article-date">
+  <time datetime="2022-01-13T03:59:54.000Z" itemprop="datePublished">2022-01-13</time>
+</a>
+    
+  </div>
+  <div class="article-inner">
+    
+    
+      <header class="article-header">
+        
+  
+    <h1 itemprop="name">
+      <a class="article-title" href="/2022/01/13/2022/javascript_function/"> [學習筆記] JavaScript function 幾種不同的寫法</a>
+    </h1>
+  
+
+      </header>
+    
+    <div class="article-entry" itemprop="articleBody">
+      
+        <h2 id="回傳純值的函數"><a href="#回傳純值的函數" class="headerlink" title="回傳純值的函數"></a>回傳純值的函數</h2><figure class="highlight javascript"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment">//return value</span></span><br><span class="line"><span class="keyword">function</span> <span class="title function_">foo1</span>(<span class="params">a, b</span>) &#123;</span><br><span class="line">  <span class="keyword">return</span> a + b;</span><br><span class="line">&#125;</span><br><span class="line"><span class="comment">// arrow function</span></span><br><span class="line"><span class="keyword">let</span> <span class="title function_">foo2</span> = (<span class="params">a, b</span>) =&gt; &#123;</span><br><span class="line">  <span class="keyword">return</span> a + b;</span><br><span class="line">&#125;;</span><br><span class="line"><span class="comment">// skip &#123; &#125; and return</span></span><br><span class="line"><span class="keyword">let</span> <span class="title function_">foo3</span> = (<span class="params">a, b</span>) =&gt; a + b;</span><br><span class="line"></span><br><span class="line"><span class="variable language_">console</span>.<span class="title function_">log</span>(<span class="string">&quot;foo1(1,2) is&quot;</span>, <span class="title function_">foo1</span>(<span class="number">1</span>, <span class="number">2</span>));</span><br><span class="line"><span class="variable language_">console</span>.<span class="title function_">log</span>(<span class="string">&quot;foo2(1,2) is&quot;</span>, <span class="title function_">foo2</span>(<span class="number">1</span>, <span class="number">2</span>));</span><br><span class="line"><span class="variable language_">console</span>.<span class="title function_">log</span>(<span class="string">&quot;foo3(1,2) is&quot;</span>, <span class="title function_">foo3</span>(<span class="number">1</span>, <span class="number">2</span>));</span><br></pre></td></tr></table></figure>
+
+<h2 id="回傳物件的函數"><a href="#回傳物件的函數" class="headerlink" title="回傳物件的函數"></a>回傳物件的函數</h2><figure class="highlight javascript"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment">//return object</span></span><br><span class="line"></span><br><span class="line"><span class="keyword">function</span> <span class="title function_">foo4</span>(<span class="params">a, b</span>) &#123;</span><br><span class="line">  <span class="keyword">return</span> &#123; <span class="attr">sum</span>: a + b &#125;;</span><br><span class="line">&#125;</span><br><span class="line"><span class="comment">// arrow function</span></span><br><span class="line"><span class="keyword">let</span> <span class="title function_">foo5</span> = (<span class="params">a, b</span>) =&gt; &#123;</span><br><span class="line">  <span class="keyword">return</span> &#123; <span class="attr">sum</span>: a + b &#125;;</span><br><span class="line">&#125;;</span><br><span class="line"><span class="comment">// add () so you can skip &#123; &#125; and return</span></span><br><span class="line"><span class="keyword">let</span> <span class="title function_">foo6</span> = (<span class="params">a, b</span>) =&gt; (&#123; <span class="attr">sum</span>: a + b &#125;);</span><br><span class="line"></span><br><span class="line"><span class="variable language_">console</span>.<span class="title function_">log</span>(<span class="string">&quot;foo4(1,2) is&quot;</span>, <span class="title function_">foo4</span>(<span class="number">1</span>, <span class="number">2</span>));</span><br><span class="line"><span class="variable language_">console</span>.<span class="title function_">log</span>(<span class="string">&quot;foo5(1,2) is&quot;</span>, <span class="title function_">foo5</span>(<span class="number">1</span>, <span class="number">2</span>));</span><br><span class="line"><span class="variable language_">console</span>.<span class="title function_">log</span>(<span class="string">&quot;foo6(1,2) is&quot;</span>, <span class="title function_">foo6</span>(<span class="number">1</span>, <span class="number">2</span>));</span><br></pre></td></tr></table></figure>
+
+<h2 id="科里-Curry-化函數"><a href="#科里-Curry-化函數" class="headerlink" title="科里(Curry)化函數"></a>科里(Curry)化函數</h2><figure class="highlight javascript"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment">//return function, execute foo7(1,2)()</span></span><br><span class="line"><span class="keyword">let</span> <span class="title function_">foo7</span> = (<span class="params">a, b</span>) =&gt; <span class="function">() =&gt;</span> a + b;</span><br><span class="line"><span class="variable language_">console</span>.<span class="title function_">log</span>(<span class="string">&quot;foo7(1,2) is&quot;</span>, <span class="title function_">foo7</span>(<span class="number">1</span>, <span class="number">2</span>)());</span><br><span class="line"><span class="comment">//curry</span></span><br><span class="line"><span class="keyword">let</span> <span class="title function_">foo8</span> = (<span class="params">a</span>) =&gt; <span class="function">(<span class="params">b</span>) =&gt;</span> a + b;</span><br><span class="line"><span class="variable language_">console</span>.<span class="title function_">log</span>(<span class="string">&quot;foo8(1,2) is&quot;</span>, <span class="title function_">foo8</span>(<span class="number">1</span>)(<span class="number">2</span>));</span><br></pre></td></tr></table></figure>
+
+<p>(fin)</p>
+
+      
+    </div>
+    <footer class="article-footer">
+      <a data-url="https://blog.marsen.me/2022/01/13/2022/javascript_function/" data-id="cuidHGC71_tdre70StNOcxFLq" class="article-share-link">Share</a>
+      
+        <a href="https://blog.marsen.me/2022/01/13/2022/javascript_function/#disqus_thread" class="article-comment-link">留言</a>
+      
+      
+    </footer>
+  </div>
+  
+</article>
+
+
+  
     <article id="post-2022/comfortable_zone" class="article article-type-post" itemscope itemprop="blogPost">
   <div class="article-meta">
     <a href="/2022/01/13/2022/comfortable_zone/" class="article-date">
@@ -259,7 +823,7 @@ j=d.createElement(s),dl=l!='dataLayer'?'&l='+l:'';j.async=true;j.src=
       
     </div>
     <footer class="article-footer">
-      <a data-url="https://blog.marsen.me/2022/01/13/2022/comfortable_zone/" data-id="cuidsoeO4OOuLd--c_f6OB4EO" class="article-share-link">Share</a>
+      <a data-url="https://blog.marsen.me/2022/01/13/2022/comfortable_zone/" data-id="cuidoG3cytc41wD81M5WJNDtb" class="article-share-link">Share</a>
       
         <a href="https://blog.marsen.me/2022/01/13/2022/comfortable_zone/#disqus_thread" class="article-comment-link">留言</a>
       
@@ -348,7 +912,7 @@ j=d.createElement(s),dl=l!='dataLayer'?'&l='+l:'';j.async=true;j.src=
       
     </div>
     <footer class="article-footer">
-      <a data-url="https://blog.marsen.me/2021/12/22/2021/gcp_cloud_learn/" data-id="cuidKPUslS8teDUAmzf2Cbggw" class="article-share-link">Share</a>
+      <a data-url="https://blog.marsen.me/2021/12/22/2021/gcp_cloud_learn/" data-id="cuidiTwkJtbB5KkDUFOfCBPKs" class="article-share-link">Share</a>
       
         <a href="https://blog.marsen.me/2021/12/22/2021/gcp_cloud_learn/#disqus_thread" class="article-comment-link">留言</a>
       
@@ -524,7 +1088,7 @@ j=d.createElement(s),dl=l!='dataLayer'?'&l='+l:'';j.async=true;j.src=
       
     </div>
     <footer class="article-footer">
-      <a data-url="https://blog.marsen.me/2021/12/03/2021/gitlab_cicd_learn/" data-id="cuid8sMhhdyNp4ISjeUGCPzGH" class="article-share-link">Share</a>
+      <a data-url="https://blog.marsen.me/2021/12/03/2021/gitlab_cicd_learn/" data-id="cuidKc-ZyaRY5-aa9t8pcd_ic" class="article-share-link">Share</a>
       
         <a href="https://blog.marsen.me/2021/12/03/2021/gitlab_cicd_learn/#disqus_thread" class="article-comment-link">留言</a>
       
@@ -577,505 +1141,9 @@ j=d.createElement(s),dl=l!='dataLayer'?'&l='+l:'';j.async=true;j.src=
       
     </div>
     <footer class="article-footer">
-      <a data-url="https://blog.marsen.me/2021/11/05/2021/terminal_split_string/" data-id="cuidZ7JPyjjJCFXpm36JcroSQ" class="article-share-link">Share</a>
+      <a data-url="https://blog.marsen.me/2021/11/05/2021/terminal_split_string/" data-id="cuidZ1NGBAnwtHJrMUVFZNIO0" class="article-share-link">Share</a>
       
         <a href="https://blog.marsen.me/2021/11/05/2021/terminal_split_string/#disqus_thread" class="article-comment-link">留言</a>
-      
-      
-  <ul class="article-tag-list" itemprop="keywords"><li class="article-tag-list-item"><a class="article-tag-list-link" href="/tags/%E5%AF%A6%E4%BD%9C%E7%AD%86%E8%A8%98/" rel="tag">實作筆記</a></li></ul>
-
-    </footer>
-  </div>
-  
-</article>
-
-
-  
-    <article id="post-2021/mac_m1_with_mysql" class="article article-type-post" itemscope itemprop="blogPost">
-  <div class="article-meta">
-    <a href="/2021/11/05/2021/mac_m1_with_mysql/" class="article-date">
-  <time datetime="2021-11-05T03:31:07.000Z" itemprop="datePublished">2021-11-05</time>
-</a>
-    
-  </div>
-  <div class="article-inner">
-    
-    
-      <header class="article-header">
-        
-  
-    <h1 itemprop="name">
-      <a class="article-title" href="/2021/11/05/2021/mac_m1_with_mysql/"> [踩雷筆記] MacBook M1 silicon X Docker X MySQL Image</a>
-    </h1>
-  
-
-      </header>
-    
-    <div class="article-entry" itemprop="articleBody">
-      
-        <h2 id="前情提要"><a href="#前情提要" class="headerlink" title="前情提要"></a>前情提要</h2><p>新工作配發了新的 MacBook 搭載最新的 M1 晶片,<br>沒想到反而遇到了許多問題, 不會有太多的文字說明,<br>僅用來記錄我實作有效的解決方法</p>
-<h3 id="情境-在-Docker-跑-MySQL"><a href="#情境-在-Docker-跑-MySQL" class="headerlink" title="情境:在 Docker 跑 MySQL"></a>情境:在 Docker 跑 MySQL</h3><p>當執行以下語法時，</p>
-<figure class="highlight shell"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">docker pull mysql </span><br></pre></td></tr></table></figure>
-
-<p>會得到錯誤訊息如下</p>
-<p>no matching manifest for linux&#x2F;arm64&#x2F;v8 in the manifest list entries</p>
-<h2 id="解決方案"><a href="#解決方案" class="headerlink" title="解決方案"></a>解決方案</h2><h3 id="拉取映像檔"><a href="#拉取映像檔" class="headerlink" title="拉取映像檔"></a>拉取映像檔</h3><blockquote>
-<p>docker pull mysql&#x2F;mysql-server:latest</p>
-</blockquote>
-<h3 id="建立-mysql-container"><a href="#建立-mysql-container" class="headerlink" title="建立 mysql container"></a>建立 mysql container</h3><blockquote>
-<p>docker run -d –name mysql -p 3306:3306 mysql&#x2F;mysql-server:latest</p>
-</blockquote>
-<h3 id="取得原始-root-密碼"><a href="#取得原始-root-密碼" class="headerlink" title="取得原始 root 密碼"></a>取得原始 root 密碼</h3><blockquote>
-<p>docker logs mysql 2&gt;&amp;1 | grep GENERATED  </p>
-</blockquote>
-<p>[Entrypoint] GENERATED ROOT PASSWORD: mysql_password_shows_here</p>
-<h3 id="連線至-container-的-image-執行-mysql-指令"><a href="#連線至-container-的-image-執行-mysql-指令" class="headerlink" title="連線至 container 的 image 執行 mysql 指令"></a>連線至 container 的 image 執行 mysql 指令</h3><blockquote>
-<p>docker exec -it mysql bash</p>
-</blockquote>
-<h3 id="使用原始-root-密碼登入-mysql"><a href="#使用原始-root-密碼登入-mysql" class="headerlink" title="使用原始 root 密碼登入 mysql"></a>使用原始 root 密碼登入 mysql</h3><blockquote>
-<p>mysql -u root -p<br>Enter password:</p>
-</blockquote>
-<p>輸入原始的 root 密碼後，<br>會看到畫面如下:</p>
-<blockquote>
-<p>Welcome to the MySQL monitor.  Commands end with ; or \g.<br>Your MySQL connection id is 25<br>Server version: 8.0.27  </p>
-<p>Copyright (c) 2000, 2021, Oracle and&#x2F;or its affiliates.  </p>
-<p>Oracle is a registered trademark of Oracle Corporation and&#x2F;or its<br>affiliates. Other names may be trademarks of their respective owners.  </p>
-<p>Type ‘help;’ or ‘\h’ for help. Type ‘\c’ to clear the current input statement.  </p>
-</blockquote>
-<h3 id="重設密碼"><a href="#重設密碼" class="headerlink" title="重設密碼"></a>重設密碼</h3><blockquote>
-<p>ALTER USER USER() IDENTIFIED BY ‘password’;</p>
-</blockquote>
-<h3 id="授權"><a href="#授權" class="headerlink" title="授權"></a>授權</h3><blockquote>
-<p>CREATE USER ‘root‘@’%’ IDENTIFIED BY ‘root’;<br>GRANT ALL ON <em>.</em> TO ‘root‘@’%’;<br>flush privileges;</p>
-</blockquote>
-<h3 id="修改-root-密碼"><a href="#修改-root-密碼" class="headerlink" title="修改 root 密碼"></a>修改 root 密碼</h3><blockquote>
-<p>ALTER USER ‘root‘@’%’ IDENTIFIED WITH mysql_native_password BY ‘password’;<br>flush privileges;</p>
-</blockquote>
-<p>(fin)</p>
-
-      
-    </div>
-    <footer class="article-footer">
-      <a data-url="https://blog.marsen.me/2021/11/05/2021/mac_m1_with_mysql/" data-id="cuidvBsMxKoWbZV_JCqtvZjHF" class="article-share-link">Share</a>
-      
-        <a href="https://blog.marsen.me/2021/11/05/2021/mac_m1_with_mysql/#disqus_thread" class="article-comment-link">留言</a>
-      
-      
-    </footer>
-  </div>
-  
-</article>
-
-
-  
-    <article id="post-2021/react_route_3_rendering_method" class="article article-type-post" itemscope itemprop="blogPost">
-  <div class="article-meta">
-    <a href="/2021/10/12/2021/react_route_3_rendering_method/" class="article-date">
-  <time datetime="2021-10-12T03:24:46.000Z" itemprop="datePublished">2021-10-12</time>
-</a>
-    
-  </div>
-  <div class="article-inner">
-    
-    
-      <header class="article-header">
-        
-  
-    <h1 itemprop="name">
-      <a class="article-title" href="/2021/10/12/2021/react_route_3_rendering_method/"> [翻譯] react-router 的三種渲染方法(component、render、children)</a>
-    </h1>
-  
-
-      </header>
-    
-    <div class="article-entry" itemprop="articleBody">
-      
-        <h2 id="前情提要"><a href="#前情提要" class="headerlink" title="前情提要"></a>前情提要</h2><p>本文內容大量參考此<a target="_blank" rel="noopener" href="https://dev.to/raaynaldo/react-router-three-route-rendering-methods-component-render-and-children-2eng">系列文章</a>, 僅作記錄之使用。<br>在學習 React 的過程中, 我們需要處理瀏覽器的網址(URL)與頁面之間的關係,<br>目前(2021 年)主流的作法，就是使用 react-router 這個 library,<br>其中有三個類似的方法</p>
-<h2 id="Rendering-Method"><a href="#Rendering-Method" class="headerlink" title="Rendering Method"></a>Rendering Method</h2><h3 id="component"><a href="#component" class="headerlink" title="component"></a>component</h3><p>使用方法:</p>
-<figure class="highlight jsx"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br></pre></td><td class="code"><pre><span class="line">&lt;<span class="title class_">Route</span> path=<span class="string">&quot;/&quot;</span> component=&#123;<span class="title class_">Home</span>&#125; /&gt;</span><br><span class="line"><span class="comment">//Same as</span></span><br><span class="line"><span class="language-xml"><span class="tag">&lt;<span class="name">Route</span> <span class="attr">path</span>=<span class="string">&quot;/&quot;</span> &gt;</span></span></span><br><span class="line"><span class="language-xml">  <span class="tag">&lt;<span class="name">Home</span> /&gt;</span></span></span><br><span class="line"><span class="language-xml"><span class="tag">&lt;/<span class="name">Route</span>&gt;</span></span></span><br></pre></td></tr></table></figure>
-
-<p>這個方法的缺點是並沒有提供傳遞 <code>props</code> 的 API</p>
-<figure class="highlight jsx"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">const</span> <span class="title function_">Home</span> = (<span class="params">props</span>) =&gt; &#123;</span><br><span class="line">  <span class="variable language_">console</span>.<span class="title function_">log</span>(props);</span><br><span class="line">  <span class="keyword">return</span> <span class="language-xml"><span class="tag">&lt;<span class="name">div</span>&gt;</span>Home<span class="tag">&lt;/<span class="name">div</span>&gt;</span></span>;</span><br><span class="line">&#125;;</span><br></pre></td></tr></table></figure>
-
-<h3 id="render"><a href="#render" class="headerlink" title="render"></a>render</h3><p>Render 這方法要求你使用一個傳入一個回傳 component 的方法,<br>我們可以透過方法參數傳遞 <code>props</code></p>
-<figure class="highlight jsx"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br></pre></td><td class="code"><pre><span class="line">&lt;<span class="title class_">Route</span></span><br><span class="line">path=<span class="string">&quot;/contact&quot;</span></span><br><span class="line">render=&#123;<span class="function">(<span class="params">routeProps</span>) =&gt;</span> &#123;</span><br><span class="line">  <span class="keyword">return</span> <span class="language-xml"><span class="tag">&lt;<span class="name">Contact</span> <span class="attr">name</span>=<span class="string">&#123;name&#125;</span> <span class="attr">address</span>=<span class="string">&#123;address&#125;</span> &#123;<span class="attr">...routeProps</span>&#125; /&gt;</span></span>;</span><br><span class="line">&#125;&#125;</span><br><span class="line">/&gt;</span><br></pre></td></tr></table></figure>
-
-<h3 id="children"><a href="#children" class="headerlink" title="children"></a>children</h3><p>基本上使用方式與 <code>render</code> 並無二致,<br>最大的差異在染渲邏輯，<code>children</code> 在路由不匹配的時候, 仍然會顯示,<br>以下例子在使用者輸入 <code>/</code> 會顯示 <code>Portfolio</code> 與 <code>Contact</code></p>
-<figure class="highlight jsx"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br></pre></td><td class="code"><pre><span class="line">&lt;<span class="title class_">Route</span> path=<span class="string">&quot;/&quot;</span> exact component=&#123;<span class="title class_">Home</span>&#125; /&gt;</span><br><span class="line"><span class="language-xml"><span class="tag">&lt;<span class="name">Route</span> <span class="attr">path</span>=<span class="string">&quot;/about&quot;</span> <span class="attr">render</span>=<span class="string">&#123;()</span> =&gt;</span> <span class="tag">&lt;<span class="name">About</span>&gt;</span><span class="tag">&lt;/<span class="name">About</span>&gt;</span>&#125; /&gt;</span></span><br><span class="line"><span class="language-xml"><span class="tag">&lt;<span class="name">Route</span> <span class="attr">path</span>=<span class="string">&quot;/portfolio&quot;</span> <span class="attr">children</span>=<span class="string">&#123;()</span> =&gt;</span> <span class="tag">&lt;<span class="name">Portfolio</span>&gt;</span><span class="tag">&lt;/<span class="name">Portfolio</span>&gt;</span>&#125; /&gt;</span></span><br><span class="line"><span class="language-xml"><span class="tag">&lt;<span class="name">Route</span> <span class="attr">path</span>=<span class="string">&quot;/contact&quot;</span> <span class="attr">children</span>=<span class="string">&#123;()</span> =&gt;</span> <span class="tag">&lt;<span class="name">Contact</span>&gt;</span><span class="tag">&lt;/<span class="name">Contact</span>&gt;</span>&#125; /&gt;</span></span><br></pre></td></tr></table></figure>
-
-<h2 id="參考"><a href="#參考" class="headerlink" title="參考"></a>參考</h2><ul>
-<li><a target="_blank" rel="noopener" href="https://dev.to/raaynaldo/react-router-three-route-rendering-methods-component-render-and-children-2eng">Rendering Methods (component, render, and children)react-router: Three Route Rendering Methods (component, render, and children)</a></li>
-</ul>
-<p>(fin)</p>
-
-      
-    </div>
-    <footer class="article-footer">
-      <a data-url="https://blog.marsen.me/2021/10/12/2021/react_route_3_rendering_method/" data-id="cuidQesiBf8Bhhiw8C2WyhXHE" class="article-share-link">Share</a>
-      
-        <a href="https://blog.marsen.me/2021/10/12/2021/react_route_3_rendering_method/#disqus_thread" class="article-comment-link">留言</a>
-      
-      
-    </footer>
-  </div>
-  
-</article>
-
-
-  
-    <article id="post-2021/i18next_config_setting" class="article article-type-post" itemscope itemprop="blogPost">
-  <div class="article-meta">
-    <a href="/2021/10/04/2021/i18next_config_setting/" class="article-date">
-  <time datetime="2021-10-04T01:52:15.000Z" itemprop="datePublished">2021-10-04</time>
-</a>
-    
-  </div>
-  <div class="article-inner">
-    
-    
-      <header class="article-header">
-        
-  
-    <h1 itemprop="name">
-      <a class="article-title" href="/2021/10/04/2021/i18next_config_setting/"> [實作筆記] 前端置多語系 i18next </a>
-    </h1>
-  
-
-      </header>
-    
-    <div class="article-entry" itemprop="articleBody">
-      
-        <h2 id="前情提要"><a href="#前情提要" class="headerlink" title="前情提要"></a>前情提要</h2><p>多語系是國際化的專案很重要的一部份,<br>這次有機會接觸到國際化的前端的案子,<br>記錄一下前端主流的 i18next 如何設定。</p>
-<h2 id="設定"><a href="#設定" class="headerlink" title="設定"></a>設定</h2><ol>
-<li><p>安裝 i18n</p>
-<figure class="highlight shell"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br></pre></td><td class="code"><pre><span class="line"><span class="meta prompt_"># </span><span class="language-bash">npm</span></span><br><span class="line"><span class="meta prompt_">$ </span><span class="language-bash">npm install i18next --save</span></span><br><span class="line"><span class="meta prompt_"></span></span><br><span class="line"><span class="meta prompt_"># </span><span class="language-bash">yarn</span></span><br><span class="line"><span class="meta prompt_">$ </span><span class="language-bash">yarn add i18next</span></span><br></pre></td></tr></table></figure>
-</li>
-<li><p>準備多語系 JSON 檔, 為 Key-Value 形式, Value 為 string<br>允許巢狀, 範例如下:</p>
-<figure class="highlight json"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br></pre></td><td class="code"><pre><span class="line"><span class="punctuation">&#123;</span></span><br><span class="line">  <span class="attr">&quot;zh&quot;</span><span class="punctuation">:</span> <span class="punctuation">&#123;</span></span><br><span class="line">    <span class="attr">&quot;Week&quot;</span><span class="punctuation">:</span> <span class="punctuation">&#123;</span></span><br><span class="line">      <span class="attr">&quot;Monday&quot;</span><span class="punctuation">:</span> <span class="string">&quot;周一&quot;</span><span class="punctuation">,</span></span><br><span class="line">      <span class="attr">&quot;Tuesday&quot;</span><span class="punctuation">:</span> <span class="string">&quot;周二&quot;</span><span class="punctuation">,</span></span><br><span class="line">      <span class="attr">&quot;Wednesday&quot;</span><span class="punctuation">:</span> <span class="string">&quot;周三&quot;</span><span class="punctuation">,</span></span><br><span class="line">      <span class="attr">&quot;Thursday&quot;</span><span class="punctuation">:</span> <span class="string">&quot;周四&quot;</span><span class="punctuation">,</span></span><br><span class="line">      <span class="attr">&quot;Friday&quot;</span><span class="punctuation">:</span> <span class="string">&quot;周五&quot;</span><span class="punctuation">,</span></span><br><span class="line">      <span class="attr">&quot;Saturday&quot;</span><span class="punctuation">:</span> <span class="string">&quot;周六&quot;</span><span class="punctuation">,</span></span><br><span class="line">      <span class="attr">&quot;Sunday&quot;</span><span class="punctuation">:</span> <span class="string">&quot;周日&quot;</span></span><br><span class="line">    <span class="punctuation">&#125;</span></span><br><span class="line">  <span class="punctuation">&#125;</span><span class="punctuation">,</span></span><br><span class="line">  <span class="attr">&quot;es&quot;</span><span class="punctuation">:</span> <span class="punctuation">&#123;</span></span><br><span class="line">    <span class="attr">&quot;Week&quot;</span><span class="punctuation">:</span> <span class="punctuation">&#123;</span></span><br><span class="line">      <span class="attr">&quot;Monday&quot;</span><span class="punctuation">:</span> <span class="string">&quot;Monday&quot;</span><span class="punctuation">,</span></span><br><span class="line">      <span class="attr">&quot;Tuesday&quot;</span><span class="punctuation">:</span> <span class="string">&quot;Tuesday&quot;</span><span class="punctuation">,</span></span><br><span class="line">      <span class="attr">&quot;Wednesday&quot;</span><span class="punctuation">:</span> <span class="string">&quot;Wednesday&quot;</span><span class="punctuation">,</span></span><br><span class="line">      <span class="attr">&quot;Thursday&quot;</span><span class="punctuation">:</span> <span class="string">&quot;Thursday&quot;</span><span class="punctuation">,</span></span><br><span class="line">      <span class="attr">&quot;Friday&quot;</span><span class="punctuation">:</span> <span class="string">&quot;Friday&quot;</span><span class="punctuation">,</span></span><br><span class="line">      <span class="attr">&quot;Saturday&quot;</span><span class="punctuation">:</span> <span class="string">&quot;Saturday&quot;</span><span class="punctuation">,</span></span><br><span class="line">      <span class="attr">&quot;Sunday&quot;</span><span class="punctuation">:</span> <span class="string">&quot;Sunday&quot;</span></span><br><span class="line">    <span class="punctuation">&#125;</span></span><br><span class="line">  <span class="punctuation">&#125;</span></span><br><span class="line"><span class="punctuation">&#125;</span></span><br></pre></td></tr></table></figure>
-</li>
-<li><p>起始設定</p>
-<figure class="highlight js"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">import</span> i18next <span class="keyword">from</span> <span class="string">&quot;i18next&quot;</span>;</span><br><span class="line"><span class="keyword">import</span> resources <span class="keyword">from</span> <span class="string">&quot;./resources&quot;</span>; <span class="comment">// 載入上一步的 JSON 檔</span></span><br><span class="line"></span><br><span class="line">i18next.<span class="title function_">init</span>(&#123;</span><br><span class="line">  <span class="attr">lng</span>: <span class="string">&quot;zh&quot;</span>, <span class="comment">// 預設語言</span></span><br><span class="line">  <span class="attr">debug</span>: <span class="literal">true</span>,</span><br><span class="line">  <span class="attr">resources</span>: resources,</span><br><span class="line">&#125;);</span><br><span class="line"></span><br><span class="line"><span class="comment">// 使用方式</span></span><br><span class="line"><span class="variable language_">document</span>.<span class="title function_">getElementById</span>(<span class="string">&quot;output&quot;</span>).<span class="property">innerHTML</span> = i18next.<span class="title function_">t</span>(<span class="string">&quot;Week.Sunday&quot;</span>);</span><br></pre></td></tr></table></figure>
-</li>
-<li><p>追加 React 設定</p>
-<figure class="highlight javascript"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">import</span> <span class="title class_">React</span> <span class="keyword">from</span> <span class="string">&quot;react&quot;</span>;</span><br><span class="line"><span class="keyword">import</span> i18n <span class="keyword">from</span> <span class="string">&quot;i18next&quot;</span>;</span><br><span class="line"><span class="keyword">import</span> &#123; useTranslation, initReactI18next &#125; <span class="keyword">from</span> <span class="string">&quot;react-i18next&quot;</span>;</span><br><span class="line"><span class="keyword">import</span> resources <span class="keyword">from</span> <span class="string">&quot;./resources&quot;</span>; <span class="comment">// 載入上一步的 JSON 檔</span></span><br><span class="line"></span><br><span class="line">i18n</span><br><span class="line">  .<span class="title function_">use</span>(initReactI18next) <span class="comment">// passes i18n down to react-i18next</span></span><br><span class="line">  .<span class="title function_">init</span>(&#123;</span><br><span class="line">    <span class="attr">resources</span>: resources,</span><br><span class="line">    <span class="attr">lng</span>: <span class="string">&quot;en&quot;</span>, <span class="comment">// if you&#x27;re using a language detector, do not define the lng option</span></span><br><span class="line">    <span class="attr">fallbackLng</span>: <span class="string">&quot;en&quot;</span>,</span><br><span class="line">    <span class="attr">interpolation</span>: &#123;</span><br><span class="line">      <span class="attr">escapeValue</span>: <span class="literal">false</span>, <span class="comment">// react already safes from xss =&gt; https://www.i18next.com/translation-function/interpolation#unescape</span></span><br><span class="line">    &#125;,</span><br><span class="line">  &#125;);</span><br></pre></td></tr></table></figure>
-
-<p>在 React 中使用</p>
-<figure class="highlight javascript"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">import</span> <span class="title class_">ReactDOM</span> <span class="keyword">from</span> <span class="string">&quot;react-dom&quot;</span>;</span><br><span class="line"><span class="keyword">function</span> <span class="title function_">App</span>(<span class="params"></span>) &#123;</span><br><span class="line">  <span class="keyword">const</span> &#123; t &#125; = <span class="title function_">useTranslation</span>();</span><br><span class="line">  <span class="keyword">return</span> <span class="language-xml"><span class="tag">&lt;<span class="name">h2</span>&gt;</span>&#123;t(&quot;Week.Sunday&quot;)&#125;<span class="tag">&lt;/<span class="name">h2</span>&gt;</span></span>;</span><br><span class="line">&#125;</span><br><span class="line"></span><br><span class="line"><span class="comment">// append app to dom</span></span><br><span class="line"><span class="title class_">ReactDOM</span>.<span class="title function_">render</span>(<span class="language-xml"><span class="tag">&lt;<span class="name">App</span> /&gt;</span></span>, <span class="variable language_">document</span>.<span class="title function_">getElementById</span>(<span class="string">&quot;root&quot;</span>));</span><br></pre></td></tr></table></figure></li>
-</ol>
-<p>其它 <a target="_blank" rel="noopener" href="https://www.i18next.com/overview/supported-frameworks">Framework</a> 請參考</p>
-<h2 id="參考"><a href="#參考" class="headerlink" title="參考"></a>參考</h2><ul>
-<li><a target="_blank" rel="noopener" href="https://www.i18next.com/">i18next</a></li>
-<li><a target="_blank" rel="noopener" href="https://react.i18next.com/">react-i18next</a></li>
-</ul>
-<p>(fin)</p>
-
-      
-    </div>
-    <footer class="article-footer">
-      <a data-url="https://blog.marsen.me/2021/10/04/2021/i18next_config_setting/" data-id="cuidZkCgJp5MLBNdvs8KBcSjw" class="article-share-link">Share</a>
-      
-        <a href="https://blog.marsen.me/2021/10/04/2021/i18next_config_setting/#disqus_thread" class="article-comment-link">留言</a>
-      
-      
-  <ul class="article-tag-list" itemprop="keywords"><li class="article-tag-list-item"><a class="article-tag-list-link" href="/tags/%E5%AF%A6%E4%BD%9C%E7%AD%86%E8%A8%98/" rel="tag">實作筆記</a></li></ul>
-
-    </footer>
-  </div>
-  
-</article>
-
-
-  
-    <article id="post-2021/lastpass_to_bitwarden" class="article article-type-post" itemscope itemprop="blogPost">
-  <div class="article-meta">
-    <a href="/2021/09/14/2021/lastpass_to_bitwarden/" class="article-date">
-  <time datetime="2021-09-14T01:15:44.000Z" itemprop="datePublished">2021-09-14</time>
-</a>
-    
-  </div>
-  <div class="article-inner">
-    
-    
-      <header class="article-header">
-        
-  
-    <h1 itemprop="name">
-      <a class="article-title" href="/2021/09/14/2021/lastpass_to_bitwarden/"> [生活筆記] 拋棄 LastPass 擁抱 BitWarden</a>
-    </h1>
-  
-
-      </header>
-    
-    <div class="article-entry" itemprop="articleBody">
-      
-        <h2 id="前情提要"><a href="#前情提要" class="headerlink" title="前情提要"></a>前情提要</h2><p>2021 年 3 月, 看到了一則新聞, 指出 LastPass 將改變它們的經營策略,<br>免費版本將只支援一種裝置, 行動裝置或電腦。<br>產品收費是天經地義, 但消費者找尋更高性價比的產品也是。<br>讓我想離開 LastPass 的主因在於, 突襲式的宣布讓我幾乎沒有反應時間,<br>免費版的限制太過苛刻, 一樣在限制裝置的功能上,<br>EverNote 這款筆記軟體也是逐步降低免費版本可跨平台的數量。<br>但是 LastPass 更狠, 瞬間降到僅限一種, 這基本上是在玩文字遊戲,<br>因為大多數的人應該都同時具備手機與個人電腦, 一般上族班只能被迫選擇電腦,<br>或是付費了事。付費當然不是問題, 但宣告期極短且粗爆的方式讓人覺得被當韭菜割。  </p>
-<p>當我稍微作了一下功課, 發現這類的服務已經多如繁星, 甚至內建在作業系統或是瀏覽器之中。<br>再進一步比較功能, 與自已所需要的功能(密碼保管、密碼產生器、跨裝置etc…)<br>有更多免費的軟體已經能滿足我的需求，比如說: BitWarden  </p>
-<h2 id="比較心得"><a href="#比較心得" class="headerlink" title="比較心得"></a>比較心得</h2><p>BitWarden 的好處，  </p>
-<ol>
-<li>免費帳戶即可跨裝置存取密碼  </li>
-<li>可以匯入 LastPass 匯出的密碼</li>
-<li>有密碼產生器</li>
-<li>有瀏覽器外掛，支援自動填入</li>
-<li>開源方案</li>
-</ol>
-<p>最後一點我是覺得最吸引我的地方，這表示如果你有一定的程式語言能力，<br>你將可以自行搭建一個密碼管理的伺服器，這點甚至對企業也是有相當的吸引力，<br>而 BitWarden 使用的語言為 TypeScript、C# 與 Python。  </p>
-<p>在轉換上是非常容易的，可以在一小時內完成這項<a target="_blank" rel="noopener" href="https://free.com.tw/migrate-passwords-from-lastpass-to-bitwarden/">作業</a>，<br>實務操作上也沒有遇到太大的困難，除了原本 LastPass 右鍵產生密碼的方式，在 BitWarden 上面沒有外，<br>其它功能或是外觀設計上，我都覺得 BitWarden 的表現更加優秀，<br>甚至有點相見恨晚的感覺。  </p>
-<p>至於沒有的功能，不是什麼大事，而且開源專案誰都可替他加上這個功能。<br>但對我來說，我已經忘了 LastPass 有什麼優點，<br>轉移到了 BitWarden 6 個月，從未再次開啟，於是今天正式將帳號刪除了。  </p>
-<h2 id="參考"><a href="#參考" class="headerlink" title="參考"></a>參考</h2><ul>
-<li><a target="_blank" rel="noopener" href="https://free.com.tw/migrate-passwords-from-lastpass-to-bitwarden/">從 LastPass 匯出密碼、移轉到 BitWarden 密碼管理工具教學</a></li>
-<li><a target="_blank" rel="noopener" href="https://infosecdecompress.com/posts/patches_password_manager_transfer_tutorial">密碼管理器搬家教學 - LastPass to BitWarden</a></li>
-<li><a target="_blank" rel="noopener" href="https://www.ithome.com.tw/news/142967">LastPass 被發現用了 7 個第三方追蹤程式</a></li>
-</ul>
-<p>(fin)</p>
-
-      
-    </div>
-    <footer class="article-footer">
-      <a data-url="https://blog.marsen.me/2021/09/14/2021/lastpass_to_bitwarden/" data-id="cuidf-7e-lMeLGK_dNBj21ctg" class="article-share-link">Share</a>
-      
-        <a href="https://blog.marsen.me/2021/09/14/2021/lastpass_to_bitwarden/#disqus_thread" class="article-comment-link">留言</a>
-      
-      
-    </footer>
-  </div>
-  
-</article>
-
-
-  
-    <article id="post-2021/azure_function_app_identity_key_vault" class="article article-type-post" itemscope itemprop="blogPost">
-  <div class="article-meta">
-    <a href="/2021/08/24/2021/azure_function_app_identity_key_vault/" class="article-date">
-  <time datetime="2021-08-24T00:51:43.000Z" itemprop="datePublished">2021-08-24</time>
-</a>
-    
-  </div>
-  <div class="article-inner">
-    
-    
-      <header class="article-header">
-        
-  
-    <h1 itemprop="name">
-      <a class="article-title" href="/2021/08/24/2021/azure_function_app_identity_key_vault/"> [實作筆記] Azure Functions 存取 Key Vault</a>
-    </h1>
-  
-
-      </header>
-    
-    <div class="article-entry" itemprop="articleBody">
-      
-        <h2 id="前情提要"><a href="#前情提要" class="headerlink" title="前情提要"></a>前情提要</h2><p>新的工作有機會接觸到微軟的 Azure Cloud 服務,<br>包含 AWS 、 GCP 的話，世界的三大雲服務都碰過一輪了,<br>不過也只是皮毛而已, 紀錄下來免得遺忘 .</p>
-<p>說明一下需求，在實作授權的</p>
-<p>在這裡我會使用到 Azure Cloud 的三個服務,</p>
-<ol>
-<li><a target="_blank" rel="noopener" href="https://docs.microsoft.com/en-us/azure/azure-functions/functions-overview">Azure Functions</a></li>
-<li><a target="_blank" rel="noopener" href="https://docs.microsoft.com/en-us/azure/active-directory/managed-identities-azure-resources/overview">Managed Identity</a></li>
-<li><a target="_blank" rel="noopener" href="https://docs.microsoft.com/en-us/azure/key-vault/general/overview">Key Vault</a></li>
-</ol>
-<h3 id="使用的服務簡介-TL-DR"><a href="#使用的服務簡介-TL-DR" class="headerlink" title="使用的服務簡介 TL;DR"></a>使用的服務簡介 TL;DR</h3><blockquote>
-<p>說明一下我理解的三個服務:</p>
-<p>Azure Functions 是微軟無伺服器(Serverless),<br>Serverless 的概念是讓開發人員專注開發, 減少對伺服器維運的成本,<br>並且提供極度彈性的可擴展性，並且可以使用更少的資源(更低的成本),<br>最大的限制是<a target="_blank" rel="noopener" href="https://docs.microsoft.com/en-us/azure/azure-functions/functions-host-json#functiontimeout">運算時間(timeout)</a>,<br>但就我個人而言的 Best Practice 在 300 秒內完成不了的運算, 應考量整體架構的瓶頸在哪裡,<br>而不是採取無限制的付費方案(Plan Type)。<br>稍微作個 ORK 評量，應該在 0.2 | 10 | 300 秒內完成計算。</p>
-<p>Managed Identity 是微軟用來作身份認証與授權的服務,<br>與其它雲服務最大的差別應該是它是基於 Azure Active Directory (Azure AD) 之上,<br>一般來說會建議使用遵循(Role-based Access Control),<br>下面的圖片很好的說明了其概念。</p>
-<p><img src="https://docs.microsoft.com/zh-tw/azure/active-directory/managed-identities-azure-resources/media/overview/when-use-managed-identities.png" alt="如何使用適用於 Azure 資源的受控識別？"></p>
-<p>Key Vault 是個相對簡單的概念, 在開發中我們會接觸到需多的密鑰、証書、連線字串等等資訊…<br>這些資訊有敏感性, 但對開發過程又不是最重要的東西,<br>這些資訊在單體架構(Monolithic)時常常面臨開發與資安的兩難,<br>而 Key Vault 可以解決這個問題(當然不同的 Cloud 也有類似的解決方案)</p>
-</blockquote>
-<h3 id="案例說明"><a href="#案例說明" class="headerlink" title="案例說明"></a>案例說明</h3><p>這次的案例，使用者會在瀏覽器提供給我們一組 Token ,<br>而我們會拿這組 Token 與第三方互動換回我們需要的 Key,<br>最後我們會把這組 Key 存進 Key Vault 給其它服務使用.<br><img src="/images/2021/function_app_key_vault_flow.png" alt="流程簡介"></p>
-<p>你可能會好奇, 在上圖中 Managed Identity 扮演的角色為何 ?<br>就是在 Function Apps 存取 Key Vault 這一段,<br>我們將提供一組 Identity 給 Function Apps 讓它有權限存取 Key Vault .</p>
-<h2 id="實作"><a href="#實作" class="headerlink" title="實作"></a>實作</h2><p>我將步驟大致分為以下幾步</p>
-<ol>
-<li>建立 Function App 與 function</li>
-<li>啟用 Function App 的 Managed Identity</li>
-<li>建立 Key Vault</li>
-<li>設定 Key Vault Access policies</li>
-<li>設定 Function App Configuration</li>
-<li>修改 Function</li>
-</ol>
-<p>讓我們開始吧.</p>
-<h3 id="建立-Function-Apps-與-function"><a href="#建立-Function-Apps-與-function" class="headerlink" title="建立 Function Apps 與 function"></a>建立 Function Apps 與 function</h3><p>開始前先作名詞解釋, 因為微軟的命名會讓剛接觸的人十分混淆</p>
-<ul>
-<li>Azure Functions : 微軟的 Serverless 產品名稱, 我們可以在這個服務下建立許多 Function Apps 的實體</li>
-<li>Functions Apps : 主要運作的實體, 也是我們要設定的地方，每個 App 裡面可以有多個 function</li>
-<li>Functions : 主要邏輯所在的地方, 以開發的角度來說, 我們應該只關心這塊</li>
-</ul>
-<p><a target="_blank" rel="noopener" href="https://docs.microsoft.com/en-us/azure/azure-functions/functions-create-function-app-portal#create-a-function-app">建立 Function Apps</a> 的步驟較為簡單，請依照微軟文件即可，<br>接下來選擇 Function Apps &gt; 選擇剛剛建立的 Functions App &gt; Create &gt; Http Trigger C#,<br>選擇這個範本我們將以 C# 語言實作，授權等級我選擇 Anonymous .</p>
-<p>建立好後，可以在 Code + Test 裡面查看預設的程式.<br>這裡建立的是 C# 指令碼, 開發上的細節請參考<a target="_blank" rel="noopener" href="https://docs.microsoft.com/zh-tw/azure/azure-functions/functions-reference-csharp#reusing-csx-code">官方文件</a></p>
-<figure class="highlight csharp"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">using</span> System.Net;</span><br><span class="line"></span><br><span class="line"><span class="function"><span class="keyword">public</span> <span class="keyword">static</span> <span class="keyword">async</span> Task&lt;HttpResponseMessage&gt; <span class="title">Run</span>(<span class="params">HttpRequestMessage req, TraceWriter log</span>)</span></span><br><span class="line">&#123;</span><br><span class="line">    log.Info(<span class="string">&quot;C# HTTP trigger function processed a request.&quot;</span>);</span><br><span class="line"></span><br><span class="line">    <span class="comment">// parse query parameter</span></span><br><span class="line">    <span class="built_in">string</span> name = req.GetQueryNameValuePairs()</span><br><span class="line">        .FirstOrDefault(q =&gt; <span class="built_in">string</span>.Compare(q.Key, <span class="string">&quot;name&quot;</span>, <span class="literal">true</span>) == <span class="number">0</span>)</span><br><span class="line">        .Value;</span><br><span class="line"></span><br><span class="line">    <span class="keyword">if</span> (name == <span class="literal">null</span>)</span><br><span class="line">    &#123;</span><br><span class="line">        <span class="comment">// Get request body</span></span><br><span class="line">        <span class="built_in">dynamic</span> data = <span class="keyword">await</span> req.Content.ReadAsAsync&lt;<span class="built_in">object</span>&gt;();</span><br><span class="line">        name = data?.name;</span><br><span class="line">    &#125;</span><br><span class="line"></span><br><span class="line">    <span class="keyword">return</span> name == <span class="literal">null</span></span><br><span class="line">        ? req.CreateResponse(HttpStatusCode.BadRequest, <span class="string">&quot;Please pass a name on the query string or in the request body&quot;</span>)</span><br><span class="line">        : req.CreateResponse(HttpStatusCode.OK, <span class="string">&quot;Hello &quot;</span> + name);</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
-
-<h3 id="啟用-Function-App-的-Managed-Identity"><a href="#啟用-Function-App-的-Managed-Identity" class="headerlink" title="啟用 Function App 的 Managed Identity"></a>啟用 Function App 的 Managed Identity</h3><p>移動到 Functions Apps 的 Settings &gt; Identity,<br>可以看 System assigned &gt; Status 將它切換為 <code>On</code>.<br>這一步的設定是為了讓服務之間可以受到 AAD 控管而不需要你自行處理.</p>
-<h3 id="建立-Key-Vault"><a href="#建立-Key-Vault" class="headerlink" title="建立 Key Vault"></a>建立 Key Vault</h3><p>在建立之前也是需要一些名詞解釋，</p>
-<ul>
-<li>Key Vault: 微軟的服務名稱</li>
-<li>key vault section: Key Vault 的實體區塊(可以想像成一個實體檔案，裡面可以存很多 Key, 並且我們可以對這個檔案進一步設定,也可以參考 <a target="_blank" rel="noopener" href="https://docs.microsoft.com/en-us/azure/key-vault/general/quick-create-portal">官方的文件快速建立</a>)</li>
-<li>Keys : 在 key vault section 的 settings 中有三種類型的資料，Keys、Secrets 與 Certificates,</li>
-</ul>
-<p>找到 Key Vault &gt; key vault section &gt; Settings &gt; Secrets , 建立一組 Secret</p>
-<p><img src="/images/2021/function_app_key_vault_create_key_vault.png" alt="建立 Key Vault"></p>
-<p>點選剛剛建立的 Secret 並且選擇 CURRENT VERSION 取得 Secret Identifier(複製下來, 待會會用到)</p>
-<h3 id="設定-Key-Vault-Access-policies"><a href="#設定-Key-Vault-Access-policies" class="headerlink" title="設定 Key Vault Access policies"></a>設定 Key Vault Access policies</h3><p>一樣在 Key Vault &gt; Settings &gt; Access policies &gt; Add access policy ,<br>在 Select principal 找到剛剛建立的 Function App,<br>在 Configure from template (optional) 我們直接套用 Secret Management,<br>這允許我們的 Function App 會取得管理 Key Vault Secret 的權限.</p>
-<h3 id="設定-Function-App-Configuration"><a href="#設定-Function-App-Configuration" class="headerlink" title="設定 Function App Configuration"></a>設定 Function App Configuration</h3><p>移動到 Function App &gt; Settings &gt; Configuration &gt; Application settings<br>我們要在這裡新加一個 Application Setting</p>
-<p>Name 自已取但是請記得，我們稍後就會用到，這裡我先命名為 <code>TestKV</code>,<br>Value 請參加下面的範例, 將前面步驟取得的 <code>Secret Identifier</code> 填到 SecretUri 之後.</p>
-<figure class="highlight text"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">@Microsoft.KeyVault(SecretUri=https://mykv.vault.azure.net/secrets/RefreshToken/xxxx)</span><br></pre></td></tr></table></figure>
-
-<p>這裡有小朋友問我, 那為什麼不把資料設定在 Function App Configuration 就好,<br>這樣子開發人員也碰不到資料, 要修改也是很有彈性的.<br>我的回答是, 這樣子其它的服務也需要這個資料怎麼辦呢？<br>Copy-Paste 會造成維護上很大的困難, 我們會希望維持一組就好.<br>放在 Key Vault 可以讓我們不同的服務共用.<br><img src="/images/2021/function_app_key_vault_overview.png" alt="Overview"></p>
-<blockquote>
-<p>反思 Best Practice 應該怎麼作???<br>設定檔散落在不同的層級, 還是應該集中管理, 再用 Config 橋接???</p>
-</blockquote>
-<h3 id="修改-Function-的代碼"><a href="#修改-Function-的代碼" class="headerlink" title="修改 Function 的代碼"></a>修改 Function 的代碼</h3><p>下列我們用 <code>TestKV</code> 這組設定與 C# 作為範例 :<br>透過環境變數取得 Key Vault 的資料</p>
-<figure class="highlight csharp"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment">// Get</span></span><br><span class="line"><span class="keyword">var</span> testKV =</span><br><span class="line">  Environment.GetEnvironmentVariable(<span class="string">&quot;TestKV&quot;</span>, EnvironmentVariableTarget.Process);</span><br></pre></td></tr></table></figure>
-
-<p>而如果你需要寫入請使用 <code>Azure SDK Client Library</code></p>
-<figure class="highlight csharp"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">using</span> Azure.Identity;</span><br><span class="line"><span class="keyword">using</span> Azure.Security.KeyVault.Secrets;</span><br><span class="line"><span class="comment"><span class="doctag">///</span> Skip ...</span></span><br><span class="line">    <span class="comment"><span class="doctag">///</span> Set</span></span><br><span class="line">    <span class="keyword">var</span> kvUri = <span class="string">$&quot;https://<span class="subst">&#123;KeyVaultName&#125;</span>.vault.azure.net&quot;</span>;</span><br><span class="line">    <span class="keyword">var</span> client = <span class="keyword">new</span> SecretClient(<span class="keyword">new</span> Uri(kvUri), <span class="keyword">new</span> DefaultAzureCredential());</span><br><span class="line">    client.SetSecret(<span class="string">$&quot;<span class="subst">&#123;SecretKey&#125;</span>&quot;</span>, <span class="string">$&quot;<span class="subst">&#123;SecretValue&#125;</span>&quot;</span>);</span><br></pre></td></tr></table></figure>
-
-<p>其它語言可以<a target="_blank" rel="noopener" href="https://docs.microsoft.com/zh-tw/azure/azure-functions/functions-how-to-use-azure-function-app-settings?tabs=portal#use-application-settings">參考</a></p>
-<h2 id="參考"><a href="#參考" class="headerlink" title="參考"></a>參考</h2><ul>
-<li><a target="_blank" rel="noopener" href="https://docs.microsoft.com/en-us/azure/azure-functions/functions-overview">Azure Functions</a></li>
-<li><a target="_blank" rel="noopener" href="https://daniel-krzyczkowski.github.io/Integrate-Key-Vault-Secrets-With-Azure-Functions/">Integrate Key Vault Secrets With Azure Functions</a></li>
-<li><a target="_blank" rel="noopener" href="https://denny.qollie.com/2016/05/22/serverless-simple-crud/">淺析 serverless 架構與實作</a></li>
-<li><a target="_blank" rel="noopener" href="https://adamtheautomator.com/azure-functions-tutorial/">Azure Function Tutorial</a></li>
-<li><a target="_blank" rel="noopener" href="https://build5nines.com/azure-functions-extend-execution-timeout-past-5-minutes/">Azure Functions: Extend Execution Timeout Past 5 Minutes</a></li>
-<li><a target="_blank" rel="noopener" href="https://docs.microsoft.com/en-us/dotnet/api/overview/azure/identity-readme#defaultazurecredential">DefaultAzureCredential</a></li>
-</ul>
-<p>(fin)</p>
-
-      
-    </div>
-    <footer class="article-footer">
-      <a data-url="https://blog.marsen.me/2021/08/24/2021/azure_function_app_identity_key_vault/" data-id="cuidYEafKavmbFt2OxUYUwUij" class="article-share-link">Share</a>
-      
-        <a href="https://blog.marsen.me/2021/08/24/2021/azure_function_app_identity_key_vault/#disqus_thread" class="article-comment-link">留言</a>
-      
-      
-  <ul class="article-tag-list" itemprop="keywords"><li class="article-tag-list-item"><a class="article-tag-list-link" href="/tags/%E5%AF%A6%E4%BD%9C%E7%AD%86%E8%A8%98/" rel="tag">實作筆記</a></li></ul>
-
-    </footer>
-  </div>
-  
-</article>
-
-
-  
-    <article id="post-2021/facebook_application_and_https_login" class="article article-type-post" itemscope itemprop="blogPost">
-  <div class="article-meta">
-    <a href="/2021/08/08/2021/facebook_application_and_https_login/" class="article-date">
-  <time datetime="2021-08-08T07:34:10.000Z" itemprop="datePublished">2021-08-08</time>
-</a>
-    
-  </div>
-  <div class="article-inner">
-    
-    
-      <header class="article-header">
-        
-  
-    <h1 itemprop="name">
-      <a class="article-title" href="/2021/08/08/2021/facebook_application_and_https_login/"> [實作筆記] 自我簽署憑証, localhost run with https </a>
-    </h1>
-  
-
-      </header>
-    
-    <div class="article-entry" itemprop="articleBody">
-      
-        <h2 id="前情提要"><a href="#前情提要" class="headerlink" title="前情提要"></a>前情提要</h2><p>最近有一批學生在學習 Express 開發網站,<br>他們需要透過 facebook 應用程式作登入。<br>遇到了以下的問題<br><img src="/../../images/2021/fb_login_fail.png" alt="Facebook 偵測到 所使用的網連線並不安全"></p>
-<p>最簡單的解決方式，重新選擇你的 Facebook Application Type 為無</p>
-<p>如下:<br>!<a href="../../images/2021/fb_application_type.png">Facebook Application Type 選擇無</a><br>這樣足以解決學生們在練習開發上的問題了。</p>
-<p>不過我有點好奇背後的真正原因是什麼 ?</p>
-<h2 id="Facebook-的政策"><a href="#Facebook-的政策" class="headerlink" title="Facebook 的政策"></a>Facebook 的政策</h2><p>Facebook 的<a target="_blank" rel="noopener" href="https://developers.facebook.com/docs/facebook-login/security/#surfacearea">文件</a>說明</p>
-<blockquote>
-<h3 id="使用-HTTPS"><a href="#使用-HTTPS" class="headerlink" title="使用 HTTPS"></a>使用 HTTPS</h3><p>使用具有加密功能的 HTTPS 作為網際網路通訊協定，而非 HTTP。HTTPS 會維護傳送資料的隱私，保護其不受竊聽攻擊。<br>此外，也能保護資料在傳送過程中不遭到置入廣告或惡意程式碼的竄改。</p>
-<p>在 2018 年 10 月 6 日，所有應用程式都必須使用 HTTPS。</p>
-</blockquote>
-<p>可能是一個原因，因為學生們的開發環境建置出來都是單純的 http ，同學也有作出相關的猜測。<br>那麼我們要怎麼快速驗証這個想法呢 ?</p>
-<h2 id="https-localhost"><a href="#https-localhost" class="headerlink" title="https-localhost"></a>https-localhost</h2><p>這是一個最快速的驗証方法，不過需要修改部份的代碼，而且遮蓋了需多細節。<br>以下以 MacOS 操作為主</p>
-<p>首先，需要安裝相依的 <a target="_blank" rel="noopener" href="https://developer.mozilla.org/en-US/docs/Mozilla/Projects/NSS/tools/NSS_Tools_certutil">NSS Tool</a></p>
-<blockquote>
-<p>brew install nss</p>
-</blockquote>
-<p>安裝 <code>https-localhost</code></p>
-<blockquote>
-<p>npm i https-localhost</p>
-</blockquote>
-<p>改寫在 Express 網站的 <code>app.js</code></p>
-<figure class="highlight javascript"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment">//const app = express()</span></span><br><span class="line"><span class="keyword">const</span> app = <span class="built_in">require</span>(<span class="string">&quot;https-localhost&quot;</span>)();</span><br></pre></td></tr></table></figure>
-
-<p>基本這樣就完成了。</p>
-<ul>
-<li>優點<ul>
-<li>改動步驟少</li>
-<li>無需理解細節</li>
-</ul>
-</li>
-<li>缺點<ul>
-<li>要改動原始代碼</li>
-</ul>
-</li>
-</ul>
-<h2 id="自我簽署憑証"><a href="#自我簽署憑証" class="headerlink" title="自我簽署憑証"></a>自我簽署憑証</h2><p>接下來我們會深入一點細節，並了解背後的機制。</p>
-<h3 id="憑証機制簡介"><a href="#憑証機制簡介" class="headerlink" title="憑証機制簡介"></a>憑証機制簡介</h3><p>我不打算從 TCP、Http 講解到 Https，網路上已有相當多的資訊，<br>或是未來有機會再補充。<br>總而言之，當你使用 Https 時，有一個很重要的觀念是，<br>你的 Server 應該提供一組<code>公鑰</code>給 User 作為資料的加解密。<br>那延伸的問題就是<strong>怎麼確認這組公鑰是可以信任的呢?</strong></p>
-<p>簡單說就是透過第三方的公正單位進行認証，所謂憑証認証機構(CA)。<br>我們相信這些機構，而機構也會幫我們進行審核。<br>而一般來說你的應用程式，比如說瀏覽器會先安裝好可信任的根憑証。</p>
-<p>一個經典的說明是這樣的:</p>
-<blockquote>
-<p>鮑伯可以隨便把憑證向外發布。<br>鮑伯與愛麗絲事先可能互不認識，但鮑伯與愛麗絲都信任伊凡，<br>愛麗絲使用認證機構伊凡的公鑰驗證數位簽章，如果驗證成功，便可以信任鮑勃的公鑰是真正屬於鮑伯的。[1]<br>愛麗絲可以使用憑證上的鮑勃的公鑰加密明文，得到密文並傳送給鮑伯。<br>鮑伯可以可以用自己的私鑰把密文解密，得到明文。</p>
-</blockquote>
-<p>以開發者而言，你可以自我簽署憑証，<br>這裡你要同時扮演鮑伯，愛麗絲與伊凡，<br>所以常有人會在其中迷失方向，角色錯亂。</p>
-<h3 id="伊凡-local-CA"><a href="#伊凡-local-CA" class="headerlink" title="伊凡(local CA)"></a>伊凡(local CA)</h3><p>伊凡是一個 CA，我們只要安裝 <code>mkcert</code>，<br>就可以建自一個本地端的 CA</p>
-<blockquote>
-<p>brew install mkcert</p>
-</blockquote>
-<p>我們來對 <code>localhost</code> 發行憑証</p>
-<blockquote>
-<p>mkcert localhost</p>
-</blockquote>
-<p>會產生下列兩個檔案，<br>分別為憑証 <code>localhost.pem</code><br>與私錀 <code>localhost-key.pem</code></p>
-<h3 id="鮑伯-Server"><a href="#鮑伯-Server" class="headerlink" title="鮑伯(Server)"></a>鮑伯(Server)</h3><p>這個時候我們角色切換至鮑伯(Server)<br>鮑伯在這個過程中最重要的發行公錀，<br>私錀是用來加密傳輸的資料的。</p>
-<p>這裡需要修改一下 Server 的程式碼</p>
-<figure class="highlight javascript"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">const</span> fs = <span class="built_in">require</span>(<span class="string">&quot;fs&quot;</span>);</span><br><span class="line"><span class="keyword">const</span> https = <span class="built_in">require</span>(<span class="string">&quot;https&quot;</span>);</span><br><span class="line"></span><br><span class="line"><span class="comment">/// 中略…</span></span><br><span class="line"></span><br><span class="line">https</span><br><span class="line">  .<span class="title function_">createServer</span>(</span><br><span class="line">    &#123;</span><br><span class="line">      <span class="attr">key</span>: fs.<span class="title function_">readFileSync</span>(<span class="string">&quot;localhost-key.pem&quot;</span>),</span><br><span class="line">      <span class="attr">cert</span>: fs.<span class="title function_">readFileSync</span>(<span class="string">&quot;localhost.pem&quot;</span>),</span><br><span class="line">    &#125;,</span><br><span class="line">    app</span><br><span class="line">  )</span><br><span class="line">  .<span class="title function_">listen</span>(<span class="number">3000</span>, <span class="keyword">function</span> (<span class="params"></span>) &#123;</span><br><span class="line">    <span class="variable language_">console</span>.<span class="title function_">log</span>(</span><br><span class="line">      <span class="string">&quot;Example app listening on port 3000! Go to https://localhost:3000/&quot;</span></span><br><span class="line">    );</span><br><span class="line">  &#125;);</span><br></pre></td></tr></table></figure>
-
-<p>這樣我們就可以允許愛麗絲透過 Https 與我們溝通囉。</p>
-<h3 id="愛麗絲-Client"><a href="#愛麗絲-Client" class="headerlink" title="愛麗絲(Client)"></a>愛麗絲(Client)</h3><p>基本你只要開啟瀏覽器，輸入 <code>https://localhost:3000/</code> 你就可以正常瀏覽了。<br>但我們要了解背後發生的過程，</p>
-<p>安裝 <code>mkcert</code> 完畢後，其實會在你的機器(與瀏覽器)上安裝根憑証，<br>這樣愛麗絲才會信任伊凡<br>可以透過以下語法查詢安裝路徑(不同 OS 會有差異)</p>
-<blockquote>
-<p>mkcert -CAROOT</p>
-</blockquote>
-<p>這個作法改動的程式也不會比較少，<br>但至少不再有黑魔法(當然你也可以去追蹤 <code>https-localhost</code> 的代碼)</p>
-<h3 id="Recap"><a href="#Recap" class="headerlink" title="Recap"></a>Recap</h3><p>快速回顧一下 <code>mkcert</code> 作了哪些事</p>
-<ol>
-<li>建立一個 local CA</li>
-<li>替你的瀏覽器安裝 CA</li>
-<li>對 localhost 發行憑証</li>
-</ol>
-<p>而你的程式需要</p>
-<ul>
-<li>改使用 https 啟動網站</li>
-</ul>
-<h2 id="別忘了解決學生問題"><a href="#別忘了解決學生問題" class="headerlink" title="別忘了解決學生問題"></a>別忘了解決學生問題</h2><p>回到 facebook 應用程式登入的問題，<br>別忘了去設定 callback 網址，並且確定是走 https<br><strong>用戶端 OAuth 設定 &gt; 有效的 OAuth 重新導向 URI</strong><br>不然會得到以下錯誤</p>
-<p><img src="/../../images/2021/fb_login_fail_wrong_domain.png" alt="忘了設定 callback URL"></p>
-<h2 id="小計"><a href="#小計" class="headerlink" title="小計"></a>小計</h2><p>文末的聯結有需多是透過 OpenSSL 的作法供參考，<br>但是會多一步驟需要安裝手動憑証(愛麗絲該作的事)。</p>
-<p>另外仍然需要修改程式這點我不是很滿意，<br>應該可以掛上其它的 Proxy Server，由 Proxy Server 處理 https 就好，<br>內網單純走 http。<br>最近也有看到<a target="_blank" rel="noopener" href="https://www.youtube.com/watch?v=gC4wmZf7dAI">零信任網路</a>，<br>不過那應該是另一個議題了</p>
-<blockquote>
-<p>Zero Trust 零信任架構近年來日受重視，在 Zero Trust 框架底下，<br>即便使用者在內網環境，也不會給予沒有期效或過高之存取權限。</p>
-</blockquote>
-<h2 id="參考"><a href="#參考" class="headerlink" title="參考"></a>參考</h2><ul>
-<li><a target="_blank" rel="noopener" href="https://www.npmjs.com/package/https-localhost?activeTab=readme">https-localhost</a></li>
-<li><a target="_blank" rel="noopener" href="https://xenby.com/b/205-%E6%8E%A8%E8%96%A6-%E5%BF%AB%E9%80%9F%E7%94%A2%E7%94%9F%E6%9C%AC%E5%9C%B0%E7%AB%AF%E9%96%8B%E7%99%BC%E7%94%A8ssl%E6%86%91%E8%AD%89%E5%B7%A5%E5%85%B7-mkcert">[推薦] 快速產生本地端開發用 SSL 憑證工具-mkcert</a></li>
-<li><a target="_blank" rel="noopener" href="https://medium.com/@shriramsharma/mkcert-you-changed-my-life-b157466880bf">mkcert, you changed my life!!</a></li>
-<li><a target="_blank" rel="noopener" href="https://tw.alphacamp.co/blog/http-https-difference">一文搞懂 HTTP 和 HTTPS 是什麼？兩者有什麼差別</a></li>
-<li><a target="_blank" rel="noopener" href="https://onlinemad.medium.com/%E6%A5%B5%E9%80%9F%E6%89%93%E9%80%A0-https-localhost-431d89a0c2e4">極速打造 https://localhost</a></li>
-<li><a target="_blank" rel="noopener" href="https://medium.com/@nitinpatel_20236/how-to-create-an-https-server-on-localhost-using-express-366435d61f28">How To Create an HTTPS Server on Localhost using Express</a></li>
-<li><a target="_blank" rel="noopener" href="https://timonweb.com/javascript/running-expressjs-server-over-https/">Running express.js server over HTTPS</a></li>
-<li><a target="_blank" rel="noopener" href="https://letsencrypt.org/zh-tw/docs/certificates-for-localhost/">使用 localhost 建立憑證</a></li>
-<li><a target="_blank" rel="noopener" href="https://blog.miniasp.com/post/2019/02/25/Creating-Self-signed-Certificate-using-OpenSSL">如何使用 OpenSSL 建立開發測試用途的自簽憑證 (Self-Signed Certificate)
-</a></li>
-</ul>
-<p>(fin)</p>
-
-      
-    </div>
-    <footer class="article-footer">
-      <a data-url="https://blog.marsen.me/2021/08/08/2021/facebook_application_and_https_login/" data-id="cuidSkRiWNFkkpEP000lbMJNI" class="article-share-link">Share</a>
-      
-        <a href="https://blog.marsen.me/2021/08/08/2021/facebook_application_and_https_login/#disqus_thread" class="article-comment-link">留言</a>
       
       
   <ul class="article-tag-list" itemprop="keywords"><li class="article-tag-list-item"><a class="article-tag-list-link" href="/tags/%E5%AF%A6%E4%BD%9C%E7%AD%86%E8%A8%98/" rel="tag">實作筆記</a></li></ul>
@@ -1090,7 +1158,7 @@ j=d.createElement(s),dl=l!='dataLayer'?'&l='+l:'';j.async=true;j.src=
 
 
   <nav id="page-nav">
-    <a class="extend prev" rel="prev" href="/page/18/">← 上一頁</a><a class="page-number" href="/">1</a><span class="space">&hellip;</span><a class="page-number" href="/page/17/">17</a><a class="page-number" href="/page/18/">18</a><span class="page-number current">19</span><a class="page-number" href="/page/20/">20</a><a class="page-number" href="/page/21/">21</a><span class="space">&hellip;</span><a class="page-number" href="/page/36/">36</a><a class="extend next" rel="next" href="/page/20/">下一頁 →</a>
+    <a class="extend prev" rel="prev" href="/page/18/">← 上一頁</a><a class="page-number" href="/">1</a><span class="space">&hellip;</span><a class="page-number" href="/page/17/">17</a><a class="page-number" href="/page/18/">18</a><span class="page-number current">19</span><a class="page-number" href="/page/20/">20</a><a class="page-number" href="/page/21/">21</a><span class="space">&hellip;</span><a class="page-number" href="/page/37/">37</a><a class="extend next" rel="next" href="/page/20/">下一頁 →</a>
   </nav>
 </section>
         
@@ -1103,23 +1171,23 @@ j=d.createElement(s),dl=l!='dataLayer'?'&l='+l:'';j.async=true;j.src=
       <ul>
         
           <li>
-            <a href="/2026/06/12/2026/frontend-static-assets-public-vs-src-assets/">[實作筆記] 形象站滿版背景影片（一）：前端靜態資源放哪裡</a>
+            <a href="/2026/06/19/2026/cloudflare-tunnel-port-conflict/">[實作筆記] Cloudflare Tunnel 測試金流時遇到 404：Port 衝突雷點</a>
           </li>
         
           <li>
-            <a href="/2026/06/11/2026/ai-weekly-20260612/">[AI生成] 20260612 科技周報</a>
+            <a href="/2026/06/17/2026/ecpay-sandbox-local-testing/">[實作筆記] ECPay 綠界沙盒串接：本機測試完整流程</a>
           </li>
         
           <li>
-            <a href="/2026/06/10/2026/ai-weekly-20260610/">[AI生成] 20260610 科技周報</a>
+            <a href="/2026/06/17/2026/cloudflared-vs-localtunnel/">[工具筆記] 本地 webhook 測試：用 cloudflared，不要用 localtunnel</a>
           </li>
         
           <li>
-            <a href="/2026/06/07/2026/hero-background-video-hosting/">[實作筆記] 形象站滿版背景影片（二）：流量、CDN 與播放器選型</a>
+            <a href="/2026/06/17/2026/nextjs-error-handling-layers/">[實作筆記] Next.js 錯誤處理的三層：middleware、try-catch、instrumentation.ts</a>
           </li>
         
           <li>
-            <a href="/2026/06/04/2026/ai-weekly-20260605/">[AI生成] 20260605 科技周報</a>
+            <a href="/2026/06/16/2026/di-nextjs-swc-compatibility/">[實作筆記] 為什麼 InversifyJS 在 Next.js 不能用？SWC 相容性問題與 awilix 解法</a>
           </li>
         
       </ul>
@@ -1131,7 +1199,7 @@ j=d.createElement(s),dl=l!='dataLayer'?'&l='+l:'';j.async=true;j.src=
   <div class="widget-wrap">
     <h3 class="widget-title">彙整</h3>
     <div class="widget">
-      <ul class="archive-list"><li class="archive-list-item"><a class="archive-list-link" href="/archives/2026/06/">六月 2026</a><span class="archive-list-count">6</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2026/05/">五月 2026</a><span class="archive-list-count">7</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2026/04/">四月 2026</a><span class="archive-list-count">12</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2026/03/">三月 2026</a><span class="archive-list-count">5</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2026/02/">二月 2026</a><span class="archive-list-count">2</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2025/12/">十二月 2025</a><span class="archive-list-count">1</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2025/11/">十一月 2025</a><span class="archive-list-count">1</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2025/10/">十月 2025</a><span class="archive-list-count">2</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2025/09/">九月 2025</a><span class="archive-list-count">4</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2025/08/">八月 2025</a><span class="archive-list-count">3</span></li><span id='list_archives2' style='display:none'><li class="archive-list-item"><a class="archive-list-link" href="/archives/2025/07/">七月 2025</a><span class="archive-list-count">4</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2025/06/">六月 2025</a><span class="archive-list-count">4</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2025/05/">五月 2025</a><span class="archive-list-count">5</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2025/04/">四月 2025</a><span class="archive-list-count">1</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2025/03/">三月 2025</a><span class="archive-list-count">2</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2025/02/">二月 2025</a><span class="archive-list-count">4</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2025/01/">一月 2025</a><span class="archive-list-count">3</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2024/12/">十二月 2024</a><span class="archive-list-count">3</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2024/11/">十一月 2024</a><span class="archive-list-count">3</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2024/10/">十月 2024</a><span class="archive-list-count">4</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2024/09/">九月 2024</a><span class="archive-list-count">5</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2024/08/">八月 2024</a><span class="archive-list-count">4</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2024/07/">七月 2024</a><span class="archive-list-count">3</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2024/06/">六月 2024</a><span class="archive-list-count">2</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2024/05/">五月 2024</a><span class="archive-list-count">1</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2024/04/">四月 2024</a><span class="archive-list-count">2</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2024/03/">三月 2024</a><span class="archive-list-count">3</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2024/02/">二月 2024</a><span class="archive-list-count">2</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2024/01/">一月 2024</a><span class="archive-list-count">4</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2023/12/">十二月 2023</a><span class="archive-list-count">2</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2023/11/">十一月 2023</a><span class="archive-list-count">3</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2023/10/">十月 2023</a><span class="archive-list-count">2</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2023/09/">九月 2023</a><span class="archive-list-count">3</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2023/08/">八月 2023</a><span class="archive-list-count">2</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2023/07/">七月 2023</a><span class="archive-list-count">6</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2023/06/">六月 2023</a><span class="archive-list-count">6</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2023/05/">五月 2023</a><span class="archive-list-count">1</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2023/04/">四月 2023</a><span class="archive-list-count">10</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2023/03/">三月 2023</a><span class="archive-list-count">5</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2023/02/">二月 2023</a><span class="archive-list-count">2</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2023/01/">一月 2023</a><span class="archive-list-count">2</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2022/12/">十二月 2022</a><span class="archive-list-count">1</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2022/10/">十月 2022</a><span class="archive-list-count">2</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2022/09/">九月 2022</a><span class="archive-list-count">6</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2022/08/">八月 2022</a><span class="archive-list-count">3</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2022/07/">七月 2022</a><span class="archive-list-count">2</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2022/06/">六月 2022</a><span class="archive-list-count">3</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2022/05/">五月 2022</a><span class="archive-list-count">7</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2022/04/">四月 2022</a><span class="archive-list-count">3</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2022/03/">三月 2022</a><span class="archive-list-count">3</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2022/02/">二月 2022</a><span class="archive-list-count">2</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2022/01/">一月 2022</a><span class="archive-list-count">3</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2021/12/">十二月 2021</a><span class="archive-list-count">2</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2021/11/">十一月 2021</a><span class="archive-list-count">2</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2021/10/">十月 2021</a><span class="archive-list-count">2</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2021/09/">九月 2021</a><span class="archive-list-count">1</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2021/08/">八月 2021</a><span class="archive-list-count">2</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2021/07/">七月 2021</a><span class="archive-list-count">4</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2021/06/">六月 2021</a><span class="archive-list-count">1</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2021/05/">五月 2021</a><span class="archive-list-count">2</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2021/04/">四月 2021</a><span class="archive-list-count">3</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2021/03/">三月 2021</a><span class="archive-list-count">3</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2021/02/">二月 2021</a><span class="archive-list-count">1</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2021/01/">一月 2021</a><span class="archive-list-count">7</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2020/12/">十二月 2020</a><span class="archive-list-count">1</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2020/11/">十一月 2020</a><span class="archive-list-count">2</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2020/10/">十月 2020</a><span class="archive-list-count">5</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2020/09/">九月 2020</a><span class="archive-list-count">5</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2020/08/">八月 2020</a><span class="archive-list-count">2</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2020/07/">七月 2020</a><span class="archive-list-count">3</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2020/06/">六月 2020</a><span class="archive-list-count">3</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2020/05/">五月 2020</a><span class="archive-list-count">3</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2020/04/">四月 2020</a><span class="archive-list-count">4</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2020/03/">三月 2020</a><span class="archive-list-count">1</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2020/02/">二月 2020</a><span class="archive-list-count">1</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2020/01/">一月 2020</a><span class="archive-list-count">5</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2019/12/">十二月 2019</a><span class="archive-list-count">1</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2019/11/">十一月 2019</a><span class="archive-list-count">2</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2019/10/">十月 2019</a><span class="archive-list-count">1</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2019/09/">九月 2019</a><span class="archive-list-count">2</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2019/08/">八月 2019</a><span class="archive-list-count">5</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2019/07/">七月 2019</a><span class="archive-list-count">1</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2019/06/">六月 2019</a><span class="archive-list-count">1</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2019/05/">五月 2019</a><span class="archive-list-count">3</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2019/04/">四月 2019</a><span class="archive-list-count">3</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2019/03/">三月 2019</a><span class="archive-list-count">1</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2019/02/">二月 2019</a><span class="archive-list-count">3</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2019/01/">一月 2019</a><span class="archive-list-count">4</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2018/12/">十二月 2018</a><span class="archive-list-count">5</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2018/11/">十一月 2018</a><span class="archive-list-count">7</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2018/10/">十月 2018</a><span class="archive-list-count">6</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2018/09/">九月 2018</a><span class="archive-list-count">3</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2018/08/">八月 2018</a><span class="archive-list-count">2</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2018/07/">七月 2018</a><span class="archive-list-count">6</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2018/06/">六月 2018</a><span class="archive-list-count">2</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2018/05/">五月 2018</a><span class="archive-list-count">1</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2018/04/">四月 2018</a><span class="archive-list-count">5</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2018/03/">三月 2018</a><span class="archive-list-count">5</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2018/02/">二月 2018</a><span class="archive-list-count">1</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2018/01/">一月 2018</a><span class="archive-list-count">5</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2017/12/">十二月 2017</a><span class="archive-list-count">3</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2017/11/">十一月 2017</a><span class="archive-list-count">1</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2017/10/">十月 2017</a><span class="archive-list-count">3</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2017/09/">九月 2017</a><span class="archive-list-count">2</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2017/08/">八月 2017</a><span class="archive-list-count">1</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2017/07/">七月 2017</a><span class="archive-list-count">2</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2017/05/">五月 2017</a><span class="archive-list-count">1</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2017/04/">四月 2017</a><span class="archive-list-count">2</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2017/03/">三月 2017</a><span class="archive-list-count">1</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2017/02/">二月 2017</a><span class="archive-list-count">1</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2017/01/">一月 2017</a><span class="archive-list-count">6</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2016/12/">十二月 2016</a><span class="archive-list-count">1</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2016/11/">十一月 2016</a><span class="archive-list-count">3</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2016/10/">十月 2016</a><span class="archive-list-count">4</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2016/09/">九月 2016</a><span class="archive-list-count">1</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2016/08/">八月 2016</a><span class="archive-list-count">6</span></li></span><span id=''></span><span onclick="var d=document.getElementById('list_archives2'); d.style.display===''?d.style='display:none':d.style=''">toggle...</span></ul>
+      <ul class="archive-list"><li class="archive-list-item"><a class="archive-list-link" href="/archives/2026/06/">六月 2026</a><span class="archive-list-count">12</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2026/05/">五月 2026</a><span class="archive-list-count">7</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2026/04/">四月 2026</a><span class="archive-list-count">12</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2026/03/">三月 2026</a><span class="archive-list-count">5</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2026/02/">二月 2026</a><span class="archive-list-count">2</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2025/12/">十二月 2025</a><span class="archive-list-count">1</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2025/11/">十一月 2025</a><span class="archive-list-count">1</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2025/10/">十月 2025</a><span class="archive-list-count">2</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2025/09/">九月 2025</a><span class="archive-list-count">4</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2025/08/">八月 2025</a><span class="archive-list-count">3</span></li><span id='list_archives2' style='display:none'><li class="archive-list-item"><a class="archive-list-link" href="/archives/2025/07/">七月 2025</a><span class="archive-list-count">4</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2025/06/">六月 2025</a><span class="archive-list-count">4</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2025/05/">五月 2025</a><span class="archive-list-count">5</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2025/04/">四月 2025</a><span class="archive-list-count">1</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2025/03/">三月 2025</a><span class="archive-list-count">2</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2025/02/">二月 2025</a><span class="archive-list-count">4</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2025/01/">一月 2025</a><span class="archive-list-count">3</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2024/12/">十二月 2024</a><span class="archive-list-count">3</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2024/11/">十一月 2024</a><span class="archive-list-count">3</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2024/10/">十月 2024</a><span class="archive-list-count">4</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2024/09/">九月 2024</a><span class="archive-list-count">5</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2024/08/">八月 2024</a><span class="archive-list-count">4</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2024/07/">七月 2024</a><span class="archive-list-count">3</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2024/06/">六月 2024</a><span class="archive-list-count">2</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2024/05/">五月 2024</a><span class="archive-list-count">1</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2024/04/">四月 2024</a><span class="archive-list-count">2</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2024/03/">三月 2024</a><span class="archive-list-count">3</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2024/02/">二月 2024</a><span class="archive-list-count">2</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2024/01/">一月 2024</a><span class="archive-list-count">4</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2023/12/">十二月 2023</a><span class="archive-list-count">2</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2023/11/">十一月 2023</a><span class="archive-list-count">3</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2023/10/">十月 2023</a><span class="archive-list-count">2</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2023/09/">九月 2023</a><span class="archive-list-count">3</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2023/08/">八月 2023</a><span class="archive-list-count">2</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2023/07/">七月 2023</a><span class="archive-list-count">6</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2023/06/">六月 2023</a><span class="archive-list-count">6</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2023/05/">五月 2023</a><span class="archive-list-count">1</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2023/04/">四月 2023</a><span class="archive-list-count">10</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2023/03/">三月 2023</a><span class="archive-list-count">5</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2023/02/">二月 2023</a><span class="archive-list-count">2</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2023/01/">一月 2023</a><span class="archive-list-count">2</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2022/12/">十二月 2022</a><span class="archive-list-count">1</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2022/10/">十月 2022</a><span class="archive-list-count">2</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2022/09/">九月 2022</a><span class="archive-list-count">6</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2022/08/">八月 2022</a><span class="archive-list-count">3</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2022/07/">七月 2022</a><span class="archive-list-count">2</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2022/06/">六月 2022</a><span class="archive-list-count">3</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2022/05/">五月 2022</a><span class="archive-list-count">7</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2022/04/">四月 2022</a><span class="archive-list-count">3</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2022/03/">三月 2022</a><span class="archive-list-count">3</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2022/02/">二月 2022</a><span class="archive-list-count">2</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2022/01/">一月 2022</a><span class="archive-list-count">3</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2021/12/">十二月 2021</a><span class="archive-list-count">2</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2021/11/">十一月 2021</a><span class="archive-list-count">2</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2021/10/">十月 2021</a><span class="archive-list-count">2</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2021/09/">九月 2021</a><span class="archive-list-count">1</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2021/08/">八月 2021</a><span class="archive-list-count">2</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2021/07/">七月 2021</a><span class="archive-list-count">4</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2021/06/">六月 2021</a><span class="archive-list-count">1</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2021/05/">五月 2021</a><span class="archive-list-count">2</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2021/04/">四月 2021</a><span class="archive-list-count">3</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2021/03/">三月 2021</a><span class="archive-list-count">3</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2021/02/">二月 2021</a><span class="archive-list-count">1</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2021/01/">一月 2021</a><span class="archive-list-count">7</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2020/12/">十二月 2020</a><span class="archive-list-count">1</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2020/11/">十一月 2020</a><span class="archive-list-count">2</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2020/10/">十月 2020</a><span class="archive-list-count">5</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2020/09/">九月 2020</a><span class="archive-list-count">5</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2020/08/">八月 2020</a><span class="archive-list-count">2</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2020/07/">七月 2020</a><span class="archive-list-count">3</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2020/06/">六月 2020</a><span class="archive-list-count">3</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2020/05/">五月 2020</a><span class="archive-list-count">3</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2020/04/">四月 2020</a><span class="archive-list-count">4</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2020/03/">三月 2020</a><span class="archive-list-count">1</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2020/02/">二月 2020</a><span class="archive-list-count">1</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2020/01/">一月 2020</a><span class="archive-list-count">5</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2019/12/">十二月 2019</a><span class="archive-list-count">1</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2019/11/">十一月 2019</a><span class="archive-list-count">2</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2019/10/">十月 2019</a><span class="archive-list-count">1</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2019/09/">九月 2019</a><span class="archive-list-count">2</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2019/08/">八月 2019</a><span class="archive-list-count">5</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2019/07/">七月 2019</a><span class="archive-list-count">1</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2019/06/">六月 2019</a><span class="archive-list-count">1</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2019/05/">五月 2019</a><span class="archive-list-count">3</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2019/04/">四月 2019</a><span class="archive-list-count">3</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2019/03/">三月 2019</a><span class="archive-list-count">1</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2019/02/">二月 2019</a><span class="archive-list-count">3</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2019/01/">一月 2019</a><span class="archive-list-count">4</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2018/12/">十二月 2018</a><span class="archive-list-count">5</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2018/11/">十一月 2018</a><span class="archive-list-count">7</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2018/10/">十月 2018</a><span class="archive-list-count">6</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2018/09/">九月 2018</a><span class="archive-list-count">3</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2018/08/">八月 2018</a><span class="archive-list-count">2</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2018/07/">七月 2018</a><span class="archive-list-count">6</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2018/06/">六月 2018</a><span class="archive-list-count">2</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2018/05/">五月 2018</a><span class="archive-list-count">1</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2018/04/">四月 2018</a><span class="archive-list-count">5</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2018/03/">三月 2018</a><span class="archive-list-count">5</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2018/02/">二月 2018</a><span class="archive-list-count">1</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2018/01/">一月 2018</a><span class="archive-list-count">5</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2017/12/">十二月 2017</a><span class="archive-list-count">3</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2017/11/">十一月 2017</a><span class="archive-list-count">1</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2017/10/">十月 2017</a><span class="archive-list-count">3</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2017/09/">九月 2017</a><span class="archive-list-count">2</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2017/08/">八月 2017</a><span class="archive-list-count">1</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2017/07/">七月 2017</a><span class="archive-list-count">2</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2017/05/">五月 2017</a><span class="archive-list-count">1</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2017/04/">四月 2017</a><span class="archive-list-count">2</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2017/03/">三月 2017</a><span class="archive-list-count">1</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2017/02/">二月 2017</a><span class="archive-list-count">1</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2017/01/">一月 2017</a><span class="archive-list-count">6</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2016/12/">十二月 2016</a><span class="archive-list-count">1</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2016/11/">十一月 2016</a><span class="archive-list-count">3</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2016/10/">十月 2016</a><span class="archive-list-count">4</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2016/09/">九月 2016</a><span class="archive-list-count">1</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2016/08/">八月 2016</a><span class="archive-list-count">6</span></li></span><span id=''></span><span onclick="var d=document.getElementById('list_archives2'); d.style.display===''?d.style='display:none':d.style=''">toggle...</span></ul>
     </div>
   </div>
 
@@ -1148,7 +1216,7 @@ This work is licensed under a
   <div class="widget-wrap">
     <h3 class="widget-title">標籤雲</h3>
     <div class="widget tagcloud">
-      <a href="/tags/Net-Framework/" style="font-size: 15px;">.Net Framework</a> <a href="/tags/AI%E7%94%9F%E6%88%90/" style="font-size: 13.13px;">AI生成</a> <a href="/tags/API/" style="font-size: 11.25px;">API</a> <a href="/tags/ASP-NET/" style="font-size: 10px;">ASP.NET</a> <a href="/tags/AWS/" style="font-size: 13.75px;">AWS</a> <a href="/tags/Agile/" style="font-size: 16.88px;">Agile</a> <a href="/tags/CI-CD/" style="font-size: 19.38px;">CI/CD</a> <a href="/tags/Cache/" style="font-size: 10px;">Cache</a> <a href="/tags/Coding-Standard/" style="font-size: 10px;">Coding Standard</a> <a href="/tags/Container/" style="font-size: 11.88px;">Container</a> <a href="/tags/Database/" style="font-size: 13.13px;">Database</a> <a href="/tags/Design-Pattern/" style="font-size: 10.63px;">Design Pattern</a> <a href="/tags/Docker/" style="font-size: 11.88px;">Docker</a> <a href="/tags/ESLint/" style="font-size: 10px;">ESLint</a> <a href="/tags/Entity-Framework/" style="font-size: 10.63px;">Entity Framework</a> <a href="/tags/Firebase/" style="font-size: 10px;">Firebase</a> <a href="/tags/GCP/" style="font-size: 10px;">GCP</a> <a href="/tags/Git/" style="font-size: 10.63px;">Git</a> <a href="/tags/Golang/" style="font-size: 11.25px;">Golang</a> <a href="/tags/Google/" style="font-size: 11.25px;">Google</a> <a href="/tags/GulpJs/" style="font-size: 10.63px;">GulpJs</a> <a href="/tags/HTTP/" style="font-size: 10px;">HTTP</a> <a href="/tags/Hexo/" style="font-size: 15px;">Hexo</a> <a href="/tags/IIS/" style="font-size: 10px;">IIS</a> <a href="/tags/IO/" style="font-size: 10px;">IO</a> <a href="/tags/Integrated-Testing/" style="font-size: 10px;">Integrated Testing</a> <a href="/tags/Jenkins/" style="font-size: 11.88px;">Jenkins</a> <a href="/tags/Kubernetes/" style="font-size: 10px;">Kubernetes</a> <a href="/tags/Linux/" style="font-size: 10.63px;">Linux</a> <a href="/tags/Mongodb/" style="font-size: 10px;">Mongodb</a> <a href="/tags/MsSQL/" style="font-size: 11.25px;">MsSQL</a> <a href="/tags/MsTest/" style="font-size: 10px;">MsTest</a> <a href="/tags/Mutation-Testing/" style="font-size: 10px;">Mutation Testing</a> <a href="/tags/Nodejs/" style="font-size: 15px;">Nodejs</a> <a href="/tags/OAuth/" style="font-size: 10px;">OAuth</a> <a href="/tags/OOP/" style="font-size: 11.25px;">OOP</a> <a href="/tags/Openshift/" style="font-size: 10.63px;">Openshift</a> <a href="/tags/PowerShell/" style="font-size: 11.25px;">PowerShell</a> <a href="/tags/React/" style="font-size: 12.5px;">React</a> <a href="/tags/Redis/" style="font-size: 11.25px;">Redis</a> <a href="/tags/SQL/" style="font-size: 11.88px;">SQL</a> <a href="/tags/Scrum/" style="font-size: 16.25px;">Scrum</a> <a href="/tags/Shell/" style="font-size: 10.63px;">Shell</a> <a href="/tags/Specflow/" style="font-size: 10px;">Specflow</a> <a href="/tags/StyleCop/" style="font-size: 10px;">StyleCop</a> <a href="/tags/TDD/" style="font-size: 15.63px;">TDD</a> <a href="/tags/Testing/" style="font-size: 14.38px;">Testing</a> <a href="/tags/Thread/" style="font-size: 10.63px;">Thread</a> <a href="/tags/Trello/" style="font-size: 10px;">Trello</a> <a href="/tags/TypeScript/" style="font-size: 14.38px;">TypeScript</a> <a href="/tags/Unit-Testing/" style="font-size: 18.75px;">Unit Testing</a> <a href="/tags/Unix/" style="font-size: 10.63px;">Unix</a> <a href="/tags/Vim/" style="font-size: 10px;">Vim</a> <a href="/tags/Visual-Studio/" style="font-size: 10px;">Visual Studio</a> <a href="/tags/html/" style="font-size: 10px;">html</a> <a href="/tags/post/" style="font-size: 10px;">post</a> <a href="/tags/%E5%AD%B8%E7%BF%92%E7%AD%86%E8%A8%98/" style="font-size: 18.13px;">學習筆記</a> <a href="/tags/%E5%AF%A6%E4%BD%9C%E7%AD%86%E8%A8%98/" style="font-size: 20px;">實作筆記</a> <a href="/tags/%E5%B7%A5%E5%85%B7%E7%AD%86%E8%A8%98/" style="font-size: 10.63px;">工具筆記</a> <a href="/tags/%E6%99%82%E9%96%93%E7%AE%A1%E7%90%86/" style="font-size: 10.63px;">時間管理</a> <a href="/tags/%E6%B4%BB%E5%8B%95%E7%AD%86%E8%A8%98/" style="font-size: 13.13px;">活動筆記</a> <a href="/tags/%E7%94%9F%E6%B4%BB%E7%AD%86%E8%A8%98/" style="font-size: 17.5px;">生活筆記</a> <a href="/tags/%E7%94%A2%E6%A5%AD%E5%A0%B1%E5%91%8A/" style="font-size: 10px;">產業報告</a> <a href="/tags/%E8%A8%98%E9%8C%84/" style="font-size: 11.25px;">記錄</a> <a href="/tags/%E8%AE%80%E6%9B%B8%E7%AD%86%E8%A8%98/" style="font-size: 10px;">讀書筆記</a> <a href="/tags/%E8%B8%A9%E9%9B%B7%E7%AD%86%E8%A8%98/" style="font-size: 15.63px;">踩雷筆記</a> <a href="/tags/%E9%87%8D%E6%A7%8B/" style="font-size: 12.5px;">重構</a> <a href="/tags/%E9%96%B1%E8%AE%80%E7%AD%86%E8%A8%98/" style="font-size: 17.5px;">閱讀筆記</a>
+      <a href="/tags/Net-Framework/" style="font-size: 15px;">.Net Framework</a> <a href="/tags/AI%E7%94%9F%E6%88%90/" style="font-size: 13.13px;">AI生成</a> <a href="/tags/API/" style="font-size: 11.25px;">API</a> <a href="/tags/ASP-NET/" style="font-size: 10px;">ASP.NET</a> <a href="/tags/AWS/" style="font-size: 13.75px;">AWS</a> <a href="/tags/Agile/" style="font-size: 16.88px;">Agile</a> <a href="/tags/CI-CD/" style="font-size: 19.38px;">CI/CD</a> <a href="/tags/Cache/" style="font-size: 10px;">Cache</a> <a href="/tags/Coding-Standard/" style="font-size: 10px;">Coding Standard</a> <a href="/tags/Container/" style="font-size: 11.88px;">Container</a> <a href="/tags/Database/" style="font-size: 13.13px;">Database</a> <a href="/tags/Design-Pattern/" style="font-size: 10.63px;">Design Pattern</a> <a href="/tags/Docker/" style="font-size: 11.88px;">Docker</a> <a href="/tags/ESLint/" style="font-size: 10px;">ESLint</a> <a href="/tags/Entity-Framework/" style="font-size: 10.63px;">Entity Framework</a> <a href="/tags/Firebase/" style="font-size: 10px;">Firebase</a> <a href="/tags/GCP/" style="font-size: 10px;">GCP</a> <a href="/tags/Git/" style="font-size: 10.63px;">Git</a> <a href="/tags/Golang/" style="font-size: 11.25px;">Golang</a> <a href="/tags/Google/" style="font-size: 11.25px;">Google</a> <a href="/tags/GulpJs/" style="font-size: 10.63px;">GulpJs</a> <a href="/tags/HTTP/" style="font-size: 10px;">HTTP</a> <a href="/tags/Hexo/" style="font-size: 15px;">Hexo</a> <a href="/tags/IIS/" style="font-size: 10px;">IIS</a> <a href="/tags/IO/" style="font-size: 10px;">IO</a> <a href="/tags/Integrated-Testing/" style="font-size: 10px;">Integrated Testing</a> <a href="/tags/Jenkins/" style="font-size: 11.88px;">Jenkins</a> <a href="/tags/Kubernetes/" style="font-size: 10px;">Kubernetes</a> <a href="/tags/Linux/" style="font-size: 10.63px;">Linux</a> <a href="/tags/Mongodb/" style="font-size: 10px;">Mongodb</a> <a href="/tags/MsSQL/" style="font-size: 11.25px;">MsSQL</a> <a href="/tags/MsTest/" style="font-size: 10px;">MsTest</a> <a href="/tags/Mutation-Testing/" style="font-size: 10px;">Mutation Testing</a> <a href="/tags/Nodejs/" style="font-size: 15px;">Nodejs</a> <a href="/tags/OAuth/" style="font-size: 10px;">OAuth</a> <a href="/tags/OOP/" style="font-size: 11.25px;">OOP</a> <a href="/tags/Openshift/" style="font-size: 10.63px;">Openshift</a> <a href="/tags/PowerShell/" style="font-size: 11.25px;">PowerShell</a> <a href="/tags/React/" style="font-size: 12.5px;">React</a> <a href="/tags/Redis/" style="font-size: 11.25px;">Redis</a> <a href="/tags/SQL/" style="font-size: 11.88px;">SQL</a> <a href="/tags/Scrum/" style="font-size: 16.25px;">Scrum</a> <a href="/tags/Shell/" style="font-size: 10.63px;">Shell</a> <a href="/tags/Specflow/" style="font-size: 10px;">Specflow</a> <a href="/tags/StyleCop/" style="font-size: 10px;">StyleCop</a> <a href="/tags/TDD/" style="font-size: 15.63px;">TDD</a> <a href="/tags/Testing/" style="font-size: 14.38px;">Testing</a> <a href="/tags/Thread/" style="font-size: 10.63px;">Thread</a> <a href="/tags/Trello/" style="font-size: 10px;">Trello</a> <a href="/tags/TypeScript/" style="font-size: 14.38px;">TypeScript</a> <a href="/tags/Unit-Testing/" style="font-size: 18.75px;">Unit Testing</a> <a href="/tags/Unix/" style="font-size: 10.63px;">Unix</a> <a href="/tags/Vim/" style="font-size: 10px;">Vim</a> <a href="/tags/Visual-Studio/" style="font-size: 10px;">Visual Studio</a> <a href="/tags/html/" style="font-size: 10px;">html</a> <a href="/tags/post/" style="font-size: 10px;">post</a> <a href="/tags/%E5%AD%B8%E7%BF%92%E7%AD%86%E8%A8%98/" style="font-size: 18.13px;">學習筆記</a> <a href="/tags/%E5%AF%A6%E4%BD%9C%E7%AD%86%E8%A8%98/" style="font-size: 20px;">實作筆記</a> <a href="/tags/%E5%B7%A5%E5%85%B7%E7%AD%86%E8%A8%98/" style="font-size: 11.25px;">工具筆記</a> <a href="/tags/%E6%99%82%E9%96%93%E7%AE%A1%E7%90%86/" style="font-size: 10.63px;">時間管理</a> <a href="/tags/%E6%B4%BB%E5%8B%95%E7%AD%86%E8%A8%98/" style="font-size: 13.13px;">活動筆記</a> <a href="/tags/%E7%94%9F%E6%B4%BB%E7%AD%86%E8%A8%98/" style="font-size: 17.5px;">生活筆記</a> <a href="/tags/%E7%94%A2%E6%A5%AD%E5%A0%B1%E5%91%8A/" style="font-size: 10px;">產業報告</a> <a href="/tags/%E8%A8%98%E9%8C%84/" style="font-size: 11.25px;">記錄</a> <a href="/tags/%E8%AE%80%E6%9B%B8%E7%AD%86%E8%A8%98/" style="font-size: 10px;">讀書筆記</a> <a href="/tags/%E8%B8%A9%E9%9B%B7%E7%AD%86%E8%A8%98/" style="font-size: 15.63px;">踩雷筆記</a> <a href="/tags/%E9%87%8D%E6%A7%8B/" style="font-size: 12.5px;">重構</a> <a href="/tags/%E9%96%B1%E8%AE%80%E7%AD%86%E8%A8%98/" style="font-size: 17.5px;">閱讀筆記</a>
     </div>
   </div>
 
@@ -1157,7 +1225,7 @@ This work is licensed under a
   <div class="widget-wrap">
     <h3 class="widget-title">標籤</h3>
     <div class="widget">
-      <ul class="tag-list" itemprop="keywords"><li class="tag-list-item"><a class="tag-list-link" href="/tags/Net-Framework/" rel="tag">.Net Framework</a><span class="tag-list-count">10</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/AI%E7%94%9F%E6%88%90/" rel="tag">AI生成</a><span class="tag-list-count">6</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/API/" rel="tag">API</a><span class="tag-list-count">3</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/ASP-NET/" rel="tag">ASP.NET</a><span class="tag-list-count">1</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/AWS/" rel="tag">AWS</a><span class="tag-list-count">7</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/Agile/" rel="tag">Agile</a><span class="tag-list-count">14</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/CI-CD/" rel="tag">CI&#x2F;CD</a><span class="tag-list-count">24</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/Cache/" rel="tag">Cache</a><span class="tag-list-count">1</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/Coding-Standard/" rel="tag">Coding Standard</a><span class="tag-list-count">1</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/Container/" rel="tag">Container</a><span class="tag-list-count">4</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/Database/" rel="tag">Database</a><span class="tag-list-count">6</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/Design-Pattern/" rel="tag">Design Pattern</a><span class="tag-list-count">2</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/Docker/" rel="tag">Docker</a><span class="tag-list-count">4</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/ESLint/" rel="tag">ESLint</a><span class="tag-list-count">1</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/Entity-Framework/" rel="tag">Entity Framework</a><span class="tag-list-count">2</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/Firebase/" rel="tag">Firebase</a><span class="tag-list-count">1</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/GCP/" rel="tag">GCP</a><span class="tag-list-count">1</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/Git/" rel="tag">Git</a><span class="tag-list-count">2</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/Golang/" rel="tag">Golang</a><span class="tag-list-count">3</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/Google/" rel="tag">Google</a><span class="tag-list-count">3</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/GulpJs/" rel="tag">GulpJs</a><span class="tag-list-count">2</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/HTTP/" rel="tag">HTTP</a><span class="tag-list-count">1</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/Hexo/" rel="tag">Hexo</a><span class="tag-list-count">10</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/IIS/" rel="tag">IIS</a><span class="tag-list-count">1</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/IO/" rel="tag">IO</a><span class="tag-list-count">1</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/Integrated-Testing/" rel="tag">Integrated Testing</a><span class="tag-list-count">1</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/Jenkins/" rel="tag">Jenkins</a><span class="tag-list-count">4</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/Kubernetes/" rel="tag">Kubernetes</a><span class="tag-list-count">1</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/Linux/" rel="tag">Linux</a><span class="tag-list-count">2</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/Mongodb/" rel="tag">Mongodb</a><span class="tag-list-count">1</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/MsSQL/" rel="tag">MsSQL</a><span class="tag-list-count">3</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/MsTest/" rel="tag">MsTest</a><span class="tag-list-count">1</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/Mutation-Testing/" rel="tag">Mutation Testing</a><span class="tag-list-count">1</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/Nodejs/" rel="tag">Nodejs</a><span class="tag-list-count">10</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/OAuth/" rel="tag">OAuth</a><span class="tag-list-count">1</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/OOP/" rel="tag">OOP</a><span class="tag-list-count">3</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/Openshift/" rel="tag">Openshift</a><span class="tag-list-count">2</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/PowerShell/" rel="tag">PowerShell</a><span class="tag-list-count">3</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/React/" rel="tag">React</a><span class="tag-list-count">5</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/Redis/" rel="tag">Redis</a><span class="tag-list-count">3</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/SQL/" rel="tag">SQL</a><span class="tag-list-count">4</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/Scrum/" rel="tag">Scrum</a><span class="tag-list-count">13</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/Shell/" rel="tag">Shell</a><span class="tag-list-count">2</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/Specflow/" rel="tag">Specflow</a><span class="tag-list-count">1</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/StyleCop/" rel="tag">StyleCop</a><span class="tag-list-count">1</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/TDD/" rel="tag">TDD</a><span class="tag-list-count">11</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/Testing/" rel="tag">Testing</a><span class="tag-list-count">8</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/Thread/" rel="tag">Thread</a><span class="tag-list-count">2</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/Trello/" rel="tag">Trello</a><span class="tag-list-count">1</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/TypeScript/" rel="tag">TypeScript</a><span class="tag-list-count">8</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/Unit-Testing/" rel="tag">Unit Testing</a><span class="tag-list-count">19</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/Unix/" rel="tag">Unix</a><span class="tag-list-count">2</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/Vim/" rel="tag">Vim</a><span class="tag-list-count">1</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/Visual-Studio/" rel="tag">Visual Studio</a><span class="tag-list-count">1</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/html/" rel="tag">html</a><span class="tag-list-count">1</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/post/" rel="tag">post</a><span class="tag-list-count">1</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/%E5%AD%B8%E7%BF%92%E7%AD%86%E8%A8%98/" rel="tag">學習筆記</a><span class="tag-list-count">16</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/%E5%AF%A6%E4%BD%9C%E7%AD%86%E8%A8%98/" rel="tag">實作筆記</a><span class="tag-list-count">155</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/%E5%B7%A5%E5%85%B7%E7%AD%86%E8%A8%98/" rel="tag">工具筆記</a><span class="tag-list-count">2</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/%E6%99%82%E9%96%93%E7%AE%A1%E7%90%86/" rel="tag">時間管理</a><span class="tag-list-count">2</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/%E6%B4%BB%E5%8B%95%E7%AD%86%E8%A8%98/" rel="tag">活動筆記</a><span class="tag-list-count">6</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/%E7%94%9F%E6%B4%BB%E7%AD%86%E8%A8%98/" rel="tag">生活筆記</a><span class="tag-list-count">15</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/%E7%94%A2%E6%A5%AD%E5%A0%B1%E5%91%8A/" rel="tag">產業報告</a><span class="tag-list-count">1</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/%E8%A8%98%E9%8C%84/" rel="tag">記錄</a><span class="tag-list-count">3</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/%E8%AE%80%E6%9B%B8%E7%AD%86%E8%A8%98/" rel="tag">讀書筆記</a><span class="tag-list-count">1</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/%E8%B8%A9%E9%9B%B7%E7%AD%86%E8%A8%98/" rel="tag">踩雷筆記</a><span class="tag-list-count">11</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/%E9%87%8D%E6%A7%8B/" rel="tag">重構</a><span class="tag-list-count">5</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/%E9%96%B1%E8%AE%80%E7%AD%86%E8%A8%98/" rel="tag">閱讀筆記</a><span class="tag-list-count">15</span></li></ul>
+      <ul class="tag-list" itemprop="keywords"><li class="tag-list-item"><a class="tag-list-link" href="/tags/Net-Framework/" rel="tag">.Net Framework</a><span class="tag-list-count">10</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/AI%E7%94%9F%E6%88%90/" rel="tag">AI生成</a><span class="tag-list-count">6</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/API/" rel="tag">API</a><span class="tag-list-count">3</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/ASP-NET/" rel="tag">ASP.NET</a><span class="tag-list-count">1</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/AWS/" rel="tag">AWS</a><span class="tag-list-count">7</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/Agile/" rel="tag">Agile</a><span class="tag-list-count">14</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/CI-CD/" rel="tag">CI&#x2F;CD</a><span class="tag-list-count">24</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/Cache/" rel="tag">Cache</a><span class="tag-list-count">1</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/Coding-Standard/" rel="tag">Coding Standard</a><span class="tag-list-count">1</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/Container/" rel="tag">Container</a><span class="tag-list-count">4</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/Database/" rel="tag">Database</a><span class="tag-list-count">6</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/Design-Pattern/" rel="tag">Design Pattern</a><span class="tag-list-count">2</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/Docker/" rel="tag">Docker</a><span class="tag-list-count">4</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/ESLint/" rel="tag">ESLint</a><span class="tag-list-count">1</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/Entity-Framework/" rel="tag">Entity Framework</a><span class="tag-list-count">2</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/Firebase/" rel="tag">Firebase</a><span class="tag-list-count">1</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/GCP/" rel="tag">GCP</a><span class="tag-list-count">1</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/Git/" rel="tag">Git</a><span class="tag-list-count">2</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/Golang/" rel="tag">Golang</a><span class="tag-list-count">3</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/Google/" rel="tag">Google</a><span class="tag-list-count">3</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/GulpJs/" rel="tag">GulpJs</a><span class="tag-list-count">2</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/HTTP/" rel="tag">HTTP</a><span class="tag-list-count">1</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/Hexo/" rel="tag">Hexo</a><span class="tag-list-count">10</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/IIS/" rel="tag">IIS</a><span class="tag-list-count">1</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/IO/" rel="tag">IO</a><span class="tag-list-count">1</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/Integrated-Testing/" rel="tag">Integrated Testing</a><span class="tag-list-count">1</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/Jenkins/" rel="tag">Jenkins</a><span class="tag-list-count">4</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/Kubernetes/" rel="tag">Kubernetes</a><span class="tag-list-count">1</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/Linux/" rel="tag">Linux</a><span class="tag-list-count">2</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/Mongodb/" rel="tag">Mongodb</a><span class="tag-list-count">1</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/MsSQL/" rel="tag">MsSQL</a><span class="tag-list-count">3</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/MsTest/" rel="tag">MsTest</a><span class="tag-list-count">1</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/Mutation-Testing/" rel="tag">Mutation Testing</a><span class="tag-list-count">1</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/Nodejs/" rel="tag">Nodejs</a><span class="tag-list-count">10</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/OAuth/" rel="tag">OAuth</a><span class="tag-list-count">1</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/OOP/" rel="tag">OOP</a><span class="tag-list-count">3</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/Openshift/" rel="tag">Openshift</a><span class="tag-list-count">2</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/PowerShell/" rel="tag">PowerShell</a><span class="tag-list-count">3</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/React/" rel="tag">React</a><span class="tag-list-count">5</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/Redis/" rel="tag">Redis</a><span class="tag-list-count">3</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/SQL/" rel="tag">SQL</a><span class="tag-list-count">4</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/Scrum/" rel="tag">Scrum</a><span class="tag-list-count">13</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/Shell/" rel="tag">Shell</a><span class="tag-list-count">2</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/Specflow/" rel="tag">Specflow</a><span class="tag-list-count">1</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/StyleCop/" rel="tag">StyleCop</a><span class="tag-list-count">1</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/TDD/" rel="tag">TDD</a><span class="tag-list-count">11</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/Testing/" rel="tag">Testing</a><span class="tag-list-count">8</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/Thread/" rel="tag">Thread</a><span class="tag-list-count">2</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/Trello/" rel="tag">Trello</a><span class="tag-list-count">1</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/TypeScript/" rel="tag">TypeScript</a><span class="tag-list-count">8</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/Unit-Testing/" rel="tag">Unit Testing</a><span class="tag-list-count">19</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/Unix/" rel="tag">Unix</a><span class="tag-list-count">2</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/Vim/" rel="tag">Vim</a><span class="tag-list-count">1</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/Visual-Studio/" rel="tag">Visual Studio</a><span class="tag-list-count">1</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/html/" rel="tag">html</a><span class="tag-list-count">1</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/post/" rel="tag">post</a><span class="tag-list-count">1</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/%E5%AD%B8%E7%BF%92%E7%AD%86%E8%A8%98/" rel="tag">學習筆記</a><span class="tag-list-count">16</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/%E5%AF%A6%E4%BD%9C%E7%AD%86%E8%A8%98/" rel="tag">實作筆記</a><span class="tag-list-count">160</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/%E5%B7%A5%E5%85%B7%E7%AD%86%E8%A8%98/" rel="tag">工具筆記</a><span class="tag-list-count">3</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/%E6%99%82%E9%96%93%E7%AE%A1%E7%90%86/" rel="tag">時間管理</a><span class="tag-list-count">2</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/%E6%B4%BB%E5%8B%95%E7%AD%86%E8%A8%98/" rel="tag">活動筆記</a><span class="tag-list-count">6</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/%E7%94%9F%E6%B4%BB%E7%AD%86%E8%A8%98/" rel="tag">生活筆記</a><span class="tag-list-count">15</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/%E7%94%A2%E6%A5%AD%E5%A0%B1%E5%91%8A/" rel="tag">產業報告</a><span class="tag-list-count">1</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/%E8%A8%98%E9%8C%84/" rel="tag">記錄</a><span class="tag-list-count">3</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/%E8%AE%80%E6%9B%B8%E7%AD%86%E8%A8%98/" rel="tag">讀書筆記</a><span class="tag-list-count">1</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/%E8%B8%A9%E9%9B%B7%E7%AD%86%E8%A8%98/" rel="tag">踩雷筆記</a><span class="tag-list-count">11</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/%E9%87%8D%E6%A7%8B/" rel="tag">重構</a><span class="tag-list-count">5</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/%E9%96%B1%E8%AE%80%E7%AD%86%E8%A8%98/" rel="tag">閱讀筆記</a><span class="tag-list-count">15</span></li></ul>
     </div>
   </div>
 
@@ -1219,20 +1287,12 @@ This work is licensed under a
 <script src="/js/script.js?v=0.js"></script>
 
 <div id="likecoin">
-Please enable JavaScript to view the LikeCoin. :P
+  <script type="text/javascript">
+    document.write(
+      "<iframe scrolling='no' frameborder='0' sandbox='allow-scripts allow-same-origin allow-popups allow-popups-to-escape-sandbox allow-storage-access-by-user-activation' style='height: 212px; width: 100%;' src='https://button.like.co/in/embed/marsenlin/button?referrer=" +
+      encodeURIComponent(location.href.split("?")[0].split("#")[0]) + "'></iframe>");
+  </script>
 </div>
-<script>
-
-  (function(){
-    var ifrm = document.createElement("iframe");
-    ifrm.setAttribute("src", "https://button.like.co/in/embed/marsenlin/button?referrer=undefined");      
-    ifrm.setAttribute("sandbox","allow-scripts allow-same-origin allow-popups allow-popups-to-escape-sandbox");
-    ifrm.frameborder = "0";
-    ifrm.scrolling = "no";
-    (document.getElementById("likecoin").replaceChild(ifrm, document.getElementById("likecoin").childNodes[0]));
-  })();
-
-</script>
 <script>
 
   var disqus_shortname = 'marsenlin';
