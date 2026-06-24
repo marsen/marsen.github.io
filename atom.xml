@@ -12,7 +12,7 @@
   <rights>All rights reserved 2026, Marsen L.</rights>
   <subtitle>waiting to load</subtitle>
   <title>Marsen's Blog</title>
-  <updated>2026-06-24T22:15:18.357Z</updated>
+  <updated>2026-06-24T23:37:40.978Z</updated>
   <entry>
     <author>
       <name>Marsen L.</name>
@@ -29,7 +29,7 @@
       <![CDATA[<h2 id="前情提要"><a href="#前情提要" class="headerlink" title="前情提要"></a>前情提要</h2><p>串接 ECPay MPG（多元收款）時，本機測試有幾個坑需要提前知道。<br>整理一下從申請沙盒帳號到 webhook 打進]]>
     </summary>
     <title>[實作筆記] ECPay 綠界沙盒串接：本機測試完整流程</title>
-    <updated>2026-06-24T22:15:18.357Z</updated>
+    <updated>2026-06-24T23:37:40.978Z</updated>
   </entry>
   <entry>
     <author>
@@ -47,7 +47,7 @@
       <![CDATA[<h2 id="前情提要"><a href="#前情提要" class="headerlink" title="前情提要"></a>前情提要</h2><p>在本機開發時，第三方金流（ECPay、TapPay）的 webhook 需要一個公開 URL 才能打回來。<br>我試了 l]]>
     </summary>
     <title>[工具筆記] 本地 webhook 測試：用 cloudflared，不要用 localtunnel</title>
-    <updated>2026-06-24T22:15:18.357Z</updated>
+    <updated>2026-06-24T23:37:40.978Z</updated>
   </entry>
   <entry>
     <author>
@@ -65,7 +65,7 @@
       <![CDATA[<h2 id="前情提要"><a href="#前情提要" class="headerlink" title="前情提要"></a>前情提要</h2><p>在串接 ECPay 金流時，一個 API Route 裡用了 <code>redirect()</code>（from <c]]>
     </summary>
     <title>[實作筆記] Next.js 錯誤處理的三層：middleware、try-catch、instrumentation.ts</title>
-    <updated>2026-06-24T22:15:18.357Z</updated>
+    <updated>2026-06-24T23:37:40.979Z</updated>
   </entry>
   <entry>
     <author>
@@ -74,16 +74,17 @@
     </author>
     <category term="實作筆記" scheme="https://blog.marsen.me/tags/%E5%AF%A6%E4%BD%9C%E7%AD%86%E8%A8%98/"/>
     <content>
-      <![CDATA[<h2 id="前情提要"><a href="#前情提要" class="headerlink" title="前情提要"></a>前情提要</h2><p>在做電商平台時，遇到一個問題：要同時支援多家金流（TapPay、ECPay、藍新），<br>PaymentService 是同一個 interface，但有三個不同的實作。</p><p>這是 DI 的經典場景，自然就想到引入 DI container 來管理。<br>調查一輪之後，才發現 Next.js 的編譯器對這件事有一個很重要的限制。</p><h2 id="Next-js-預設用-SWC-編譯"><a href="#Next-js-預設用-SWC-編譯" class="headerlink" title="Next.js 預設用 SWC 編譯"></a>Next.js 預設用 SWC 編譯</h2><p>SWC 是用 Rust 寫的 JavaScript&#x2F;TypeScript 編譯器，Next.js 從 v12 開始改用它作為預設編譯器。</p><p>快很多，這是事實。但問題來了。</p><h2 id="InversifyJS-和-tsyringe-為什麼不能用"><a href="#InversifyJS-和-tsyringe-為什麼不能用" class="headerlink" title="InversifyJS 和 tsyringe 為什麼不能用"></a>InversifyJS 和 tsyringe 為什麼不能用</h2><p>InversifyJS 和 tsyringe 是目前最主流的兩個 TypeScript DI framework，<br>兩個都靠裝飾器（decorator）做依賴注入：</p><figure class="highlight ts"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br></pre></td><td class="code"><pre><span class="line"><span class="meta">@injectable</span>()</span><br><span class="line"><span class="keyword">class</span> <span class="title class_">TapPayPaymentAdapter</span> <span class="keyword">implements</span> <span class="title class_">PaymentService</span> &#123;</span><br><span class="line">  <span class="title function_">constructor</span>(<span class="params"><span class="meta">@inject</span>(<span class="string">&#x27;Logger&#x27;</span>) <span class="keyword">private</span> logger: LoggerService</span>) &#123;&#125;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure><p>這個模式需要兩個東西：</p><ol><li><strong><code>emitDecoratorMetadata</code></strong>：TypeScript 編譯時把型別資訊保留下來</li><li><strong><code>reflect-metadata</code></strong>：在執行期讀取那些型別資訊</li></ol><p>問題在於：<strong>SWC 對 <code>emitDecoratorMetadata</code> 的支援不完整</strong>。</p><p>SWC 的目標是快，不是完整複製 tsc 的行為。<br><code>reflect-metadata</code> 依賴的 metadata 在 SWC 編譯後不保證存在，跑起來會出錯或行為異常。</p><p>要硬用 InversifyJS，得把 Next.js 的編譯器換回 tsc，放棄 SWC 的效能優勢。代價太高。</p><h2 id="awilix-為什麼可以"><a href="#awilix-為什麼可以" class="headerlink" title="awilix 為什麼可以"></a>awilix 為什麼可以</h2><p>awilix 完全不用裝飾器，也不依賴 <code>reflect-metadata</code>。<br>它靠的是<strong>命名慣例</strong>：建構子參數的名稱對應 container 裡的 key。</p><figure class="highlight ts"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment">// container 裡這樣註冊</span></span><br><span class="line">container.<span class="title function_">register</span>(&#123;</span><br><span class="line">  <span class="attr">loggerService</span>: <span class="title function_">asClass</span>(<span class="title class_">PinoLoggerService</span>),</span><br><span class="line">  <span class="attr">tapPayService</span>: <span class="title function_">asClass</span>(<span class="title class_">TapPayPaymentAdapter</span>),</span><br><span class="line">  <span class="attr">ecpayService</span>: <span class="title function_">asClass</span>(<span class="title class_">EcpayPaymentAdapter</span>),</span><br><span class="line">&#125;)</span><br><span class="line"></span><br><span class="line"><span class="comment">// adapter 建構子這樣寫</span></span><br><span class="line"><span class="keyword">class</span> <span class="title class_">TapPayPaymentAdapter</span> &#123;</span><br><span class="line">  <span class="title function_">constructor</span>(<span class="params">&#123; loggerService &#125;: &#123; loggerService: LoggerService &#125;</span>) &#123;&#125;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure><p>名稱對上，awilix 自動注入。不需要編譯器幫你保留任何型別資訊，SWC 完全相容。</p><h2 id="三家比較"><a href="#三家比較" class="headerlink" title="三家比較"></a>三家比較</h2><table><thead><tr><th></th><th>InversifyJS</th><th>tsyringe</th><th>awilix</th></tr></thead><tbody><tr><td>週下載量</td><td>1.5M</td><td>600K</td><td>400K</td></tr><tr><td>裝飾器</td><td>需要</td><td>需要</td><td>不需要</td></tr><tr><td>reflect-metadata</td><td>需要</td><td>需要</td><td>不需要</td></tr><tr><td>Next.js &#x2F; SWC</td><td>❌</td><td>❌</td><td>✅</td></tr><tr><td>學習曲線</td><td>高</td><td>中</td><td>低</td></tr></tbody></table><p>下載量 InversifyJS 最高，但 Next.js 專案用不了。<br>Next.js 能用的只有 awilix。</p><h2 id="業界趨勢"><a href="#業界趨勢" class="headerlink" title="業界趨勢"></a>業界趨勢</h2><p>2026 的調查顯示，小型 Node.js 專案的趨勢反而是<strong>遠離 DI container</strong>，<br>回到手寫的 module-level singleton 或手動 dependency passing。</p><p>這不是說 DI container 不好，而是：</p><ul><li>依賴圖簡單時，手寫 container 清楚又好讀</li><li>依賴圖複雜到手寫開始讓人痛了，再引入才是真正有感的投資</li></ul><p>對我的情況，引入 awilix 的理由不只是技術問題，<br>還有<strong>早期建立團隊共識</strong>：早期引入就變成慣例，晚期引入沒人敢動。</p><h2 id="小結"><a href="#小結" class="headerlink" title="小結"></a>小結</h2><p>Next.js 用 SWC，SWC 不完整支援 reflect-metadata，所以 InversifyJS 和 tsyringe 不能用。<br>Next.js 專案要引入 DI container，awilix 是目前唯一合理的選擇。</p><p>(fin)</p>]]>
+      <![CDATA[<h2 id="前情提要"><a href="#前情提要" class="headerlink" title="前情提要"></a>前情提要</h2><p>在做電商平台時，遇到一個問題：要同時支援多家金流（TapPay、ECPay、藍新），</p><p>所以我設計了多個不同的 PaymentService 來實作同一個 interface。</p><p>這算是 DI 的經典場景，自然就想到引入 DI container 來管理。</p><p>調查一輪之後，才發現 Next.js 的編譯器對這件事有一個很重要的限制。</p><h2 id="Next-js-預設用-SWC-編譯"><a href="#Next-js-預設用-SWC-編譯" class="headerlink" title="Next.js 預設用 SWC 編譯"></a>Next.js 預設用 SWC 編譯</h2><p>SWC 是用 Rust 寫的 JavaScript&#x2F;TypeScript 編譯器，Next.js 從 v12 開始改用它作為預設編譯器。</p><p>快很多，這是事實。但問題來了。</p><h2 id="InversifyJS-和-tsyringe-為什麼不能用"><a href="#InversifyJS-和-tsyringe-為什麼不能用" class="headerlink" title="InversifyJS 和 tsyringe 為什麼不能用"></a>InversifyJS 和 tsyringe 為什麼不能用</h2><p>InversifyJS 和 tsyringe 是目前最主流的兩個 TypeScript DI framework，</p><p>兩個都靠裝飾器（decorator）做依賴注入：</p><figure class="highlight ts"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br></pre></td><td class="code"><pre><span class="line"><span class="meta">@injectable</span>()</span><br><span class="line"><span class="keyword">class</span> <span class="title class_">TapPayPaymentAdapter</span> <span class="keyword">implements</span> <span class="title class_">PaymentService</span> &#123;</span><br><span class="line">  <span class="title function_">constructor</span>(<span class="params"><span class="meta">@inject</span>(<span class="string">&#x27;Logger&#x27;</span>) <span class="keyword">private</span> logger: LoggerService</span>) &#123;&#125;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure><p>這個模式需要兩個東西：</p><ol><li><strong><code>emitDecoratorMetadata</code></strong>：TypeScript 編譯時把型別資訊保留下來</li><li><strong><code>reflect-metadata</code></strong>：在執行期讀取那些型別資訊</li></ol><p>問題在於：<strong>SWC 對 <code>emitDecoratorMetadata</code> 的支援不完整</strong>。</p><p>SWC 的目標是快，不是完整複製 tsc 的行為。</p><p><code>reflect-metadata</code> 依賴的 metadata 在 SWC 編譯後不保證存在，跑起來會出錯或行為異常。</p><p>要硬用 InversifyJS，得把 Next.js 的編譯器換回 tsc，放棄 SWC 的效能優勢。代價太高。</p><h2 id="awilix-為什麼可以"><a href="#awilix-為什麼可以" class="headerlink" title="awilix 為什麼可以"></a>awilix 為什麼可以</h2><p>awilix 完全不用裝飾器，也不依賴 <code>reflect-metadata</code>。</p><p>它靠的是<strong>命名慣例</strong>：建構子參數的名稱對應 container 裡的 key。</p><figure class="highlight ts"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment">// container 裡這樣註冊</span></span><br><span class="line">container.<span class="title function_">register</span>(&#123;</span><br><span class="line">  <span class="attr">loggerService</span>: <span class="title function_">asClass</span>(<span class="title class_">PinoLoggerService</span>),</span><br><span class="line">  <span class="attr">tapPayService</span>: <span class="title function_">asClass</span>(<span class="title class_">TapPayPaymentAdapter</span>),</span><br><span class="line">  <span class="attr">ecpayService</span>: <span class="title function_">asClass</span>(<span class="title class_">EcpayPaymentAdapter</span>),</span><br><span class="line">&#125;)</span><br><span class="line"></span><br><span class="line"><span class="comment">// adapter 建構子這樣寫</span></span><br><span class="line"><span class="keyword">class</span> <span class="title class_">TapPayPaymentAdapter</span> &#123;</span><br><span class="line">  <span class="title function_">constructor</span>(<span class="params">&#123; loggerService &#125;: &#123; loggerService: LoggerService &#125;</span>) &#123;&#125;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure><p>名稱對上，awilix 自動注入。不需要編譯器幫你保留任何型別資訊，SWC 完全相容。</p><h2 id="三家比較"><a href="#三家比較" class="headerlink" title="三家比較"></a>三家比較</h2><table><thead><tr><th></th><th>InversifyJS</th><th>tsyringe</th><th>awilix</th></tr></thead><tbody><tr><td>週下載量</td><td>1.5M</td><td>600K</td><td>400K</td></tr><tr><td>GitHub Stars</td><td>12K</td><td>6K</td><td>4.2K</td></tr><tr><td>裝飾器</td><td>需要</td><td>需要</td><td>不需要</td></tr><tr><td>reflect-metadata</td><td>需要</td><td>需要</td><td>不需要</td></tr><tr><td>Next.js &#x2F; SWC</td><td>❌</td><td>❌</td><td>✅</td></tr><tr><td>學習曲線</td><td>高</td><td>中</td><td>低</td></tr><tr><td>Token&#x2F;Symbol 保護</td><td>✅</td><td>✅</td><td>❌ 參數名即 key</td></tr><tr><td>Minification 安全</td><td>✅</td><td>✅</td><td>⚠️ 需額外設定</td></tr><tr><td>型別保護時機</td><td>編譯期</td><td>編譯期</td><td>執行期</td></tr></tbody></table><p>下載量 InversifyJS 最高，但 Next.js 專案用不了。</p><p>awilix 能跑，代價是命名耦合與 minification 的隱患，小專案先忽略。</p><h2 id="業界趨勢"><a href="#業界趨勢" class="headerlink" title="業界趨勢"></a>業界趨勢</h2><p>2026 的調查顯示，小型 Node.js 專案的趨勢反而是<strong>遠離 DI container</strong>，</p><p>回到手寫的 module-level singleton 或手動 dependency passing。</p><p>這不是說 DI container 不好，而是：</p><ul><li>依賴圖簡單時，手寫 container 清楚又好讀</li><li>依賴圖複雜到手寫開始讓人痛了，再引入才是真正有感的投資</li></ul><p>我的考量是<strong>早期建立團隊開發共識與原則</strong>：</p><p>在 AI 時代，這樣技術學習門檻不高，早期引入就變成慣例，讓 AI 用乾淨架構去開發，才不會一沱。</p><h2 id="小結"><a href="#小結" class="headerlink" title="小結"></a>小結</h2><p>Next.js 用 SWC，SWC 不完整支援 reflect-metadata，所以 InversifyJS 和 tsyringe 不能用。</p><p>Next.js 專案要引入 DI container，awilix 是目前唯一合理的選擇。</p><p>(fin)</p>]]>
     </content>
     <id>https://blog.marsen.me/2026/06/16/2026/di-nextjs-swc-compatibility/</id>
     <link href="https://blog.marsen.me/2026/06/16/2026/di-nextjs-swc-compatibility/"/>
     <published>2026-06-16T20:26:03.000Z</published>
     <summary>
-      <![CDATA[<h2 id="前情提要"><a href="#前情提要" class="headerlink" title="前情提要"></a>前情提要</h2><p>在做電商平台時，遇到一個問題：要同時支援多家金流（TapPay、ECPay、藍新），<br>PaymentService 是]]>
+      <![CDATA[<h2 id="前情提要"><a href="#前情提要" class="headerlink" title="前情提要"></a>前情提要</h2><p>在做電商平台時，遇到一個問題：要同時支援多家金流（TapPay、ECPay、藍新），</p>
+<p>所以我設計了多個不同的]]>
     </summary>
     <title>[實作筆記] 為什麼 InversifyJS 在 Next.js 不能用？SWC 相容性問題與 awilix 解法</title>
-    <updated>2026-06-24T22:15:18.357Z</updated>
+    <updated>2026-06-24T23:37:40.978Z</updated>
   </entry>
   <entry>
     <author>
@@ -102,7 +103,7 @@
 <figure class="highli]]>
     </summary>
     <title>[實作筆記] Next.js 16 — middleware 改名為 proxy 了</title>
-    <updated>2026-06-24T22:15:18.357Z</updated>
+    <updated>2026-06-24T23:37:40.979Z</updated>
   </entry>
   <entry>
     <author>
@@ -121,7 +122,7 @@
 <p>這個問題帶出了前端靜]]>
     </summary>
     <title>[實作筆記] 形象站滿版背景影片（一）：前端靜態資源放哪裡</title>
-    <updated>2026-06-24T22:15:18.357Z</updated>
+    <updated>2026-06-24T23:37:40.978Z</updated>
   </entry>
   <entry>
     <author>
@@ -140,7 +141,7 @@
 <h2 id="本周要點"><a href="#本周要點" class="headerlink" title="本周要點"></a>本周要]]>
     </summary>
     <title>[AI生成] 20260612 科技周報</title>
-    <updated>2026-06-24T22:15:18.357Z</updated>
+    <updated>2026-06-24T23:37:40.978Z</updated>
   </entry>
   <entry>
     <author>
@@ -158,7 +159,7 @@
       <![CDATA[<h2 id="前情提要"><a href="#前情提要" class="headerlink" title="前情提要"></a>前情提要</h2><p>AI Coding 工具迭代太快，半年就是一個世代。<br>趁 2026 年中把目前市場上的 Agent Coding 工具]]>
     </summary>
     <title>[工具筆記] 2026 年中 AI Agent Coding 工具盤點：Claude Code、Cursor、Codex 怎麼選</title>
-    <updated>2026-06-24T22:15:18.355Z</updated>
+    <updated>2026-06-24T23:37:40.977Z</updated>
   </entry>
   <entry>
     <author>
@@ -177,7 +178,7 @@
 <h2 id="本周要點"><a href="#本周要點" class="headerlink" title="本周要點"></a>本周要]]>
     </summary>
     <title>[AI生成] 20260610 科技周報</title>
-    <updated>2026-06-24T22:15:18.357Z</updated>
+    <updated>2026-06-24T23:37:40.978Z</updated>
   </entry>
   <entry>
     <author>
@@ -197,7 +198,7 @@
 <p>Hero 區塊是網頁最頂部的全版區塊，通]]>
     </summary>
     <title>[實作筆記] 形象站滿版背景影片（二）：流量、CDN 與播放器選型</title>
-    <updated>2026-06-24T22:15:18.357Z</updated>
+    <updated>2026-06-24T23:37:40.978Z</updated>
   </entry>
   <entry>
     <author>
@@ -216,7 +217,7 @@
 <h2 id="本周要點"><a href="#本周要點" class="headerlink" title="本周要點"></a>本周要]]>
     </summary>
     <title>[AI生成] 20260605 科技周報</title>
-    <updated>2026-06-24T22:15:18.357Z</updated>
+    <updated>2026-06-24T23:37:40.978Z</updated>
   </entry>
   <entry>
     <author>
@@ -235,7 +236,7 @@
 <figure class="hi]]>
     </summary>
     <title>[實作筆記] 盤點與清理自訂網域的 Email DNS 殘留（用郵件 header 當偵探）</title>
-    <updated>2026-06-24T22:15:18.357Z</updated>
+    <updated>2026-06-24T23:37:40.978Z</updated>
   </entry>
   <entry>
     <author>
@@ -254,7 +255,7 @@
 <fi]]>
     </summary>
     <title>[實作筆記] 更新自架在 GCP VM 上的 n8n（Docker 版）</title>
-    <updated>2026-06-24T22:15:18.358Z</updated>
+    <updated>2026-06-24T23:37:40.979Z</updated>
   </entry>
   <entry>
     <author>
@@ -273,7 +274,7 @@
 <p>比著發現原來存在著兩種金流串接]]>
     </summary>
     <title>[工具筆記] Prime Token vs MPG：兩種台灣電商金流模式的本質差異</title>
-    <updated>2026-06-24T22:15:18.357Z</updated>
+    <updated>2026-06-24T23:37:40.979Z</updated>
   </entry>
   <entry>
     <author>
@@ -291,7 +292,7 @@
       <![CDATA[<h2 id="前情提要"><a href="#前情提要" class="headerlink" title="前情提要"></a>前情提要</h2><p>想把個人 PBI 清單整合進 GitHub Projects，<br>同時設定 GitHub Actions 讓新 Issu]]>
     </summary>
     <title>[踩雷筆記] gh CLI 操作 GitHub Projects 與 Actions 的授權</title>
-    <updated>2026-06-24T22:15:18.357Z</updated>
+    <updated>2026-06-24T23:37:40.978Z</updated>
   </entry>
   <entry>
     <author>
@@ -309,7 +310,7 @@
       <![CDATA[<h2 id="前情提要"><a href="#前情提要" class="headerlink" title="前情提要"></a>前情提要</h2><p>用 LINE Bot 做系統通知，結果某天發現通知完全停了，重啟也沒用。<br>查了一圈才發現根本原因不是程式問題，這篇記錄]]>
     </summary>
     <title>[實作筆記] LINE Messaging API 用量查詢：免費額度怎麼看，以及為什麼通知會停止</title>
-    <updated>2026-06-24T22:15:18.357Z</updated>
+    <updated>2026-06-24T23:37:40.978Z</updated>
   </entry>
   <entry>
     <author>
@@ -328,7 +329,7 @@
 <li><a href="https://www.theverge.com/ai-artificial-intellig]]>
     </summary>
     <title>[AI生成]20260505 周報</title>
-    <updated>2026-06-24T22:15:18.357Z</updated>
+    <updated>2026-06-24T23:37:40.978Z</updated>
   </entry>
   <entry>
     <author>
@@ -347,7 +348,7 @@
 <li><a href="https://www.theverge.com/ai-artificial-intellig]]>
     </summary>
     <title>[AI生成]20260504 周報</title>
-    <updated>2026-06-24T22:15:18.357Z</updated>
+    <updated>2026-06-24T23:37:40.978Z</updated>
   </entry>
   <entry>
     <author>
@@ -366,7 +367,7 @@
 <li><a href="https://www.briefs.co/news/uber-torches-entire-]]>
     </summary>
     <title>[AI生成]20260502 周報</title>
-    <updated>2026-06-24T22:15:18.357Z</updated>
+    <updated>2026-06-24T23:37:40.978Z</updated>
   </entry>
   <entry>
     <author>
@@ -385,6 +386,6 @@
 <p>VM 重開機沒問題，但容器砍掉重建、或換]]>
     </summary>
     <title>[實作筆記] 個人自動化平台(七) n8n 備份自動化：workflow + credentials → GitHub</title>
-    <updated>2026-06-24T22:15:18.357Z</updated>
+    <updated>2026-06-24T23:37:40.978Z</updated>
   </entry>
 </feed>
