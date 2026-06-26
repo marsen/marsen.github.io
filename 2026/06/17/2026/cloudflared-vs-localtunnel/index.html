@@ -43,7 +43,7 @@ j=d.createElement(s),dl=l!='dataLayer'?'&l='+l:'';j.async=true;j.src=
 <meta property="og:description" content="前情提要在本機開發時，第三方金流（ECPay、TapPay）的 webhook 需要一個公開 URL 才能打回來。我試了 localtunnel，然後換成 cloudflared，體驗差很多，記錄一下。 localtunnel 的問題localtunnel 安裝很簡單： 1npx localtunnel --port 3000  但實際用起來有幾個痛點： 不穩定。tunnel 動不動就斷，斷了 U">
 <meta property="og:locale" content="zh_TW">
 <meta property="article:published_time" content="2026-06-17T21:02:58.000Z">
-<meta property="article:modified_time" content="2026-06-26T09:51:03.003Z">
+<meta property="article:modified_time" content="2026-06-26T18:34:54.506Z">
 <meta property="article:author" content="Marsen L.">
 <meta property="article:tag" content="工具筆記">
 <meta name="twitter:card" content="summary">
@@ -189,22 +189,13 @@ j=d.createElement(s),dl=l!='dataLayer'?'&l='+l:'';j.async=true;j.src=
 
 <p>然後重啟 dev server，金流後台的 webhook URL 也一起更新，就可以測了。</p>
 <p>每次重新跑 URL 會換，這點跟 localtunnel 一樣，需要重設一次。<br>但只要 tunnel 不斷，URL 就是固定的，這點比 localtunnel 好太多。</p>
-<h2 id="雷點：Port-衝突導致-404"><a href="#雷點：Port-衝突導致-404" class="headerlink" title="雷點：Port 衝突導致 404"></a>雷點：Port 衝突導致 404</h2><p>cloudflared 的 tunnel 指向的 port 是靜態設定，<br>但 Next.js 如果 3000 被佔用，會自動 fallback 到 3001：</p>
-<figure class="highlight text"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">⚠ Port 3000 is in use by process 65277, using available port 3001 instead.</span><br></pre></td></tr></table></figure>
-
-<p>tunnel 不知道這件事，流量還是打到 3000，金流 callback 就 404。</p>
-<p>本機瀏覽器開 <code>localhost:3001</code> 完全正常，只有走 tunnel 的路徑壞，很難發現。</p>
-<p>解法很簡單，先砍掉佔用 3000 的 process 再重啟：</p>
-<figure class="highlight bash"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br></pre></td><td class="code"><pre><span class="line">lsof -ti:3000 | xargs <span class="built_in">kill</span> -9</span><br><span class="line">pnpm dev</span><br></pre></td></tr></table></figure>
-
 <h2 id="小結"><a href="#小結" class="headerlink" title="小結"></a>小結</h2><p>本機測 webhook，直接用 cloudflared，不要碰 localtunnel。<br>免安裝、沒有驗證頁擋路、穩定，完全沒有理由繼續用 localtunnel。</p>
-<p>測試前記得確認 dev server 跑在哪個 port，tunnel 要對齊。</p>
 <p>(fin)</p>
 
       
     </div>
     <footer class="article-footer">
-      <a data-url="https://blog.marsen.me/2026/06/17/2026/cloudflared-vs-localtunnel/" data-id="cuid70-ad2G4ATLjV8t4qtJco" class="article-share-link">Share</a>
+      <a data-url="https://blog.marsen.me/2026/06/17/2026/cloudflared-vs-localtunnel/" data-id="cuidIkTQ-rz-z6OgF5YXcf7Lq" class="article-share-link">Share</a>
       
         <a href="https://blog.marsen.me/2026/06/17/2026/cloudflared-vs-localtunnel/#disqus_thread" class="article-comment-link">留言</a>
       

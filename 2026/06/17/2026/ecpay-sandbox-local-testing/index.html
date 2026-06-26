@@ -43,7 +43,7 @@ j=d.createElement(s),dl=l!='dataLayer'?'&l='+l:'';j.async=true;j.src=
 <meta property="og:description" content="前情提要串接 ECPay MPG（多元收款）時，本機測試有幾個坑需要提前知道。整理一下從申請沙盒帳號到 webhook 打進來的完整流程。 申請沙盒帳號到 ECPay 開發者後台申請測試帳號： 1https:&#x2F;&#x2F;vendor.ecpay.com.tw  登入後進入「廠商後台」→「系統開發」→「系統介接測試」，可以拿到沙盒專用的三個憑證： 123ECPAY_MERCHANT_ID&#x3D;3002607EC">
 <meta property="og:locale" content="zh_TW">
 <meta property="article:published_time" content="2026-06-17T21:12:57.000Z">
-<meta property="article:modified_time" content="2026-06-26T09:51:03.003Z">
+<meta property="article:modified_time" content="2026-06-26T18:34:54.506Z">
 <meta property="article:author" content="Marsen L.">
 <meta property="article:tag" content="實作筆記">
 <meta name="twitter:card" content="summary">
@@ -137,25 +137,7 @@ j=d.createElement(s),dl=l!='dataLayer'?'&l='+l:'';j.async=true;j.src=
 
 <p>這三組是 ECPay 官方的公開測試值，可以直接用。</p>
 <h2 id="兩個重要-URL-的差別"><a href="#兩個重要-URL-的差別" class="headerlink" title="兩個重要 URL 的差別"></a>兩個重要 URL 的差別</h2><p>ECPay MPG 有兩個容易搞混的 URL 參數：</p>
-<table>
-<thead>
-<tr>
-<th>參數</th>
-<th>觸發時機</th>
-<th>方向</th>
-</tr>
-</thead>
-<tbody><tr>
-<td><code>ReturnURL</code></td>
-<td>付款完成後 ECPay 主動通知</td>
-<td>ECPay → 你的 server（POST）</td>
-</tr>
-<tr>
-<td><code>OrderResultURL</code></td>
-<td>付款完成後瀏覽器跳回</td>
-<td>ECPay → 使用者瀏覽器（POST redirect）</td>
-</tr>
-</tbody></table>
+<p>| 參數 | 觸發時機 | 方向 |<br>|　——　|　———　|　——　|<br>| <code>ReturnURL</code> | 付款完成後 ECPay 主動通知 | ECPay → 你的 server（POST） |<br>| <code>OrderResultURL</code> | 付款完成後瀏覽器跳回 | ECPay → 使用者瀏覽器（POST redirect） |</p>
 <p>兩個都要設，缺一個就會有問題：</p>
 <ul>
 <li>沒有 <code>ReturnURL</code>：訂單狀態永遠不會更新，使用者付了錢系統不知道</li>
@@ -180,47 +162,23 @@ j=d.createElement(s),dl=l!='dataLayer'?'&l='+l:'';j.async=true;j.src=
 <li>比對結果與收到的 <code>CheckMacValue</code></li>
 </ol>
 <p>驗證不過要回 <code>0|FAIL</code>，成功要回 <code>1|OK</code>。<br>不管成功失敗，HTTP status 都回 200，這是 ECPay 的協定要求。</p>
-<h2 id="測試信用卡"><a href="#測試信用卡" class="headerlink" title="測試信用卡"></a>測試信用卡</h2><p>沙盒環境可以用以下測試卡：</p>
-<table>
-<thead>
-<tr>
-<th>卡號</th>
-<th>有效月年</th>
-<th>CVV</th>
-<th>說明</th>
-</tr>
-</thead>
-<tbody><tr>
-<td>4311-9522-2222-2222</td>
-<td>任意未到期</td>
-<td>任意</td>
-<td>成功付款</td>
-</tr>
-<tr>
-<td>4311-9522-2222-2222</td>
-<td>任意未到期</td>
-<td>任意</td>
-<td>3D 驗證（依設定）</td>
-</tr>
-</tbody></table>
+<h2 id="測試信用卡"><a href="#測試信用卡" class="headerlink" title="測試信用卡"></a>測試信用卡</h2><p>測試卡號請參考官方「測試介接資訊」頁面，卡號較多且會更新，不在這裡複製。</p>
 <p>ECPay 沙盒付款頁網址：</p>
 <figure class="highlight text"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">https://payment-stage.ecpay.com.tw/Cashier/AioCheckout/index</span><br></pre></td></tr></table></figure>
 
 <p>這個頁面上的所有付款方式（包括 Apple Pay）都是沙盒，不會真實扣款。</p>
-<h2 id="常見錯誤"><a href="#常見錯誤" class="headerlink" title="常見錯誤"></a>常見錯誤</h2><p><strong>付款失敗，訊息代碼 10100058</strong></p>
-<p>通常是 CheckMacValue 算錯。<br>確認 HASH_KEY、HASH_IV 正確，URL encode 用的是 <code>encodeURIComponent</code> 後轉小寫（不是 <code>encodeURI</code>）。</p>
-<p><strong>付款成功但訂單沒更新</strong></p>
-<p><code>ReturnURL</code> 沒收到 webhook。檢查：</p>
+<h2 id="常見錯誤"><a href="#常見錯誤" class="headerlink" title="常見錯誤"></a>常見錯誤</h2><h3 id="付款失敗"><a href="#付款失敗" class="headerlink" title="付款失敗"></a>付款失敗</h3><p>通常是 CheckMacValue 算錯。<br>確認 HASH_KEY、HASH_IV 正確，URL encode 用的是 <code>encodeURIComponent</code> 後轉小寫（不是 <code>encodeURI</code>）。</p>
+<h3 id="付款成功但訂單沒更新"><a href="#付款成功但訂單沒更新" class="headerlink" title="付款成功但訂單沒更新"></a>付款成功但訂單沒更新</h3><p><code>ReturnURL</code> 沒收到 webhook callback。</p>
 <ol>
-<li>tunnel 有沒有在跑</li>
+<li>地端測試時，可以檢查tunnel 有沒有在跑</li>
 <li><code>ReturnURL</code> 有沒有帶到正確的 tunnel URL</li>
 <li>dev server log 有沒有收到 POST</li>
 </ol>
-<p><strong>付款完成後使用者停在 ECPay 頁面</strong></p>
-<p><code>OrderResultURL</code> 沒設或設錯，ECPay 不知道要跳回哪裡。</p>
+<h3 id="付款完成後使用者停在-ECPay-頁面"><a href="#付款完成後使用者停在-ECPay-頁面" class="headerlink" title="付款完成後使用者停在 ECPay 頁面"></a>付款完成後使用者停在 ECPay 頁面</h3><p><code>OrderResultURL</code> 沒設或設錯，ECPay 不知道要跳回哪裡。</p>
 <p><strong>redirect 跑到 <code>https://localhost:3000</code></strong></p>
 <p>在 API Route Handler 裡用 <code>request.url</code> 拿 origin 時，<br>cloudflared 會加 <code>X-Forwarded-Proto: https</code>，導致 Next.js 認為 origin 是 <code>https://localhost:3000</code>。<br>解法是直接讀 <code>NEXT_PUBLIC_BASE_URL</code> 環境變數，不要從 request 推。</p>
 <h2 id="參考"><a href="#參考" class="headerlink" title="參考"></a>參考</h2><ul>
+<li><a target="_blank" rel="noopener" href="https://developers.ecpay.com.tw/2856/">ECPay 官方：測試介接資訊（含測試卡號）</a></li>
 <li><a href="/2026/cloudflared-vs-localtunnel/">本地 webhook 測試：用 cloudflared，不要用 localtunnel</a></li>
 </ul>
 <h2 id="小結"><a href="#小結" class="headerlink" title="小結"></a>小結</h2><p>ECPay 沙盒串接的關鍵點：</p>
@@ -235,7 +193,7 @@ j=d.createElement(s),dl=l!='dataLayer'?'&l='+l:'';j.async=true;j.src=
       
     </div>
     <footer class="article-footer">
-      <a data-url="https://blog.marsen.me/2026/06/17/2026/ecpay-sandbox-local-testing/" data-id="cuidmO-Wdwqe7XhCwYGl9xQoI" class="article-share-link">Share</a>
+      <a data-url="https://blog.marsen.me/2026/06/17/2026/ecpay-sandbox-local-testing/" data-id="cuidYsRPzC1l6e5H9BC7eZNDd" class="article-share-link">Share</a>
       
         <a href="https://blog.marsen.me/2026/06/17/2026/ecpay-sandbox-local-testing/#disqus_thread" class="article-comment-link">留言</a>
       

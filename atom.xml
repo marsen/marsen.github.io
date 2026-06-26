@@ -12,7 +12,7 @@
   <rights>All rights reserved 2026, Marsen L.</rights>
   <subtitle>waiting to load</subtitle>
   <title>Marsen's Blog</title>
-  <updated>2026-06-26T09:51:03.003Z</updated>
+  <updated>2026-06-26T18:34:54.506Z</updated>
   <entry>
     <author>
       <name>Marsen L.</name>
@@ -20,7 +20,7 @@
     </author>
     <category term="實作筆記" scheme="https://blog.marsen.me/tags/%E5%AF%A6%E4%BD%9C%E7%AD%86%E8%A8%98/"/>
     <content>
-      <![CDATA[<h2 id="前情提要"><a href="#前情提要" class="headerlink" title="前情提要"></a>前情提要</h2><p>串接 ECPay MPG（多元收款）時，本機測試有幾個坑需要提前知道。<br>整理一下從申請沙盒帳號到 webhook 打進來的完整流程。</p><h2 id="申請沙盒帳號"><a href="#申請沙盒帳號" class="headerlink" title="申請沙盒帳號"></a>申請沙盒帳號</h2><p>到 ECPay 開發者後台申請測試帳號：</p><figure class="highlight text"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">https://vendor.ecpay.com.tw</span><br></pre></td></tr></table></figure><p>登入後進入「廠商後台」→「系統開發」→「系統介接測試」，<br>可以拿到沙盒專用的三個憑證：</p><figure class="highlight ini"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br></pre></td><td class="code"><pre><span class="line"><span class="attr">ECPAY_MERCHANT_ID</span>=<span class="number">3002607</span></span><br><span class="line"><span class="attr">ECPAY_HASH_KEY</span>=pwFHCqoQZGmho4w6</span><br><span class="line"><span class="attr">ECPAY_HASH_IV</span>=EkRm7uxTO9nv1tog</span><br></pre></td></tr></table></figure><p>這三組是 ECPay 官方的公開測試值，可以直接用。</p><h2 id="兩個重要-URL-的差別"><a href="#兩個重要-URL-的差別" class="headerlink" title="兩個重要 URL 的差別"></a>兩個重要 URL 的差別</h2><p>ECPay MPG 有兩個容易搞混的 URL 參數：</p><table><thead><tr><th>參數</th><th>觸發時機</th><th>方向</th></tr></thead><tbody><tr><td><code>ReturnURL</code></td><td>付款完成後 ECPay 主動通知</td><td>ECPay → 你的 server（POST）</td></tr><tr><td><code>OrderResultURL</code></td><td>付款完成後瀏覽器跳回</td><td>ECPay → 使用者瀏覽器（POST redirect）</td></tr></tbody></table><p>兩個都要設，缺一個就會有問題：</p><ul><li>沒有 <code>ReturnURL</code>：訂單狀態永遠不會更新，使用者付了錢系統不知道</li><li>沒有 <code>OrderResultURL</code>：付款完成後使用者停在 ECPay 頁面，不會跳回你的網站</li></ul><h2 id="本機測試的問題"><a href="#本機測試的問題" class="headerlink" title="本機測試的問題"></a>本機測試的問題</h2><p>ECPay 的 <code>ReturnURL</code> 是 server-to-server 的 webhook，<br>ECPay 的機器要能打到你的 server，所以 <code>localhost</code> 根本不行。</p><p>解法是用 tunnel 工具讓本機有一個公開 URL。<br>推薦用 <strong>cloudflared</strong>，不要用 localtunnel（理由另篇說明）。</p><figure class="highlight bash"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">npx cloudflared tunnel --url http://localhost:3000</span><br></pre></td></tr></table></figure><p>拿到 URL 之後更新 <code>.env.local</code>：</p><figure class="highlight ini"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line"><span class="attr">NEXT_PUBLIC_BASE_URL</span>=https://your-tunnel.trycloudflare.com</span><br></pre></td></tr></table></figure><p>重啟 dev server，這個 URL 就會被用來組 <code>ReturnURL</code> 和 <code>OrderResultURL</code>。</p><h2 id="CheckMacValue-驗證"><a href="#CheckMacValue-驗證" class="headerlink" title="CheckMacValue 驗證"></a>CheckMacValue 驗證</h2><p>ECPay 打來的 webhook 會帶一個 <code>CheckMacValue</code>，<br>這是用 HASH_KEY 和 HASH_IV 算出來的簽章，用來確認請求是真的來自 ECPay。</p><p>驗證流程：</p><ol><li>把收到的 POST body 解析成 key-value</li><li>移除 <code>CheckMacValue</code> 欄位本身</li><li>依 key 字母排序，組成 <code>key=value&amp;key=value</code> 字串</li><li>前後加上 <code>HashKey=...&amp;</code> 和 <code>&amp;HashIV=...</code></li><li>URL encode（小寫）後做 SHA256，轉大寫</li><li>比對結果與收到的 <code>CheckMacValue</code></li></ol><p>驗證不過要回 <code>0|FAIL</code>，成功要回 <code>1|OK</code>。<br>不管成功失敗，HTTP status 都回 200，這是 ECPay 的協定要求。</p><h2 id="測試信用卡"><a href="#測試信用卡" class="headerlink" title="測試信用卡"></a>測試信用卡</h2><p>沙盒環境可以用以下測試卡：</p><table><thead><tr><th>卡號</th><th>有效月年</th><th>CVV</th><th>說明</th></tr></thead><tbody><tr><td>4311-9522-2222-2222</td><td>任意未到期</td><td>任意</td><td>成功付款</td></tr><tr><td>4311-9522-2222-2222</td><td>任意未到期</td><td>任意</td><td>3D 驗證（依設定）</td></tr></tbody></table><p>ECPay 沙盒付款頁網址：</p><figure class="highlight text"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">https://payment-stage.ecpay.com.tw/Cashier/AioCheckout/index</span><br></pre></td></tr></table></figure><p>這個頁面上的所有付款方式（包括 Apple Pay）都是沙盒，不會真實扣款。</p><h2 id="常見錯誤"><a href="#常見錯誤" class="headerlink" title="常見錯誤"></a>常見錯誤</h2><p><strong>付款失敗，訊息代碼 10100058</strong></p><p>通常是 CheckMacValue 算錯。<br>確認 HASH_KEY、HASH_IV 正確，URL encode 用的是 <code>encodeURIComponent</code> 後轉小寫（不是 <code>encodeURI</code>）。</p><p><strong>付款成功但訂單沒更新</strong></p><p><code>ReturnURL</code> 沒收到 webhook。檢查：</p><ol><li>tunnel 有沒有在跑</li><li><code>ReturnURL</code> 有沒有帶到正確的 tunnel URL</li><li>dev server log 有沒有收到 POST</li></ol><p><strong>付款完成後使用者停在 ECPay 頁面</strong></p><p><code>OrderResultURL</code> 沒設或設錯，ECPay 不知道要跳回哪裡。</p><p><strong>redirect 跑到 <code>https://localhost:3000</code></strong></p><p>在 API Route Handler 裡用 <code>request.url</code> 拿 origin 時，<br>cloudflared 會加 <code>X-Forwarded-Proto: https</code>，導致 Next.js 認為 origin 是 <code>https://localhost:3000</code>。<br>解法是直接讀 <code>NEXT_PUBLIC_BASE_URL</code> 環境變數，不要從 request 推。</p><h2 id="參考"><a href="#參考" class="headerlink" title="參考"></a>參考</h2><ul><li><a href="/2026/cloudflared-vs-localtunnel/">本地 webhook 測試：用 cloudflared，不要用 localtunnel</a></li></ul><h2 id="小結"><a href="#小結" class="headerlink" title="小結"></a>小結</h2><p>ECPay 沙盒串接的關鍵點：</p><ol><li><code>ReturnURL</code> 和 <code>OrderResultURL</code> 都要設，職責不同</li><li>本機測試一定要用 tunnel，推薦 cloudflared</li><li>CheckMacValue 驗證不能省，這是確認 webhook 來源的唯一機制</li><li>API Route 裡的 redirect URL 要從環境變數讀，不要從 request 推</li></ol><p>(fin)</p>]]>
+      <![CDATA[<h2 id="前情提要"><a href="#前情提要" class="headerlink" title="前情提要"></a>前情提要</h2><p>串接 ECPay MPG（多元收款）時，本機測試有幾個坑需要提前知道。<br>整理一下從申請沙盒帳號到 webhook 打進來的完整流程。</p><h2 id="申請沙盒帳號"><a href="#申請沙盒帳號" class="headerlink" title="申請沙盒帳號"></a>申請沙盒帳號</h2><p>到 ECPay 開發者後台申請測試帳號：</p><figure class="highlight text"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">https://vendor.ecpay.com.tw</span><br></pre></td></tr></table></figure><p>登入後進入「廠商後台」→「系統開發」→「系統介接測試」，<br>可以拿到沙盒專用的三個憑證：</p><figure class="highlight ini"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br></pre></td><td class="code"><pre><span class="line"><span class="attr">ECPAY_MERCHANT_ID</span>=<span class="number">3002607</span></span><br><span class="line"><span class="attr">ECPAY_HASH_KEY</span>=pwFHCqoQZGmho4w6</span><br><span class="line"><span class="attr">ECPAY_HASH_IV</span>=EkRm7uxTO9nv1tog</span><br></pre></td></tr></table></figure><p>這三組是 ECPay 官方的公開測試值，可以直接用。</p><h2 id="兩個重要-URL-的差別"><a href="#兩個重要-URL-的差別" class="headerlink" title="兩個重要 URL 的差別"></a>兩個重要 URL 的差別</h2><p>ECPay MPG 有兩個容易搞混的 URL 參數：</p><p>| 參數 | 觸發時機 | 方向 |<br>|　——　|　———　|　——　|<br>| <code>ReturnURL</code> | 付款完成後 ECPay 主動通知 | ECPay → 你的 server（POST） |<br>| <code>OrderResultURL</code> | 付款完成後瀏覽器跳回 | ECPay → 使用者瀏覽器（POST redirect） |</p><p>兩個都要設，缺一個就會有問題：</p><ul><li>沒有 <code>ReturnURL</code>：訂單狀態永遠不會更新，使用者付了錢系統不知道</li><li>沒有 <code>OrderResultURL</code>：付款完成後使用者停在 ECPay 頁面，不會跳回你的網站</li></ul><h2 id="本機測試的問題"><a href="#本機測試的問題" class="headerlink" title="本機測試的問題"></a>本機測試的問題</h2><p>ECPay 的 <code>ReturnURL</code> 是 server-to-server 的 webhook，<br>ECPay 的機器要能打到你的 server，所以 <code>localhost</code> 根本不行。</p><p>解法是用 tunnel 工具讓本機有一個公開 URL。<br>推薦用 <strong>cloudflared</strong>，不要用 localtunnel（理由另篇說明）。</p><figure class="highlight bash"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">npx cloudflared tunnel --url http://localhost:3000</span><br></pre></td></tr></table></figure><p>拿到 URL 之後更新 <code>.env.local</code>：</p><figure class="highlight ini"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line"><span class="attr">NEXT_PUBLIC_BASE_URL</span>=https://your-tunnel.trycloudflare.com</span><br></pre></td></tr></table></figure><p>重啟 dev server，這個 URL 就會被用來組 <code>ReturnURL</code> 和 <code>OrderResultURL</code>。</p><h2 id="CheckMacValue-驗證"><a href="#CheckMacValue-驗證" class="headerlink" title="CheckMacValue 驗證"></a>CheckMacValue 驗證</h2><p>ECPay 打來的 webhook 會帶一個 <code>CheckMacValue</code>，<br>這是用 HASH_KEY 和 HASH_IV 算出來的簽章，用來確認請求是真的來自 ECPay。</p><p>驗證流程：</p><ol><li>把收到的 POST body 解析成 key-value</li><li>移除 <code>CheckMacValue</code> 欄位本身</li><li>依 key 字母排序，組成 <code>key=value&amp;key=value</code> 字串</li><li>前後加上 <code>HashKey=...&amp;</code> 和 <code>&amp;HashIV=...</code></li><li>URL encode（小寫）後做 SHA256，轉大寫</li><li>比對結果與收到的 <code>CheckMacValue</code></li></ol><p>驗證不過要回 <code>0|FAIL</code>，成功要回 <code>1|OK</code>。<br>不管成功失敗，HTTP status 都回 200，這是 ECPay 的協定要求。</p><h2 id="測試信用卡"><a href="#測試信用卡" class="headerlink" title="測試信用卡"></a>測試信用卡</h2><p>測試卡號請參考官方「測試介接資訊」頁面，卡號較多且會更新，不在這裡複製。</p><p>ECPay 沙盒付款頁網址：</p><figure class="highlight text"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">https://payment-stage.ecpay.com.tw/Cashier/AioCheckout/index</span><br></pre></td></tr></table></figure><p>這個頁面上的所有付款方式（包括 Apple Pay）都是沙盒，不會真實扣款。</p><h2 id="常見錯誤"><a href="#常見錯誤" class="headerlink" title="常見錯誤"></a>常見錯誤</h2><h3 id="付款失敗"><a href="#付款失敗" class="headerlink" title="付款失敗"></a>付款失敗</h3><p>通常是 CheckMacValue 算錯。<br>確認 HASH_KEY、HASH_IV 正確，URL encode 用的是 <code>encodeURIComponent</code> 後轉小寫（不是 <code>encodeURI</code>）。</p><h3 id="付款成功但訂單沒更新"><a href="#付款成功但訂單沒更新" class="headerlink" title="付款成功但訂單沒更新"></a>付款成功但訂單沒更新</h3><p><code>ReturnURL</code> 沒收到 webhook callback。</p><ol><li>地端測試時，可以檢查tunnel 有沒有在跑</li><li><code>ReturnURL</code> 有沒有帶到正確的 tunnel URL</li><li>dev server log 有沒有收到 POST</li></ol><h3 id="付款完成後使用者停在-ECPay-頁面"><a href="#付款完成後使用者停在-ECPay-頁面" class="headerlink" title="付款完成後使用者停在 ECPay 頁面"></a>付款完成後使用者停在 ECPay 頁面</h3><p><code>OrderResultURL</code> 沒設或設錯，ECPay 不知道要跳回哪裡。</p><p><strong>redirect 跑到 <code>https://localhost:3000</code></strong></p><p>在 API Route Handler 裡用 <code>request.url</code> 拿 origin 時，<br>cloudflared 會加 <code>X-Forwarded-Proto: https</code>，導致 Next.js 認為 origin 是 <code>https://localhost:3000</code>。<br>解法是直接讀 <code>NEXT_PUBLIC_BASE_URL</code> 環境變數，不要從 request 推。</p><h2 id="參考"><a href="#參考" class="headerlink" title="參考"></a>參考</h2><ul><li><a href="https://developers.ecpay.com.tw/2856/">ECPay 官方：測試介接資訊（含測試卡號）</a></li><li><a href="/2026/cloudflared-vs-localtunnel/">本地 webhook 測試：用 cloudflared，不要用 localtunnel</a></li></ul><h2 id="小結"><a href="#小結" class="headerlink" title="小結"></a>小結</h2><p>ECPay 沙盒串接的關鍵點：</p><ol><li><code>ReturnURL</code> 和 <code>OrderResultURL</code> 都要設，職責不同</li><li>本機測試一定要用 tunnel，推薦 cloudflared</li><li>CheckMacValue 驗證不能省，這是確認 webhook 來源的唯一機制</li><li>API Route 裡的 redirect URL 要從環境變數讀，不要從 request 推</li></ol><p>(fin)</p>]]>
     </content>
     <id>https://blog.marsen.me/2026/06/17/2026/ecpay-sandbox-local-testing/</id>
     <link href="https://blog.marsen.me/2026/06/17/2026/ecpay-sandbox-local-testing/"/>
@@ -29,7 +29,7 @@
       <![CDATA[<h2 id="前情提要"><a href="#前情提要" class="headerlink" title="前情提要"></a>前情提要</h2><p>串接 ECPay MPG（多元收款）時，本機測試有幾個坑需要提前知道。<br>整理一下從申請沙盒帳號到 webhook 打進]]>
     </summary>
     <title>[實作筆記] ECPay 綠界沙盒串接：本機測試完整流程</title>
-    <updated>2026-06-26T09:51:03.003Z</updated>
+    <updated>2026-06-26T18:34:54.506Z</updated>
   </entry>
   <entry>
     <author>
@@ -38,7 +38,7 @@
     </author>
     <category term="工具筆記" scheme="https://blog.marsen.me/tags/%E5%B7%A5%E5%85%B7%E7%AD%86%E8%A8%98/"/>
     <content>
-      <![CDATA[<h2 id="前情提要"><a href="#前情提要" class="headerlink" title="前情提要"></a>前情提要</h2><p>在本機開發時，第三方金流（ECPay、TapPay）的 webhook 需要一個公開 URL 才能打回來。<br>我試了 localtunnel，然後換成 cloudflared，體驗差很多，記錄一下。</p><h2 id="localtunnel-的問題"><a href="#localtunnel-的問題" class="headerlink" title="localtunnel 的問題"></a>localtunnel 的問題</h2><p>localtunnel 安裝很簡單：</p><figure class="highlight bash"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">npx localtunnel --port 3000</span><br></pre></td></tr></table></figure><p>但實際用起來有幾個痛點：</p><p><strong>不穩定</strong>。tunnel 動不動就斷，斷了 URL 就換掉，要重新設定金流後台的 webhook URL。<br>測到一半付款成功，webhook 送過來的時候 tunnel 已經掛了，log 什麼都沒有，很難 debug。</p><p><strong>IP 驗證頁</strong>。localtunnel 為了防濫用，第一次打這個 URL 會先跳出一個「請輸入你的 IP」確認頁面。<br>金流打 webhook 的時候是自動 POST，不是人在點，所以它打到的是那個驗證頁，根本進不來。</p><p>解法是在 header 加 <code>bypass-tunnel-reminder: true</code>，但第三方的 webhook request 你改不了，等於這個問題無解。</p><h2 id="cloudflared：免安裝，開箱即用"><a href="#cloudflared：免安裝，開箱即用" class="headerlink" title="cloudflared：免安裝，開箱即用"></a>cloudflared：免安裝，開箱即用</h2><p>cloudflared 是 Cloudflare 官方出的 tunnel 工具。<br>最棒的一點：<strong>不需要帳號，不需要安裝</strong>，一行指令直接跑：</p><figure class="highlight bash"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">npx cloudflared tunnel --url http://localhost:3000</span><br></pre></td></tr></table></figure><p>跑起來會拿到一個 <code>trycloudflare.com</code> 的 URL，例如：</p><figure class="highlight text"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">https://rolled-intro-operator-meat.trycloudflare.com</span><br></pre></td></tr></table></figure><p>沒有 IP 驗證頁，webhook 直接打進來，不會被擋。<br>穩定度比 localtunnel 好很多，整個測試過程沒斷過。</p><h2 id="快速比較"><a href="#快速比較" class="headerlink" title="快速比較"></a>快速比較</h2><table><thead><tr><th></th><th>localtunnel</th><th>cloudflared</th></tr></thead><tbody><tr><td>安裝</td><td><code>npm i -g localtunnel</code></td><td>不需要</td></tr><tr><td>帳號</td><td>不需要</td><td>不需要</td></tr><tr><td>穩定度</td><td>容易斷</td><td>穩定</td></tr><tr><td>IP 驗證頁</td><td>有（webhook 無法繞過）</td><td>無</td></tr><tr><td>URL 固定</td><td>否</td><td>否</td></tr><tr><td>免費</td><td>是</td><td>是</td></tr></tbody></table><h2 id="使用方式"><a href="#使用方式" class="headerlink" title="使用方式"></a>使用方式</h2><figure class="highlight bash"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">npx cloudflared tunnel --url http://localhost:3000</span><br></pre></td></tr></table></figure><p>拿到 URL 之後，把它設到需要公開 URL 的地方，例如 <code>.env.local</code>：</p><figure class="highlight ini"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line"><span class="attr">NEXT_PUBLIC_BASE_URL</span>=https://rolled-intro-operator-meat.trycloudflare.com</span><br></pre></td></tr></table></figure><p>然後重啟 dev server，金流後台的 webhook URL 也一起更新，就可以測了。</p><p>每次重新跑 URL 會換，這點跟 localtunnel 一樣，需要重設一次。<br>但只要 tunnel 不斷，URL 就是固定的，這點比 localtunnel 好太多。</p><h2 id="雷點：Port-衝突導致-404"><a href="#雷點：Port-衝突導致-404" class="headerlink" title="雷點：Port 衝突導致 404"></a>雷點：Port 衝突導致 404</h2><p>cloudflared 的 tunnel 指向的 port 是靜態設定，<br>但 Next.js 如果 3000 被佔用，會自動 fallback 到 3001：</p><figure class="highlight text"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">⚠ Port 3000 is in use by process 65277, using available port 3001 instead.</span><br></pre></td></tr></table></figure><p>tunnel 不知道這件事，流量還是打到 3000，金流 callback 就 404。</p><p>本機瀏覽器開 <code>localhost:3001</code> 完全正常，只有走 tunnel 的路徑壞，很難發現。</p><p>解法很簡單，先砍掉佔用 3000 的 process 再重啟：</p><figure class="highlight bash"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br></pre></td><td class="code"><pre><span class="line">lsof -ti:3000 | xargs <span class="built_in">kill</span> -9</span><br><span class="line">pnpm dev</span><br></pre></td></tr></table></figure><h2 id="小結"><a href="#小結" class="headerlink" title="小結"></a>小結</h2><p>本機測 webhook，直接用 cloudflared，不要碰 localtunnel。<br>免安裝、沒有驗證頁擋路、穩定，完全沒有理由繼續用 localtunnel。</p><p>測試前記得確認 dev server 跑在哪個 port，tunnel 要對齊。</p><p>(fin)</p>]]>
+      <![CDATA[<h2 id="前情提要"><a href="#前情提要" class="headerlink" title="前情提要"></a>前情提要</h2><p>在本機開發時，第三方金流（ECPay、TapPay）的 webhook 需要一個公開 URL 才能打回來。<br>我試了 localtunnel，然後換成 cloudflared，體驗差很多，記錄一下。</p><h2 id="localtunnel-的問題"><a href="#localtunnel-的問題" class="headerlink" title="localtunnel 的問題"></a>localtunnel 的問題</h2><p>localtunnel 安裝很簡單：</p><figure class="highlight bash"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">npx localtunnel --port 3000</span><br></pre></td></tr></table></figure><p>但實際用起來有幾個痛點：</p><p><strong>不穩定</strong>。tunnel 動不動就斷，斷了 URL 就換掉，要重新設定金流後台的 webhook URL。<br>測到一半付款成功，webhook 送過來的時候 tunnel 已經掛了，log 什麼都沒有，很難 debug。</p><p><strong>IP 驗證頁</strong>。localtunnel 為了防濫用，第一次打這個 URL 會先跳出一個「請輸入你的 IP」確認頁面。<br>金流打 webhook 的時候是自動 POST，不是人在點，所以它打到的是那個驗證頁，根本進不來。</p><p>解法是在 header 加 <code>bypass-tunnel-reminder: true</code>，但第三方的 webhook request 你改不了，等於這個問題無解。</p><h2 id="cloudflared：免安裝，開箱即用"><a href="#cloudflared：免安裝，開箱即用" class="headerlink" title="cloudflared：免安裝，開箱即用"></a>cloudflared：免安裝，開箱即用</h2><p>cloudflared 是 Cloudflare 官方出的 tunnel 工具。<br>最棒的一點：<strong>不需要帳號，不需要安裝</strong>，一行指令直接跑：</p><figure class="highlight bash"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">npx cloudflared tunnel --url http://localhost:3000</span><br></pre></td></tr></table></figure><p>跑起來會拿到一個 <code>trycloudflare.com</code> 的 URL，例如：</p><figure class="highlight text"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">https://rolled-intro-operator-meat.trycloudflare.com</span><br></pre></td></tr></table></figure><p>沒有 IP 驗證頁，webhook 直接打進來，不會被擋。<br>穩定度比 localtunnel 好很多，整個測試過程沒斷過。</p><h2 id="快速比較"><a href="#快速比較" class="headerlink" title="快速比較"></a>快速比較</h2><table><thead><tr><th></th><th>localtunnel</th><th>cloudflared</th></tr></thead><tbody><tr><td>安裝</td><td><code>npm i -g localtunnel</code></td><td>不需要</td></tr><tr><td>帳號</td><td>不需要</td><td>不需要</td></tr><tr><td>穩定度</td><td>容易斷</td><td>穩定</td></tr><tr><td>IP 驗證頁</td><td>有（webhook 無法繞過）</td><td>無</td></tr><tr><td>URL 固定</td><td>否</td><td>否</td></tr><tr><td>免費</td><td>是</td><td>是</td></tr></tbody></table><h2 id="使用方式"><a href="#使用方式" class="headerlink" title="使用方式"></a>使用方式</h2><figure class="highlight bash"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">npx cloudflared tunnel --url http://localhost:3000</span><br></pre></td></tr></table></figure><p>拿到 URL 之後，把它設到需要公開 URL 的地方，例如 <code>.env.local</code>：</p><figure class="highlight ini"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line"><span class="attr">NEXT_PUBLIC_BASE_URL</span>=https://rolled-intro-operator-meat.trycloudflare.com</span><br></pre></td></tr></table></figure><p>然後重啟 dev server，金流後台的 webhook URL 也一起更新，就可以測了。</p><p>每次重新跑 URL 會換，這點跟 localtunnel 一樣，需要重設一次。<br>但只要 tunnel 不斷，URL 就是固定的，這點比 localtunnel 好太多。</p><h2 id="小結"><a href="#小結" class="headerlink" title="小結"></a>小結</h2><p>本機測 webhook，直接用 cloudflared，不要碰 localtunnel。<br>免安裝、沒有驗證頁擋路、穩定，完全沒有理由繼續用 localtunnel。</p><p>(fin)</p>]]>
     </content>
     <id>https://blog.marsen.me/2026/06/17/2026/cloudflared-vs-localtunnel/</id>
     <link href="https://blog.marsen.me/2026/06/17/2026/cloudflared-vs-localtunnel/"/>
@@ -47,7 +47,7 @@
       <![CDATA[<h2 id="前情提要"><a href="#前情提要" class="headerlink" title="前情提要"></a>前情提要</h2><p>在本機開發時，第三方金流（ECPay、TapPay）的 webhook 需要一個公開 URL 才能打回來。<br>我試了 l]]>
     </summary>
     <title>[工具筆記] 本地 webhook 測試：用 cloudflared，不要用 localtunnel</title>
-    <updated>2026-06-26T09:51:03.003Z</updated>
+    <updated>2026-06-26T18:34:54.506Z</updated>
   </entry>
   <entry>
     <author>
@@ -65,7 +65,7 @@
       <![CDATA[<h2 id="前情提要"><a href="#前情提要" class="headerlink" title="前情提要"></a>前情提要</h2><p>在串接 ECPay 金流時，一個 API Route 裡用了 <code>redirect()</code>（from <c]]>
     </summary>
     <title>[實作筆記] Next.js 錯誤處理的三層：middleware、try-catch、instrumentation.ts</title>
-    <updated>2026-06-26T09:51:03.003Z</updated>
+    <updated>2026-06-26T18:34:54.507Z</updated>
   </entry>
   <entry>
     <author>
@@ -84,7 +84,7 @@
 <p>所以我設計了多個不同的]]>
     </summary>
     <title>[實作筆記] 為什麼 InversifyJS 在 Next.js 不能用？SWC 相容性問題與 awilix 解法</title>
-    <updated>2026-06-26T09:51:03.003Z</updated>
+    <updated>2026-06-26T18:34:54.506Z</updated>
   </entry>
   <entry>
     <author>
@@ -103,7 +103,7 @@
 <figure class="highli]]>
     </summary>
     <title>[實作筆記] Next.js 16 — middleware 改名為 proxy 了</title>
-    <updated>2026-06-26T09:51:03.003Z</updated>
+    <updated>2026-06-26T18:34:54.507Z</updated>
   </entry>
   <entry>
     <author>
@@ -122,7 +122,7 @@
 <p>這個問題帶出了前端靜]]>
     </summary>
     <title>[實作筆記] 形象站滿版背景影片（一）：前端靜態資源放哪裡</title>
-    <updated>2026-06-26T09:51:03.003Z</updated>
+    <updated>2026-06-26T18:34:54.506Z</updated>
   </entry>
   <entry>
     <author>
@@ -141,7 +141,7 @@
 <h2 id="本周要點"><a href="#本周要點" class="headerlink" title="本周要點"></a>本周要]]>
     </summary>
     <title>[AI生成] 20260612 科技周報</title>
-    <updated>2026-06-26T09:51:03.003Z</updated>
+    <updated>2026-06-26T18:34:54.506Z</updated>
   </entry>
   <entry>
     <author>
@@ -159,7 +159,7 @@
       <![CDATA[<h2 id="前情提要"><a href="#前情提要" class="headerlink" title="前情提要"></a>前情提要</h2><p>AI Coding 工具迭代太快，半年就是一個世代。<br>趁 2026 年中把目前市場上的 Agent Coding 工具]]>
     </summary>
     <title>[工具筆記] 2026 年中 AI Agent Coding 工具盤點：Claude Code、Cursor、Codex 怎麼選</title>
-    <updated>2026-06-26T09:51:03.001Z</updated>
+    <updated>2026-06-26T18:34:54.505Z</updated>
   </entry>
   <entry>
     <author>
@@ -178,7 +178,7 @@
 <h2 id="本周要點"><a href="#本周要點" class="headerlink" title="本周要點"></a>本周要]]>
     </summary>
     <title>[AI生成] 20260610 科技周報</title>
-    <updated>2026-06-26T09:51:03.003Z</updated>
+    <updated>2026-06-26T18:34:54.506Z</updated>
   </entry>
   <entry>
     <author>
@@ -198,7 +198,7 @@
 <p>Hero 區塊是網頁最頂部的全版區塊，通]]>
     </summary>
     <title>[實作筆記] 形象站滿版背景影片（二）：流量、CDN 與播放器選型</title>
-    <updated>2026-06-26T09:51:03.003Z</updated>
+    <updated>2026-06-26T18:34:54.506Z</updated>
   </entry>
   <entry>
     <author>
@@ -217,7 +217,7 @@
 <h2 id="本周要點"><a href="#本周要點" class="headerlink" title="本周要點"></a>本周要]]>
     </summary>
     <title>[AI生成] 20260605 科技周報</title>
-    <updated>2026-06-26T09:51:03.003Z</updated>
+    <updated>2026-06-26T18:34:54.506Z</updated>
   </entry>
   <entry>
     <author>
@@ -236,7 +236,7 @@
 <figure class="hi]]>
     </summary>
     <title>[實作筆記] 盤點與清理自訂網域的 Email DNS 殘留（用郵件 header 當偵探）</title>
-    <updated>2026-06-26T09:51:03.003Z</updated>
+    <updated>2026-06-26T18:34:54.506Z</updated>
   </entry>
   <entry>
     <author>
@@ -255,7 +255,7 @@
 <fi]]>
     </summary>
     <title>[實作筆記] 個人自動化平台(番外) 更新自架在 GCP VM 上的 n8n（Docker 版）</title>
-    <updated>2026-06-26T09:51:03.003Z</updated>
+    <updated>2026-06-26T18:34:54.507Z</updated>
   </entry>
   <entry>
     <author>
@@ -274,7 +274,7 @@
 <p>比著發現原來存在著兩種金流串接]]>
     </summary>
     <title>[工具筆記] Prime Token vs MPG：兩種台灣電商金流模式的本質差異</title>
-    <updated>2026-06-26T09:51:03.003Z</updated>
+    <updated>2026-06-26T18:34:54.507Z</updated>
   </entry>
   <entry>
     <author>
@@ -292,7 +292,7 @@
       <![CDATA[<h2 id="前情提要"><a href="#前情提要" class="headerlink" title="前情提要"></a>前情提要</h2><p>想把個人 PBI 清單整合進 GitHub Projects，<br>同時設定 GitHub Actions 讓新 Issu]]>
     </summary>
     <title>[踩雷筆記] gh CLI 操作 GitHub Projects 與 Actions 的授權</title>
-    <updated>2026-06-26T09:51:03.003Z</updated>
+    <updated>2026-06-26T18:34:54.506Z</updated>
   </entry>
   <entry>
     <author>
@@ -310,7 +310,7 @@
       <![CDATA[<h2 id="前情提要"><a href="#前情提要" class="headerlink" title="前情提要"></a>前情提要</h2><p>用 LINE Bot 做系統通知，結果某天發現通知完全停了，重啟也沒用。<br>查了一圈才發現根本原因不是程式問題，這篇記錄]]>
     </summary>
     <title>[實作筆記] LINE Messaging API 用量查詢：免費額度怎麼看，以及為什麼通知會停止</title>
-    <updated>2026-06-26T09:51:03.003Z</updated>
+    <updated>2026-06-26T18:34:54.506Z</updated>
   </entry>
   <entry>
     <author>
@@ -329,7 +329,7 @@
 <li><a href="https://www.theverge.com/ai-artificial-intellig]]>
     </summary>
     <title>[AI生成]20260505 周報</title>
-    <updated>2026-06-26T09:51:03.003Z</updated>
+    <updated>2026-06-26T18:34:54.506Z</updated>
   </entry>
   <entry>
     <author>
@@ -348,7 +348,7 @@
 <li><a href="https://www.theverge.com/ai-artificial-intellig]]>
     </summary>
     <title>[AI生成]20260504 周報</title>
-    <updated>2026-06-26T09:51:03.003Z</updated>
+    <updated>2026-06-26T18:34:54.506Z</updated>
   </entry>
   <entry>
     <author>
@@ -367,7 +367,7 @@
 <li><a href="https://www.briefs.co/news/uber-torches-entire-]]>
     </summary>
     <title>[AI生成]20260502 周報</title>
-    <updated>2026-06-26T09:51:03.003Z</updated>
+    <updated>2026-06-26T18:34:54.506Z</updated>
   </entry>
   <entry>
     <author>
@@ -386,6 +386,6 @@
 <p>VM 重開機沒問題，但容器砍掉重建、或換]]>
     </summary>
     <title>[實作筆記] 個人自動化平台(七) n8n 備份自動化：workflow + credentials → GitHub</title>
-    <updated>2026-06-26T09:51:03.003Z</updated>
+    <updated>2026-06-26T18:34:54.506Z</updated>
   </entry>
 </feed>

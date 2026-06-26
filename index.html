@@ -134,25 +134,7 @@ j=d.createElement(s),dl=l!='dataLayer'?'&l='+l:'';j.async=true;j.src=
 
 <p>這三組是 ECPay 官方的公開測試值，可以直接用。</p>
 <h2 id="兩個重要-URL-的差別"><a href="#兩個重要-URL-的差別" class="headerlink" title="兩個重要 URL 的差別"></a>兩個重要 URL 的差別</h2><p>ECPay MPG 有兩個容易搞混的 URL 參數：</p>
-<table>
-<thead>
-<tr>
-<th>參數</th>
-<th>觸發時機</th>
-<th>方向</th>
-</tr>
-</thead>
-<tbody><tr>
-<td><code>ReturnURL</code></td>
-<td>付款完成後 ECPay 主動通知</td>
-<td>ECPay → 你的 server（POST）</td>
-</tr>
-<tr>
-<td><code>OrderResultURL</code></td>
-<td>付款完成後瀏覽器跳回</td>
-<td>ECPay → 使用者瀏覽器（POST redirect）</td>
-</tr>
-</tbody></table>
+<p>| 參數 | 觸發時機 | 方向 |<br>|　——　|　———　|　——　|<br>| <code>ReturnURL</code> | 付款完成後 ECPay 主動通知 | ECPay → 你的 server（POST） |<br>| <code>OrderResultURL</code> | 付款完成後瀏覽器跳回 | ECPay → 使用者瀏覽器（POST redirect） |</p>
 <p>兩個都要設，缺一個就會有問題：</p>
 <ul>
 <li>沒有 <code>ReturnURL</code>：訂單狀態永遠不會更新，使用者付了錢系統不知道</li>
@@ -177,47 +159,23 @@ j=d.createElement(s),dl=l!='dataLayer'?'&l='+l:'';j.async=true;j.src=
 <li>比對結果與收到的 <code>CheckMacValue</code></li>
 </ol>
 <p>驗證不過要回 <code>0|FAIL</code>，成功要回 <code>1|OK</code>。<br>不管成功失敗，HTTP status 都回 200，這是 ECPay 的協定要求。</p>
-<h2 id="測試信用卡"><a href="#測試信用卡" class="headerlink" title="測試信用卡"></a>測試信用卡</h2><p>沙盒環境可以用以下測試卡：</p>
-<table>
-<thead>
-<tr>
-<th>卡號</th>
-<th>有效月年</th>
-<th>CVV</th>
-<th>說明</th>
-</tr>
-</thead>
-<tbody><tr>
-<td>4311-9522-2222-2222</td>
-<td>任意未到期</td>
-<td>任意</td>
-<td>成功付款</td>
-</tr>
-<tr>
-<td>4311-9522-2222-2222</td>
-<td>任意未到期</td>
-<td>任意</td>
-<td>3D 驗證（依設定）</td>
-</tr>
-</tbody></table>
+<h2 id="測試信用卡"><a href="#測試信用卡" class="headerlink" title="測試信用卡"></a>測試信用卡</h2><p>測試卡號請參考官方「測試介接資訊」頁面，卡號較多且會更新，不在這裡複製。</p>
 <p>ECPay 沙盒付款頁網址：</p>
 <figure class="highlight text"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">https://payment-stage.ecpay.com.tw/Cashier/AioCheckout/index</span><br></pre></td></tr></table></figure>
 
 <p>這個頁面上的所有付款方式（包括 Apple Pay）都是沙盒，不會真實扣款。</p>
-<h2 id="常見錯誤"><a href="#常見錯誤" class="headerlink" title="常見錯誤"></a>常見錯誤</h2><p><strong>付款失敗，訊息代碼 10100058</strong></p>
-<p>通常是 CheckMacValue 算錯。<br>確認 HASH_KEY、HASH_IV 正確，URL encode 用的是 <code>encodeURIComponent</code> 後轉小寫（不是 <code>encodeURI</code>）。</p>
-<p><strong>付款成功但訂單沒更新</strong></p>
-<p><code>ReturnURL</code> 沒收到 webhook。檢查：</p>
+<h2 id="常見錯誤"><a href="#常見錯誤" class="headerlink" title="常見錯誤"></a>常見錯誤</h2><h3 id="付款失敗"><a href="#付款失敗" class="headerlink" title="付款失敗"></a>付款失敗</h3><p>通常是 CheckMacValue 算錯。<br>確認 HASH_KEY、HASH_IV 正確，URL encode 用的是 <code>encodeURIComponent</code> 後轉小寫（不是 <code>encodeURI</code>）。</p>
+<h3 id="付款成功但訂單沒更新"><a href="#付款成功但訂單沒更新" class="headerlink" title="付款成功但訂單沒更新"></a>付款成功但訂單沒更新</h3><p><code>ReturnURL</code> 沒收到 webhook callback。</p>
 <ol>
-<li>tunnel 有沒有在跑</li>
+<li>地端測試時，可以檢查tunnel 有沒有在跑</li>
 <li><code>ReturnURL</code> 有沒有帶到正確的 tunnel URL</li>
 <li>dev server log 有沒有收到 POST</li>
 </ol>
-<p><strong>付款完成後使用者停在 ECPay 頁面</strong></p>
-<p><code>OrderResultURL</code> 沒設或設錯，ECPay 不知道要跳回哪裡。</p>
+<h3 id="付款完成後使用者停在-ECPay-頁面"><a href="#付款完成後使用者停在-ECPay-頁面" class="headerlink" title="付款完成後使用者停在 ECPay 頁面"></a>付款完成後使用者停在 ECPay 頁面</h3><p><code>OrderResultURL</code> 沒設或設錯，ECPay 不知道要跳回哪裡。</p>
 <p><strong>redirect 跑到 <code>https://localhost:3000</code></strong></p>
 <p>在 API Route Handler 裡用 <code>request.url</code> 拿 origin 時，<br>cloudflared 會加 <code>X-Forwarded-Proto: https</code>，導致 Next.js 認為 origin 是 <code>https://localhost:3000</code>。<br>解法是直接讀 <code>NEXT_PUBLIC_BASE_URL</code> 環境變數，不要從 request 推。</p>
 <h2 id="參考"><a href="#參考" class="headerlink" title="參考"></a>參考</h2><ul>
+<li><a target="_blank" rel="noopener" href="https://developers.ecpay.com.tw/2856/">ECPay 官方：測試介接資訊（含測試卡號）</a></li>
 <li><a href="/2026/cloudflared-vs-localtunnel/">本地 webhook 測試：用 cloudflared，不要用 localtunnel</a></li>
 </ul>
 <h2 id="小結"><a href="#小結" class="headerlink" title="小結"></a>小結</h2><p>ECPay 沙盒串接的關鍵點：</p>
@@ -232,7 +190,7 @@ j=d.createElement(s),dl=l!='dataLayer'?'&l='+l:'';j.async=true;j.src=
       
     </div>
     <footer class="article-footer">
-      <a data-url="https://blog.marsen.me/2026/06/17/2026/ecpay-sandbox-local-testing/" data-id="cuidmO-Wdwqe7XhCwYGl9xQoI" class="article-share-link">Share</a>
+      <a data-url="https://blog.marsen.me/2026/06/17/2026/ecpay-sandbox-local-testing/" data-id="cuidYsRPzC1l6e5H9BC7eZNDd" class="article-share-link">Share</a>
       
         <a href="https://blog.marsen.me/2026/06/17/2026/ecpay-sandbox-local-testing/#disqus_thread" class="article-comment-link">留言</a>
       
@@ -329,22 +287,13 @@ j=d.createElement(s),dl=l!='dataLayer'?'&l='+l:'';j.async=true;j.src=
 
 <p>然後重啟 dev server，金流後台的 webhook URL 也一起更新，就可以測了。</p>
 <p>每次重新跑 URL 會換，這點跟 localtunnel 一樣，需要重設一次。<br>但只要 tunnel 不斷，URL 就是固定的，這點比 localtunnel 好太多。</p>
-<h2 id="雷點：Port-衝突導致-404"><a href="#雷點：Port-衝突導致-404" class="headerlink" title="雷點：Port 衝突導致 404"></a>雷點：Port 衝突導致 404</h2><p>cloudflared 的 tunnel 指向的 port 是靜態設定，<br>但 Next.js 如果 3000 被佔用，會自動 fallback 到 3001：</p>
-<figure class="highlight text"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">⚠ Port 3000 is in use by process 65277, using available port 3001 instead.</span><br></pre></td></tr></table></figure>
-
-<p>tunnel 不知道這件事，流量還是打到 3000，金流 callback 就 404。</p>
-<p>本機瀏覽器開 <code>localhost:3001</code> 完全正常，只有走 tunnel 的路徑壞，很難發現。</p>
-<p>解法很簡單，先砍掉佔用 3000 的 process 再重啟：</p>
-<figure class="highlight bash"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br></pre></td><td class="code"><pre><span class="line">lsof -ti:3000 | xargs <span class="built_in">kill</span> -9</span><br><span class="line">pnpm dev</span><br></pre></td></tr></table></figure>
-
 <h2 id="小結"><a href="#小結" class="headerlink" title="小結"></a>小結</h2><p>本機測 webhook，直接用 cloudflared，不要碰 localtunnel。<br>免安裝、沒有驗證頁擋路、穩定，完全沒有理由繼續用 localtunnel。</p>
-<p>測試前記得確認 dev server 跑在哪個 port，tunnel 要對齊。</p>
 <p>(fin)</p>
 
       
     </div>
     <footer class="article-footer">
-      <a data-url="https://blog.marsen.me/2026/06/17/2026/cloudflared-vs-localtunnel/" data-id="cuid70-ad2G4ATLjV8t4qtJco" class="article-share-link">Share</a>
+      <a data-url="https://blog.marsen.me/2026/06/17/2026/cloudflared-vs-localtunnel/" data-id="cuidIkTQ-rz-z6OgF5YXcf7Lq" class="article-share-link">Share</a>
       
         <a href="https://blog.marsen.me/2026/06/17/2026/cloudflared-vs-localtunnel/#disqus_thread" class="article-comment-link">留言</a>
       
@@ -460,7 +409,7 @@ j=d.createElement(s),dl=l!='dataLayer'?'&l='+l:'';j.async=true;j.src=
       
     </div>
     <footer class="article-footer">
-      <a data-url="https://blog.marsen.me/2026/06/17/2026/nextjs-error-handling-layers/" data-id="cuidq4Foh3Va1Bdj0H7Tqca5k" class="article-share-link">Share</a>
+      <a data-url="https://blog.marsen.me/2026/06/17/2026/nextjs-error-handling-layers/" data-id="cuidqOreIU27Xo6cRzFM2T8LI" class="article-share-link">Share</a>
       
         <a href="https://blog.marsen.me/2026/06/17/2026/nextjs-error-handling-layers/#disqus_thread" class="article-comment-link">留言</a>
       
@@ -602,7 +551,7 @@ j=d.createElement(s),dl=l!='dataLayer'?'&l='+l:'';j.async=true;j.src=
       
     </div>
     <footer class="article-footer">
-      <a data-url="https://blog.marsen.me/2026/06/16/2026/di-nextjs-swc-compatibility/" data-id="cuidyio5e9HFHpAuQ3oZwPg8h" class="article-share-link">Share</a>
+      <a data-url="https://blog.marsen.me/2026/06/16/2026/di-nextjs-swc-compatibility/" data-id="cuidBCi6PuRflbhJYWBraPs_Z" class="article-share-link">Share</a>
       
         <a href="https://blog.marsen.me/2026/06/16/2026/di-nextjs-swc-compatibility/#disqus_thread" class="article-comment-link">留言</a>
       
@@ -697,7 +646,7 @@ j=d.createElement(s),dl=l!='dataLayer'?'&l='+l:'';j.async=true;j.src=
       
     </div>
     <footer class="article-footer">
-      <a data-url="https://blog.marsen.me/2026/06/16/2026/nextjs16-middleware-to-proxy/" data-id="cuidheoGN68zx38_i0KElrv0m" class="article-share-link">Share</a>
+      <a data-url="https://blog.marsen.me/2026/06/16/2026/nextjs16-middleware-to-proxy/" data-id="cuidfVZfwjG068vkGWVcfmDTG" class="article-share-link">Share</a>
       
         <a href="https://blog.marsen.me/2026/06/16/2026/nextjs16-middleware-to-proxy/#disqus_thread" class="article-comment-link">留言</a>
       
@@ -777,7 +726,7 @@ j=d.createElement(s),dl=l!='dataLayer'?'&l='+l:'';j.async=true;j.src=
       
     </div>
     <footer class="article-footer">
-      <a data-url="https://blog.marsen.me/2026/06/12/2026/frontend-static-assets-public-vs-src-assets/" data-id="cuid-Mzr8NXHS3Dl2rKg9lnCE" class="article-share-link">Share</a>
+      <a data-url="https://blog.marsen.me/2026/06/12/2026/frontend-static-assets-public-vs-src-assets/" data-id="cuid9X_J3Wi1UnE8opvgkAQYQ" class="article-share-link">Share</a>
       
         <a href="https://blog.marsen.me/2026/06/12/2026/frontend-static-assets-public-vs-src-assets/#disqus_thread" class="article-comment-link">留言</a>
       
@@ -847,7 +796,7 @@ j=d.createElement(s),dl=l!='dataLayer'?'&l='+l:'';j.async=true;j.src=
       
     </div>
     <footer class="article-footer">
-      <a data-url="https://blog.marsen.me/2026/06/11/2026/ai-weekly-20260612/" data-id="cuidBPj9_dwOjrSmF75AyCW7q" class="article-share-link">Share</a>
+      <a data-url="https://blog.marsen.me/2026/06/11/2026/ai-weekly-20260612/" data-id="cuidQ2ZRh_6spChyDxczfiUQL" class="article-share-link">Share</a>
       
         <a href="https://blog.marsen.me/2026/06/11/2026/ai-weekly-20260612/#disqus_thread" class="article-comment-link">留言</a>
       
@@ -1125,7 +1074,7 @@ j=d.createElement(s),dl=l!='dataLayer'?'&l='+l:'';j.async=true;j.src=
       
     </div>
     <footer class="article-footer">
-      <a data-url="https://blog.marsen.me/2026/06/11/2026/ai-agent-coding-tools-2026/" data-id="cuidQzOTibF_se0Ws2kKRNf6c" class="article-share-link">Share</a>
+      <a data-url="https://blog.marsen.me/2026/06/11/2026/ai-agent-coding-tools-2026/" data-id="cuidbOKDldLENF0l6-XkKp8pZ" class="article-share-link">Share</a>
       
         <a href="https://blog.marsen.me/2026/06/11/2026/ai-agent-coding-tools-2026/#disqus_thread" class="article-comment-link">留言</a>
       
@@ -1182,7 +1131,7 @@ j=d.createElement(s),dl=l!='dataLayer'?'&l='+l:'';j.async=true;j.src=
       
     </div>
     <footer class="article-footer">
-      <a data-url="https://blog.marsen.me/2026/06/10/2026/ai-weekly-20260610/" data-id="cuidZPBX1yRusmleFKD3d0ksB" class="article-share-link">Share</a>
+      <a data-url="https://blog.marsen.me/2026/06/10/2026/ai-weekly-20260610/" data-id="cuidFQJk-76HbIDsWhlDTVzmJ" class="article-share-link">Share</a>
       
         <a href="https://blog.marsen.me/2026/06/10/2026/ai-weekly-20260610/#disqus_thread" class="article-comment-link">留言</a>
       
@@ -1329,7 +1278,7 @@ j=d.createElement(s),dl=l!='dataLayer'?'&l='+l:'';j.async=true;j.src=
       
     </div>
     <footer class="article-footer">
-      <a data-url="https://blog.marsen.me/2026/06/07/2026/hero-background-video-hosting/" data-id="cuid2-9BC8hv5SQYeWxrQw88z" class="article-share-link">Share</a>
+      <a data-url="https://blog.marsen.me/2026/06/07/2026/hero-background-video-hosting/" data-id="cuidjxhIhFIf_dWvg7EqX45wN" class="article-share-link">Share</a>
       
         <a href="https://blog.marsen.me/2026/06/07/2026/hero-background-video-hosting/#disqus_thread" class="article-comment-link">留言</a>
       
