@@ -232,7 +232,7 @@ j=d.createElement(s),dl=l!='dataLayer'?'&l='+l:'';j.async=true;j.src=
       
     </div>
     <footer class="article-footer">
-      <a data-url="https://blog.marsen.me/2026/06/17/2026/ecpay-sandbox-local-testing/" data-id="cuidesifrTloAecfXmX00JmLa" class="article-share-link">Share</a>
+      <a data-url="https://blog.marsen.me/2026/06/17/2026/ecpay-sandbox-local-testing/" data-id="cuidmO-Wdwqe7XhCwYGl9xQoI" class="article-share-link">Share</a>
       
         <a href="https://blog.marsen.me/2026/06/17/2026/ecpay-sandbox-local-testing/#disqus_thread" class="article-comment-link">留言</a>
       
@@ -344,7 +344,7 @@ j=d.createElement(s),dl=l!='dataLayer'?'&l='+l:'';j.async=true;j.src=
       
     </div>
     <footer class="article-footer">
-      <a data-url="https://blog.marsen.me/2026/06/17/2026/cloudflared-vs-localtunnel/" data-id="cuidceQH0bqxwhJQs6GNNfb7h" class="article-share-link">Share</a>
+      <a data-url="https://blog.marsen.me/2026/06/17/2026/cloudflared-vs-localtunnel/" data-id="cuid70-ad2G4ATLjV8t4qtJco" class="article-share-link">Share</a>
       
         <a href="https://blog.marsen.me/2026/06/17/2026/cloudflared-vs-localtunnel/#disqus_thread" class="article-comment-link">留言</a>
       
@@ -383,8 +383,8 @@ j=d.createElement(s),dl=l!='dataLayer'?'&l='+l:'';j.async=true;j.src=
         <h2 id="前情提要"><a href="#前情提要" class="headerlink" title="前情提要"></a>前情提要</h2><p>在串接 ECPay 金流時，一個 API Route 裡用了 <code>redirect()</code>（from <code>next/navigation</code>），</p>
 <p>結果 ECPay 的 callback 打進來之後整個 dev server 直接掛掉。</p>
 <p>通常我會設計成主要的商業邏輯（包含錯誤的商業邏輯）走流程處理，</p>
-<p>無法處理的由最終防線（通常會在 middleware 的後面）接住錯誤</p>
-<p>主要的商業邏輯，儘可能少一點的 try-catch(原則上不用)</p>
+<p>無法處理的由最終防線（通常會在 middleware 的後面）接住錯誤。</p>
+<p>主要的商業邏輯，儘可能少一點的 try-catch（原則上不用）。</p>
 <p>但 Next 還要考慮到 Edge Runtime, 借這個機會深入了解一下 Next 的錯誤處理機制</p>
 <h2 id="Next-js-請求的三層"><a href="#Next-js-請求的三層" class="headerlink" title="Next.js 請求的三層"></a>Next.js 請求的三層</h2><figure class="highlight text"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br><span class="line">29</span><br><span class="line">30</span><br><span class="line">31</span><br><span class="line">32</span><br><span class="line">33</span><br></pre></td><td class="code"><pre><span class="line">HTTP Request</span><br><span class="line">     │</span><br><span class="line">     ▼</span><br><span class="line">┌─────────────────────────────────────┐</span><br><span class="line">│  middleware（Edge Runtime）          │  ← auth guard、redirect</span><br><span class="line">│                                     │</span><br><span class="line">│  出錯 → onRequestError 觸發         │  ← instrumentation 接得住</span><br><span class="line">│       → 但 Pino logger 在這裡失效   │  ⚠️ Edge Runtime 限制</span><br><span class="line">│       → Next.js 回 500             │</span><br><span class="line">└──────────────┬──────────────────────┘</span><br><span class="line">               │</span><br><span class="line">               ▼</span><br><span class="line">┌─────────────────────────────────────┐</span><br><span class="line">│  API Route / Server Component       │</span><br><span class="line">│  （Node.js，完整環境）               │</span><br><span class="line">│                                     │</span><br><span class="line">│  ┌─────────────────────────────┐    │</span><br><span class="line">│  │  業務層 try-catch            │    │  ← 有業務理由才放</span><br><span class="line">│  │  （ECPay→0|FAIL、OAuth→     │    │</span><br><span class="line">│  │   /login?error=...）        │    │</span><br><span class="line">│  └──────────────┬──────────────┘    │</span><br><span class="line">│                 │ 未被接住           │</span><br><span class="line">│                 ▼                   │</span><br><span class="line">│  ┌─────────────────────────────┐    │</span><br><span class="line">│  │  instrumentation.ts         │    │  ← 最終防線，全域自動生效</span><br><span class="line">│  │  onRequestError             │    │</span><br><span class="line">│  │  Node.js → Pino logger ✅   │    │</span><br><span class="line">│  │  → Next.js 回 500           │    │</span><br><span class="line">│  └─────────────────────────────┘    │</span><br><span class="line">└─────────────────────────────────────┘</span><br><span class="line">               │</span><br><span class="line">               ▼</span><br><span class="line">         HTTP Response</span><br></pre></td></tr></table></figure>
 
@@ -460,7 +460,7 @@ j=d.createElement(s),dl=l!='dataLayer'?'&l='+l:'';j.async=true;j.src=
       
     </div>
     <footer class="article-footer">
-      <a data-url="https://blog.marsen.me/2026/06/17/2026/nextjs-error-handling-layers/" data-id="cuidwHOrk39gxY4JniC-pdPMc" class="article-share-link">Share</a>
+      <a data-url="https://blog.marsen.me/2026/06/17/2026/nextjs-error-handling-layers/" data-id="cuidq4Foh3Va1Bdj0H7Tqca5k" class="article-share-link">Share</a>
       
         <a href="https://blog.marsen.me/2026/06/17/2026/nextjs-error-handling-layers/#disqus_thread" class="article-comment-link">留言</a>
       
@@ -602,7 +602,7 @@ j=d.createElement(s),dl=l!='dataLayer'?'&l='+l:'';j.async=true;j.src=
       
     </div>
     <footer class="article-footer">
-      <a data-url="https://blog.marsen.me/2026/06/16/2026/di-nextjs-swc-compatibility/" data-id="cuidjv_Lobi-pUT5sMrttKmza" class="article-share-link">Share</a>
+      <a data-url="https://blog.marsen.me/2026/06/16/2026/di-nextjs-swc-compatibility/" data-id="cuidyio5e9HFHpAuQ3oZwPg8h" class="article-share-link">Share</a>
       
         <a href="https://blog.marsen.me/2026/06/16/2026/di-nextjs-swc-compatibility/#disqus_thread" class="article-comment-link">留言</a>
       
@@ -697,7 +697,7 @@ j=d.createElement(s),dl=l!='dataLayer'?'&l='+l:'';j.async=true;j.src=
       
     </div>
     <footer class="article-footer">
-      <a data-url="https://blog.marsen.me/2026/06/16/2026/nextjs16-middleware-to-proxy/" data-id="cuidXcKEnMJPjjIYCtG2-l5Jh" class="article-share-link">Share</a>
+      <a data-url="https://blog.marsen.me/2026/06/16/2026/nextjs16-middleware-to-proxy/" data-id="cuidheoGN68zx38_i0KElrv0m" class="article-share-link">Share</a>
       
         <a href="https://blog.marsen.me/2026/06/16/2026/nextjs16-middleware-to-proxy/#disqus_thread" class="article-comment-link">留言</a>
       
@@ -777,7 +777,7 @@ j=d.createElement(s),dl=l!='dataLayer'?'&l='+l:'';j.async=true;j.src=
       
     </div>
     <footer class="article-footer">
-      <a data-url="https://blog.marsen.me/2026/06/12/2026/frontend-static-assets-public-vs-src-assets/" data-id="cuid1cQCF-dPw1zCWHaet1P-1" class="article-share-link">Share</a>
+      <a data-url="https://blog.marsen.me/2026/06/12/2026/frontend-static-assets-public-vs-src-assets/" data-id="cuid-Mzr8NXHS3Dl2rKg9lnCE" class="article-share-link">Share</a>
       
         <a href="https://blog.marsen.me/2026/06/12/2026/frontend-static-assets-public-vs-src-assets/#disqus_thread" class="article-comment-link">留言</a>
       
@@ -847,7 +847,7 @@ j=d.createElement(s),dl=l!='dataLayer'?'&l='+l:'';j.async=true;j.src=
       
     </div>
     <footer class="article-footer">
-      <a data-url="https://blog.marsen.me/2026/06/11/2026/ai-weekly-20260612/" data-id="cuidsjwdChv-wK6s7yJ1o70IH" class="article-share-link">Share</a>
+      <a data-url="https://blog.marsen.me/2026/06/11/2026/ai-weekly-20260612/" data-id="cuidBPj9_dwOjrSmF75AyCW7q" class="article-share-link">Share</a>
       
         <a href="https://blog.marsen.me/2026/06/11/2026/ai-weekly-20260612/#disqus_thread" class="article-comment-link">留言</a>
       
@@ -1125,7 +1125,7 @@ j=d.createElement(s),dl=l!='dataLayer'?'&l='+l:'';j.async=true;j.src=
       
     </div>
     <footer class="article-footer">
-      <a data-url="https://blog.marsen.me/2026/06/11/2026/ai-agent-coding-tools-2026/" data-id="cuidEzhy_-K031DYR_KsB_KHP" class="article-share-link">Share</a>
+      <a data-url="https://blog.marsen.me/2026/06/11/2026/ai-agent-coding-tools-2026/" data-id="cuidQzOTibF_se0Ws2kKRNf6c" class="article-share-link">Share</a>
       
         <a href="https://blog.marsen.me/2026/06/11/2026/ai-agent-coding-tools-2026/#disqus_thread" class="article-comment-link">留言</a>
       
@@ -1182,7 +1182,7 @@ j=d.createElement(s),dl=l!='dataLayer'?'&l='+l:'';j.async=true;j.src=
       
     </div>
     <footer class="article-footer">
-      <a data-url="https://blog.marsen.me/2026/06/10/2026/ai-weekly-20260610/" data-id="cuid64Gkjgdi14smquealKASt" class="article-share-link">Share</a>
+      <a data-url="https://blog.marsen.me/2026/06/10/2026/ai-weekly-20260610/" data-id="cuidZPBX1yRusmleFKD3d0ksB" class="article-share-link">Share</a>
       
         <a href="https://blog.marsen.me/2026/06/10/2026/ai-weekly-20260610/#disqus_thread" class="article-comment-link">留言</a>
       
@@ -1329,7 +1329,7 @@ j=d.createElement(s),dl=l!='dataLayer'?'&l='+l:'';j.async=true;j.src=
       
     </div>
     <footer class="article-footer">
-      <a data-url="https://blog.marsen.me/2026/06/07/2026/hero-background-video-hosting/" data-id="cuidyOMRxixrEflHY2H5en3F8" class="article-share-link">Share</a>
+      <a data-url="https://blog.marsen.me/2026/06/07/2026/hero-background-video-hosting/" data-id="cuid2-9BC8hv5SQYeWxrQw88z" class="article-share-link">Share</a>
       
         <a href="https://blog.marsen.me/2026/06/07/2026/hero-background-video-hosting/#disqus_thread" class="article-comment-link">留言</a>
       
