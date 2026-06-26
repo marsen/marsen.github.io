@@ -43,7 +43,7 @@ j=d.createElement(s),dl=l!='dataLayer'?'&l='+l:'';j.async=true;j.src=
 <meta property="og:description" content="前情提要n8n 跑起來、workflow 也在跑了，下一個問題：掛掉怎麼辦？ VM 重開機沒問題，但容器砍掉重建、或換 VM，workflow 和 credentials 就都要重設。這篇記錄怎麼用 CLI export + git 做自動備份。  備份方案決策考慮過幾個方向：    方案 問題    備份整個 .n8n 目錄 SQLite 每次執行都寫入，幾乎天天變動，太肥   只備份 work">
 <meta property="og:locale" content="zh_TW">
 <meta property="article:published_time" content="2026-04-29T19:08:11.000Z">
-<meta property="article:modified_time" content="2026-06-26T05:51:16.226Z">
+<meta property="article:modified_time" content="2026-06-26T07:34:26.119Z">
 <meta property="article:author" content="Marsen L.">
 <meta property="article:tag" content="實作筆記">
 <meta name="twitter:card" content="summary">
@@ -187,8 +187,7 @@ j=d.createElement(s),dl=l!='dataLayer'?'&l='+l:'';j.async=true;j.src=
 <p>用文字搜尋就找得到：</p>
 <figure class="highlight bash"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">grep -r <span class="string">&quot;access_token\|IGAA&quot;</span> backup/</span><br></pre></td></tr></table></figure>
 
-<p><strong>解法：改用 n8n Credential 存 token</strong></p>
-<p>n8n 的 Credential 有獨立加密機制，workflow JSON 裡只會存 Credential 的 ID，不含實際值。這樣備份出來的 workflow 就不會洩漏 token。</p>
+<h3 id="解法：改用-n8n-Credential-存-token"><a href="#解法：改用-n8n-Credential-存-token" class="headerlink" title="解法：改用 n8n Credential 存 token"></a>解法：改用 n8n Credential 存 token</h3><p>n8n 的 Credential 有獨立加密機制，workflow JSON 裡只會存 Credential 的 ID，不含實際值。這樣備份出來的 workflow 就不會洩漏 token。</p>
 <figure class="highlight text"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br></pre></td><td class="code"><pre><span class="line"># 不好（硬寫在節點）</span><br><span class="line">&quot;access_token&quot;: &quot;IGAAYLng3...&quot;</span><br><span class="line"></span><br><span class="line"># 好（引用 Credential）</span><br><span class="line">&quot;credentials&quot;: &#123; &quot;instagramOAuth2Api&quot;: &#123; &quot;id&quot;: &quot;xxx&quot;, &quot;name&quot;: &quot;IG&quot; &#125; &#125;</span><br></pre></td></tr></table></figure>
 
 <p>Credential 本身也可以 export 備份，但它是加密的（用 <code>N8N_ENCRYPTION_KEY</code>），只要 Key 沒洩漏，備份裡的 Credential 就是安全的。</p>
@@ -217,6 +216,7 @@ j=d.createElement(s),dl=l!='dataLayer'?'&l='+l:'';j.async=true;j.src=
 <li><a href="/2026/04/27/2026/n8n-5-pipeline-process/">個人自動化平台(五) n8n 實作：處理層，Aggregate + Gemini 週報整理</a></li>
 <li><a href="/2026/04/22/2026/n8n-6-pipeline-output/">個人自動化平台(六) n8n 實作：輸出層，Instagram API 取得 Token 全記錄</a></li>
 <li><a href="/2026/04/27/2026/n8n-6.1-google-oauth-redirect-uri-debug/">個人自動化平台(番外) Google OAuth redirect_uri_mismatch 除錯記錄</a></li>
+<li><a href="/2026/05/28/2026/n8n-7.1-docker-update-on-gcp-vm/">個人自動化平台(番外) 更新自架在 GCP VM 上的 n8n（Docker 版）</a></li>
 </ul>
 <h2 id="小結"><a href="#小結" class="headerlink" title="小結"></a>小結</h2><ul>
 <li>CLI export 是 Community 版可用的最輕量備份方案</li>
@@ -231,7 +231,7 @@ j=d.createElement(s),dl=l!='dataLayer'?'&l='+l:'';j.async=true;j.src=
       
     </div>
     <footer class="article-footer">
-      <a data-url="https://blog.marsen.me/2026/04/29/2026/n8n-7-backup-automation/" data-id="cuidg_T8Sc0qh3hhcV_RM5ohp" class="article-share-link">Share</a>
+      <a data-url="https://blog.marsen.me/2026/04/29/2026/n8n-7-backup-automation/" data-id="cuidpPFDQZmr0JYXHZ3iUZmlo" class="article-share-link">Share</a>
       
         <a href="https://blog.marsen.me/2026/04/29/2026/n8n-7-backup-automation/#disqus_thread" class="article-comment-link">留言</a>
       
@@ -292,12 +292,20 @@ j=d.createElement(s),dl=l!='dataLayer'?'&l='+l:'';j.async=true;j.src=
   
   
     <div id="likecoin">
-  <script type="text/javascript">
-    document.write(
-      "<iframe scrolling='no' frameborder='0' sandbox='allow-scripts allow-same-origin allow-popups allow-popups-to-escape-sandbox allow-storage-access-by-user-activation' style='height: 212px; width: 100%;' src='https://button.like.co/in/embed/marsenlin/button?referrer=" +
-      encodeURIComponent(location.href.split("?")[0].split("#")[0]) + "'></iframe>");
-  </script>
+Please enable JavaScript to view the LikeCoin. :P
 </div>
+<script>
+
+  (function(){
+    var ifrm = document.createElement("iframe");
+    ifrm.setAttribute("src", "https://button.like.co/in/embed/marsenlin/button?referrer=https%3A%2F%2Fblog.marsen.me%2F2026%2F04%2F29%2F2026%2Fn8n-7-backup-automation%2F");      
+    ifrm.setAttribute("sandbox","allow-scripts allow-same-origin allow-popups allow-popups-to-escape-sandbox");
+    ifrm.frameborder = "0";
+    ifrm.scrolling = "no";
+    (document.getElementById("likecoin").replaceChild(ifrm, document.getElementById("likecoin").childNodes[0]));
+  })();
+
+</script>
   
   <div id="disqus_thread">
     <noscript>Please enable JavaScript to view the <a target="_blank" rel="noopener" href="//disqus.com/?ref_noscript">comments powered by Disqus.</a></noscript>
@@ -430,12 +438,20 @@ This work is licensed under a
 <script src="/js/script.js?v=0.js"></script>
 
 <div id="likecoin">
-  <script type="text/javascript">
-    document.write(
-      "<iframe scrolling='no' frameborder='0' sandbox='allow-scripts allow-same-origin allow-popups allow-popups-to-escape-sandbox allow-storage-access-by-user-activation' style='height: 212px; width: 100%;' src='https://button.like.co/in/embed/marsenlin/button?referrer=" +
-      encodeURIComponent(location.href.split("?")[0].split("#")[0]) + "'></iframe>");
-  </script>
+Please enable JavaScript to view the LikeCoin. :P
 </div>
+<script>
+
+  (function(){
+    var ifrm = document.createElement("iframe");
+    ifrm.setAttribute("src", "https://button.like.co/in/embed/marsenlin/button?referrer=https%3A%2F%2Fblog.marsen.me%2F2026%2F04%2F29%2F2026%2Fn8n-7-backup-automation%2F");      
+    ifrm.setAttribute("sandbox","allow-scripts allow-same-origin allow-popups allow-popups-to-escape-sandbox");
+    ifrm.frameborder = "0";
+    ifrm.scrolling = "no";
+    (document.getElementById("likecoin").replaceChild(ifrm, document.getElementById("likecoin").childNodes[0]));
+  })();
+
+</script>
 <script>
 
   var disqus_shortname = 'marsenlin';
