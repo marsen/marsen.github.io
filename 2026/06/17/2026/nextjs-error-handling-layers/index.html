@@ -35,15 +35,15 @@ j=d.createElement(s),dl=l!='dataLayer'?'&l='+l:'';j.async=true;j.src=
   
   <title>[實作筆記] Next.js 錯誤處理的三層：middleware、try-catch、instrumentation.ts | Marsen&#39;s Blog</title>
   <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
-  <meta name="description" content="前情提要在串接 ECPay 金流時，一個 API Route 裡用了 redirect()（from next&#x2F;navigation），結果 ECPay 的 callback 打進來之後整個 dev server 直接掛掉。 沒有 log、沒有提示，user 看到 503。 這讓我重新想了一遍 Next.js 的錯誤處理應該怎麼設計——中間討論到 middleware、Edge Runtime、i">
+  <meta name="description" content="前情提要在串接 ECPay 金流時，一個 API Route 裡用了 redirect()（from next&#x2F;navigation）， 結果 ECPay 的 callback 打進來之後整個 dev server 直接掛掉。 通常我會設計成主要的商業邏輯（包含錯誤的商業邏輯）走流程處理， 無法處理的由最終防線（通常會在 middleware 的後面）接住錯誤 主要的商業邏輯，儘可能少一點的 tr">
 <meta property="og:type" content="article">
 <meta property="og:title" content="[實作筆記] Next.js 錯誤處理的三層：middleware、try-catch、instrumentation.ts">
 <meta property="og:url" content="https://blog.marsen.me/2026/06/17/2026/nextjs-error-handling-layers/index.html">
 <meta property="og:site_name" content="Marsen&#39;s Blog">
-<meta property="og:description" content="前情提要在串接 ECPay 金流時，一個 API Route 裡用了 redirect()（from next&#x2F;navigation），結果 ECPay 的 callback 打進來之後整個 dev server 直接掛掉。 沒有 log、沒有提示，user 看到 503。 這讓我重新想了一遍 Next.js 的錯誤處理應該怎麼設計——中間討論到 middleware、Edge Runtime、i">
+<meta property="og:description" content="前情提要在串接 ECPay 金流時，一個 API Route 裡用了 redirect()（from next&#x2F;navigation）， 結果 ECPay 的 callback 打進來之後整個 dev server 直接掛掉。 通常我會設計成主要的商業邏輯（包含錯誤的商業邏輯）走流程處理， 無法處理的由最終防線（通常會在 middleware 的後面）接住錯誤 主要的商業邏輯，儘可能少一點的 tr">
 <meta property="og:locale" content="zh_TW">
 <meta property="article:published_time" content="2026-06-17T18:22:10.000Z">
-<meta property="article:modified_time" content="2026-06-26T09:37:09.561Z">
+<meta property="article:modified_time" content="2026-06-26T09:49:12.949Z">
 <meta property="article:author" content="Marsen L.">
 <meta property="article:tag" content="實作筆記">
 <meta name="twitter:card" content="summary">
@@ -128,19 +128,25 @@ j=d.createElement(s),dl=l!='dataLayer'?'&l='+l:'';j.async=true;j.src=
     
     <div class="article-entry" itemprop="articleBody">
       
-        <h2 id="前情提要"><a href="#前情提要" class="headerlink" title="前情提要"></a>前情提要</h2><p>在串接 ECPay 金流時，一個 API Route 裡用了 <code>redirect()</code>（from <code>next/navigation</code>），結果 ECPay 的 callback 打進來之後整個 dev server 直接掛掉。</p>
-<p>沒有 log、沒有提示，user 看到 503。</p>
-<p>這讓我重新想了一遍 Next.js 的錯誤處理應該怎麼設計——中間討論到 middleware、Edge Runtime、instrumentation.ts，整理在這裡。</p>
+        <h2 id="前情提要"><a href="#前情提要" class="headerlink" title="前情提要"></a>前情提要</h2><p>在串接 ECPay 金流時，一個 API Route 裡用了 <code>redirect()</code>（from <code>next/navigation</code>），</p>
+<p>結果 ECPay 的 callback 打進來之後整個 dev server 直接掛掉。</p>
+<p>通常我會設計成主要的商業邏輯（包含錯誤的商業邏輯）走流程處理，</p>
+<p>無法處理的由最終防線（通常會在 middleware 的後面）接住錯誤</p>
+<p>主要的商業邏輯，儘可能少一點的 try-catch(原則上不用)</p>
+<p>但 Next 還要考慮到 Edge Runtime, 借這個機會深入了解一下 Next 的錯誤處理機制</p>
 <h2 id="Next-js-請求的三層"><a href="#Next-js-請求的三層" class="headerlink" title="Next.js 請求的三層"></a>Next.js 請求的三層</h2><figure class="highlight text"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br><span class="line">29</span><br><span class="line">30</span><br><span class="line">31</span><br><span class="line">32</span><br><span class="line">33</span><br></pre></td><td class="code"><pre><span class="line">HTTP Request</span><br><span class="line">     │</span><br><span class="line">     ▼</span><br><span class="line">┌─────────────────────────────────────┐</span><br><span class="line">│  middleware（Edge Runtime）          │  ← auth guard、redirect</span><br><span class="line">│                                     │</span><br><span class="line">│  出錯 → onRequestError 觸發         │  ← instrumentation 接得住</span><br><span class="line">│       → 但 Pino logger 在這裡失效   │  ⚠️ Edge Runtime 限制</span><br><span class="line">│       → Next.js 回 500             │</span><br><span class="line">└──────────────┬──────────────────────┘</span><br><span class="line">               │</span><br><span class="line">               ▼</span><br><span class="line">┌─────────────────────────────────────┐</span><br><span class="line">│  API Route / Server Component       │</span><br><span class="line">│  （Node.js，完整環境）               │</span><br><span class="line">│                                     │</span><br><span class="line">│  ┌─────────────────────────────┐    │</span><br><span class="line">│  │  業務層 try-catch            │    │  ← 有業務理由才放</span><br><span class="line">│  │  （ECPay→0|FAIL、OAuth→     │    │</span><br><span class="line">│  │   /login?error=...）        │    │</span><br><span class="line">│  └──────────────┬──────────────┘    │</span><br><span class="line">│                 │ 未被接住           │</span><br><span class="line">│                 ▼                   │</span><br><span class="line">│  ┌─────────────────────────────┐    │</span><br><span class="line">│  │  instrumentation.ts         │    │  ← 最終防線，全域自動生效</span><br><span class="line">│  │  onRequestError             │    │</span><br><span class="line">│  │  Node.js → Pino logger ✅   │    │</span><br><span class="line">│  │  → Next.js 回 500           │    │</span><br><span class="line">│  └─────────────────────────────┘    │</span><br><span class="line">└─────────────────────────────────────┘</span><br><span class="line">               │</span><br><span class="line">               ▼</span><br><span class="line">         HTTP Response</span><br></pre></td></tr></table></figure>
 
 <p>每一層的職責不一樣，不能混用。</p>
-<h2 id="第一層：middleware"><a href="#第一層：middleware" class="headerlink" title="第一層：middleware"></a>第一層：middleware</h2><p>Next.js middleware 跑在 <strong>Edge Runtime</strong>——這是一個故意閹割過的 JS 執行環境，只有 Web 標準 API（<code>fetch</code>、<code>Request</code>、<code>Response</code>），沒有 Node.js 的東西。</p>
+<h2 id="第一層：middleware"><a href="#第一層：middleware" class="headerlink" title="第一層：middleware"></a>第一層：middleware</h2><p>Next.js 的 middleware， 跑在 <strong>Edge Runtime</strong>——這是一個故意閹割過的 JS 執行環境，</p>
+<p>只有 Web 標準 API（<code>fetch</code>、<code>Request</code>、<code>Response</code>），沒有 Node.js 的東西。</p>
 <p>所以 middleware 能做的事很有限：</p>
 <figure class="highlight ts"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment">// ✅ 可以：讀 cookie、做 redirect、檢查 JWT</span></span><br><span class="line"><span class="comment">// ❌ 不行：連資料庫、用 Pino logger、用大多數 npm 套件</span></span><br></pre></td></tr></table></figure>
 
-<p>這不是 Vercel 的限制，是 Next.js 的設計決策——middleware 在每個請求最前面跑，設計目標是輕量、快，所以鎖死在 Edge Runtime。</p>
+<p>這不是 Vercel 的限制，是 Next.js 的設計決策——middleware 在每個請求最前面跑，</p>
+<p>設計目標是輕量、快，所以鎖死在 Edge Runtime。</p>
 <p><strong>結論：middleware 只放輕量的守衛邏輯（auth check、redirect），不是錯誤處理的地方。</strong></p>
-<h2 id="第二層：業務層-try-catch"><a href="#第二層：業務層-try-catch" class="headerlink" title="第二層：業務層 try-catch"></a>第二層：業務層 try-catch</h2><p>API Route 跑在完整 Node.js 上，可以做任何事。但 try-catch 的原則是：<strong>只有業務理由才放，不要為了「防止 crash」而加</strong>。</p>
+<h2 id="第二層：業務層-try-catch"><a href="#第二層：業務層-try-catch" class="headerlink" title="第二層：業務層 try-catch"></a>第二層：業務層 try-catch</h2><p>API Route 跑在完整 Node.js 上，可以做任何事。</p>
+<p>但 try-catch 的原則是不使用，除非<strong>有業務理由</strong>。</p>
 <p>什麼叫業務理由？</p>
 <figure class="highlight ts"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment">// ✅ ECPay webhook 協定要求：出錯必須回 0|FAIL，不能回 500</span></span><br><span class="line"><span class="keyword">try</span> &#123;</span><br><span class="line">  <span class="comment">// ... 處理邏輯</span></span><br><span class="line">  <span class="keyword">return</span> <span class="keyword">new</span> <span class="title class_">Response</span>(<span class="string">&#x27;1|OK&#x27;</span>, &#123; <span class="attr">status</span>: <span class="number">200</span> &#125;)</span><br><span class="line">&#125; <span class="keyword">catch</span> (err) &#123;</span><br><span class="line">  logger.<span class="title function_">error</span>(<span class="string">&#x27;ECPay webhook error&#x27;</span>, &#123; <span class="attr">error</span>: err &#125;)</span><br><span class="line">  <span class="keyword">return</span> <span class="keyword">new</span> <span class="title class_">Response</span>(<span class="string">&#x27;0|FAIL&#x27;</span>, &#123; <span class="attr">status</span>: <span class="number">200</span> &#125;)</span><br><span class="line">&#125;</span><br><span class="line"></span><br><span class="line"><span class="comment">// ✅ OAuth 失敗：應該導到 /login?error=... 而不是白畫面</span></span><br><span class="line"><span class="keyword">try</span> &#123;</span><br><span class="line">  <span class="comment">// ... OAuth 流程</span></span><br><span class="line">&#125; <span class="keyword">catch</span> &#123;</span><br><span class="line">  <span class="keyword">return</span> <span class="title class_">NextResponse</span>.<span class="title function_">redirect</span>(<span class="keyword">new</span> <span class="title function_">URL</span>(<span class="string">&#x27;/login?error=server_error&#x27;</span>, request.<span class="property">url</span>))</span><br><span class="line">&#125;</span><br><span class="line"></span><br><span class="line"><span class="comment">// ❌ 只是怕 crash，沒有業務意義</span></span><br><span class="line"><span class="keyword">try</span> &#123;</span><br><span class="line">  <span class="comment">// ...</span></span><br><span class="line">&#125; <span class="keyword">catch</span> (err) &#123;</span><br><span class="line">  <span class="keyword">return</span> <span class="keyword">new</span> <span class="title class_">Response</span>(<span class="string">&#x27;error&#x27;</span>, &#123; <span class="attr">status</span>: <span class="number">500</span> &#125;) <span class="comment">// 跟 Next.js 預設行為一樣，多此一舉</span></span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
 
@@ -191,6 +197,9 @@ j=d.createElement(s),dl=l!='dataLayer'?'&l='+l:'';j.async=true;j.src=
 <td>無法改 response；Edge 下需另處理</td>
 </tr>
 </tbody></table>
+<h2 id="參考"><a href="#參考" class="headerlink" title="參考"></a>參考</h2><ul>
+<li><a target="_blank" rel="noopener" href="https://nextjs.org/docs/app/api-reference/file-conventions/instrumentation#onrequesterror-optional">Next.js 官方文件：instrumentation.js — onRequestError</a></li>
+</ul>
 <h2 id="小結"><a href="#小結" class="headerlink" title="小結"></a>小結</h2><p>不要為了「怕 crash」而到處加 try-catch，那只是把問題藏起來。</p>
 <p>正確的順序是：先把 <code>instrumentation.ts</code> 設起來，確保所有未處理的錯誤都有 log，然後只在真的有業務需求的地方加 try-catch。</p>
 <p>這樣新加的 route 自動有防護，不需要靠人記得。</p>
@@ -199,7 +208,7 @@ j=d.createElement(s),dl=l!='dataLayer'?'&l='+l:'';j.async=true;j.src=
       
     </div>
     <footer class="article-footer">
-      <a data-url="https://blog.marsen.me/2026/06/17/2026/nextjs-error-handling-layers/" data-id="cuidlpg8lCESawec0cC1sSPrb" class="article-share-link">Share</a>
+      <a data-url="https://blog.marsen.me/2026/06/17/2026/nextjs-error-handling-layers/" data-id="cuidwHOrk39gxY4JniC-pdPMc" class="article-share-link">Share</a>
       
         <a href="https://blog.marsen.me/2026/06/17/2026/nextjs-error-handling-layers/#disqus_thread" class="article-comment-link">留言</a>
       
