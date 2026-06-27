@@ -12,7 +12,27 @@
   <rights>All rights reserved 2026, Marsen L.</rights>
   <subtitle>waiting to load</subtitle>
   <title>Marsen's Blog</title>
-  <updated>2026-06-27T23:35:22.373Z</updated>
+  <updated>2026-06-27T23:42:47.059Z</updated>
+  <entry>
+    <author>
+      <name>Marsen L.</name>
+      <email>admin@marsen.me</email>
+    </author>
+    <category term="實作筆記" scheme="https://blog.marsen.me/tags/%E5%AF%A6%E4%BD%9C%E7%AD%86%E8%A8%98/"/>
+    <content>
+      <![CDATA[<h2 id="前情提要"><a href="#前情提要" class="headerlink" title="前情提要"></a>前情提要</h2><p><strong>Resend</strong> 是一個以開發者為核心設計的 Email 發送服務，API 乾淨、SDK 齊全，免費層每月 3,000 封，適合個人專案或 SaaS 的交易信（訂單、通知、驗證碼）。</p><p>Open &amp; Click Tracking 是 email 行銷的基本指標蒐集機制：</p><ul><li><strong>Open Tracking</strong>：在 email 裡埋一張 1px 透明圖片，收件人開信時瀏覽器會載入它，Resend 藉此記錄「開信率」。</li><li><strong>Click Tracking</strong>：把 email 裡的連結換成中繼 URL，點擊後先經過 Resend 記錄，再跳到原始目標，藉此追蹤「點擊率」。</li></ul><p>這個功能預設關閉，開啟前必須先設定自訂 tracking subdomain，才能讓追蹤連結掛在你自己的 domain 下，而非 Resend 的共用 domain。</p><h2 id="為什麼不能直接用-Resend-預設的-tracking-domain"><a href="#為什麼不能直接用-Resend-預設的-tracking-domain" class="headerlink" title="為什麼不能直接用 Resend 預設的 tracking domain"></a>為什麼不能直接用 Resend 預設的 tracking domain</h2><p>Open Tracking 的原理是在 email 裡塞一個 1px 透明圖片，收件人開信時瀏覽器載入這張圖，Resend 就知道「被打開了」。<br>Click Tracking 則是把 email 裡的連結換成中繼 URL，收件人點了之後先到 Resend，記錄一筆，再跳到原始連結。</p><p>預設這兩個 URL 的 domain 都是 Resend 的（例如 <code>track.resend.dev</code>）。</p><p>問題有兩個：</p><ol><li><p><strong>deliverability</strong>：Gmail、Outlook 的垃圾信過濾會注意 email 內的 domain 跟寄件人是否一致。圖片跟連結指向一個陌生的 domain，可疑分數會上升。</p></li><li><p><strong>共用 reputation</strong>：Resend 的 tracking domain 是所有用戶共用的。如果有人用 Resend 大量發垃圾信被封，你也可能受連帶影響。</p></li></ol><p>設定自己的 subdomain 可以解決這兩個問題。</p><h2 id="設定步驟"><a href="#設定步驟" class="headerlink" title="設定步驟"></a>設定步驟</h2><h3 id="1-在-Resend-找到-Domain-設定"><a href="#1-在-Resend-找到-Domain-設定" class="headerlink" title="1. 在 Resend 找到 Domain 設定"></a>1. 在 Resend 找到 Domain 設定</h3><p>進 Resend Dashboard → Domains，點開你的 domain（這個 domain 要已經驗證完成，也就是已經能寄信的那個）。</p><h3 id="2-開啟-Tracking"><a href="#2-開啟-Tracking" class="headerlink" title="2. 開啟 Tracking"></a>2. 開啟 Tracking</h3><p>在 domain 設定頁面找到 <strong>Tracking</strong> 區塊，開啟 Open Tracking 和 Click Tracking。</p><p>開啟後 Resend 會給你一筆 CNAME 紀錄要加到 DNS：</p><figure class="highlight text"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br></pre></td><td class="code"><pre><span class="line">類型：CNAME</span><br><span class="line">名稱：tracking</span><br><span class="line">值：links1.resend-dns.com</span><br></pre></td></tr></table></figure><p>最終效果是你的 <code>tracking.yourdomain.com</code> 會指向 Resend 的 tracking endpoint。</p><h3 id="3-在-DNS-加-CNAME-記錄"><a href="#3-在-DNS-加-CNAME-記錄" class="headerlink" title="3. 在 DNS 加 CNAME 記錄"></a>3. 在 DNS 加 CNAME 記錄</h3><p>如果 DNS 是用 Cloudflare 管的，Resend 有直接整合——在 Resend 介面授權連結 Cloudflare，它會自動幫你加好那筆 CNAME，不需要手動操作。</p><p>其他 DNS 提供商就要自己去加。Cloudflare 的話記得把 Proxy 設成 DNS only（灰色雲），CNAME 才能正常傳遞。</p><h3 id="4-等-DNS-生效"><a href="#4-等-DNS-生效" class="headerlink" title="4. 等 DNS 生效"></a>4. 等 DNS 生效</h3><p>一般 5 分鐘到幾小時，Cloudflare 通常很快。</p><p>回到 Resend 按 Verify，綠燈就是設定完成。</p><h2 id="開啟後的行為"><a href="#開啟後的行為" class="headerlink" title="開啟後的行為"></a>開啟後的行為</h2><p>設定完之後，Resend 寄出去的 email 裡：</p><ul><li>圖片 URL 會從 <code>track.resend.dev/open/xxx</code> 變成 <code>track.yourdomain.com/open/xxx</code></li><li>連結會從 <code>track.resend.dev/click/xxx</code> 變成 <code>track.yourdomain.com/click/xxx</code></li></ul><p>都是你自己的 domain，deliverability 更好。</p><h2 id="程式碼端不需要改"><a href="#程式碼端不需要改" class="headerlink" title="程式碼端不需要改"></a>程式碼端不需要改</h2><p>這是 Resend 的 infrastructure 層設定，你的程式碼不需要動任何東西。只要 domain 驗證完成，之後的每封信都自動套用。</p><h2 id="小結"><a href="#小結" class="headerlink" title="小結"></a>小結</h2><p>整個設定大概 10 分鐘。核心就一件事：加一筆 CNAME 到 DNS，把 tracking 的 subdomain 接到 Resend。</p><p>之後 open rate 和 click rate 就能在 Resend Dashboard 看到了。</p><p>(fin)</p>]]>
+    </content>
+    <id>https://blog.marsen.me/2026/06/23/2026/resend-custom-tracking-domain/</id>
+    <link href="https://blog.marsen.me/2026/06/23/2026/resend-custom-tracking-domain/"/>
+    <published>2026-06-23T21:40:35.000Z</published>
+    <summary>
+      <![CDATA[<h2 id="前情提要"><a href="#前情提要" class="headerlink" title="前情提要"></a>前情提要</h2><p><strong>Resend</strong> 是一個以開發者為核心設計的 Email 發送服務，API 乾淨、SDK 齊全]]>
+    </summary>
+    <title>
+      <![CDATA[[實作筆記] 設定 Resend 自訂 Tracking Domain，開啟 Open & Click Tracking]]>
+    </title>
+    <updated>2026-06-27T23:42:47.059Z</updated>
+  </entry>
   <entry>
     <author>
       <name>Marsen L.</name>
@@ -29,7 +49,7 @@
       <![CDATA[<h2 id="前情提要"><a href="#前情提要" class="headerlink" title="前情提要"></a>前情提要</h2><p>在串接藍新金流時，以為在正式站註冊完就能直接測試，結果找了半天都找不到沙盒設定。<br>記錄一下這個讓人繞路的細節。</p>]]>
     </summary>
     <title>[實作筆記] 藍新金流沙盒是獨立測試站，要另外申請</title>
-    <updated>2026-06-27T23:35:22.373Z</updated>
+    <updated>2026-06-27T23:42:47.059Z</updated>
   </entry>
   <entry>
     <author>
@@ -47,7 +67,7 @@
       <![CDATA[<h2 id="前情提要"><a href="#前情提要" class="headerlink" title="前情提要"></a>前情提要</h2><p>串接 ECPay MPG（多元收款）時，本機測試有幾個坑需要提前知道。<br>整理一下從申請沙盒帳號到 webhook 打進]]>
     </summary>
     <title>[實作筆記] ECPay 綠界沙盒串接：本機測試完整流程</title>
-    <updated>2026-06-27T23:35:22.373Z</updated>
+    <updated>2026-06-27T23:42:47.059Z</updated>
   </entry>
   <entry>
     <author>
@@ -65,7 +85,7 @@
       <![CDATA[<h2 id="前情提要"><a href="#前情提要" class="headerlink" title="前情提要"></a>前情提要</h2><p>在本機開發時，第三方金流（ECPay、TapPay）的 webhook 需要一個公開 URL 才能打回來。<br>我試了 l]]>
     </summary>
     <title>[工具筆記] 本地 webhook 測試：用 cloudflared，不要用 localtunnel</title>
-    <updated>2026-06-27T23:35:22.373Z</updated>
+    <updated>2026-06-27T23:42:47.059Z</updated>
   </entry>
   <entry>
     <author>
@@ -83,7 +103,7 @@
       <![CDATA[<h2 id="前情提要"><a href="#前情提要" class="headerlink" title="前情提要"></a>前情提要</h2><p>在串接 ECPay 金流時，一個 API Route 裡用了 <code>redirect()</code>（from <c]]>
     </summary>
     <title>[實作筆記] Next.js 錯誤處理的三層：middleware、try-catch、instrumentation.ts</title>
-    <updated>2026-06-27T23:35:22.373Z</updated>
+    <updated>2026-06-27T23:42:47.059Z</updated>
   </entry>
   <entry>
     <author>
@@ -102,7 +122,7 @@
 <p>所以我設計了多個不同的]]>
     </summary>
     <title>[實作筆記] 為什麼 InversifyJS 在 Next.js 不能用？SWC 相容性問題與 awilix 解法</title>
-    <updated>2026-06-27T23:35:22.373Z</updated>
+    <updated>2026-06-27T23:42:47.059Z</updated>
   </entry>
   <entry>
     <author>
@@ -121,7 +141,7 @@
 <figure class="highli]]>
     </summary>
     <title>[實作筆記] Next.js 16 — middleware 改名為 proxy 了</title>
-    <updated>2026-06-27T23:35:22.374Z</updated>
+    <updated>2026-06-27T23:42:47.059Z</updated>
   </entry>
   <entry>
     <author>
@@ -140,7 +160,7 @@
 <p>這個問題帶出了前端靜]]>
     </summary>
     <title>[實作筆記] 形象站滿版背景影片（一）：前端靜態資源放哪裡</title>
-    <updated>2026-06-27T23:35:22.373Z</updated>
+    <updated>2026-06-27T23:42:47.059Z</updated>
   </entry>
   <entry>
     <author>
@@ -159,7 +179,7 @@
 <h2 id="本周要點"><a href="#本周要點" class="headerlink" title="本周要點"></a>本周要]]>
     </summary>
     <title>[AI生成] 20260612 科技周報</title>
-    <updated>2026-06-27T23:35:22.373Z</updated>
+    <updated>2026-06-27T23:42:47.059Z</updated>
   </entry>
   <entry>
     <author>
@@ -177,7 +197,7 @@
       <![CDATA[<h2 id="前情提要"><a href="#前情提要" class="headerlink" title="前情提要"></a>前情提要</h2><p>AI Coding 工具迭代太快，半年就是一個世代。<br>趁 2026 年中把目前市場上的 Agent Coding 工具]]>
     </summary>
     <title>[工具筆記] 2026 年中 AI Agent Coding 工具盤點：Claude Code、Cursor、Codex 怎麼選</title>
-    <updated>2026-06-27T23:35:22.372Z</updated>
+    <updated>2026-06-27T23:42:47.057Z</updated>
   </entry>
   <entry>
     <author>
@@ -196,7 +216,7 @@
 <h2 id="本周要點"><a href="#本周要點" class="headerlink" title="本周要點"></a>本周要]]>
     </summary>
     <title>[AI生成] 20260610 科技周報</title>
-    <updated>2026-06-27T23:35:22.373Z</updated>
+    <updated>2026-06-27T23:42:47.059Z</updated>
   </entry>
   <entry>
     <author>
@@ -216,7 +236,7 @@
 <p>Hero 區塊是網頁最頂部的全版區塊，通]]>
     </summary>
     <title>[實作筆記] 形象站滿版背景影片（二）：流量、CDN 與播放器選型</title>
-    <updated>2026-06-27T23:35:22.373Z</updated>
+    <updated>2026-06-27T23:42:47.059Z</updated>
   </entry>
   <entry>
     <author>
@@ -234,7 +254,7 @@
       <![CDATA[<h2 id="前情提要"><a href="#前情提要" class="headerlink" title="前情提要"></a>前情提要</h2><p>我有個 n8n workflow，每週自動抓 AI 新聞 → Gemini 生週報 → 發一篇 IG，順便生一張配圖、也產一]]>
     </summary>
     <title>[實作筆記] n8n AI 週報踩坑記：一條接錯的線，與找免費生圖來源的旅程</title>
-    <updated>2026-06-27T23:35:22.373Z</updated>
+    <updated>2026-06-27T23:42:47.059Z</updated>
   </entry>
   <entry>
     <author>
@@ -253,7 +273,7 @@
 <h2 id="本周要點"><a href="#本周要點" class="headerlink" title="本周要點"></a>本周要]]>
     </summary>
     <title>[AI生成] 20260605 科技周報</title>
-    <updated>2026-06-27T23:35:22.373Z</updated>
+    <updated>2026-06-27T23:42:47.059Z</updated>
   </entry>
   <entry>
     <author>
@@ -272,7 +292,7 @@
 <figure class="hi]]>
     </summary>
     <title>[實作筆記] 盤點與清理自訂網域的 Email DNS 殘留（用郵件 header 當偵探）</title>
-    <updated>2026-06-27T23:35:22.373Z</updated>
+    <updated>2026-06-27T23:42:47.059Z</updated>
   </entry>
   <entry>
     <author>
@@ -291,7 +311,7 @@
 <fi]]>
     </summary>
     <title>[實作筆記] 個人自動化平台(番外) 更新自架在 GCP VM 上的 n8n（Docker 版）</title>
-    <updated>2026-06-27T23:35:22.373Z</updated>
+    <updated>2026-06-27T23:42:47.059Z</updated>
   </entry>
   <entry>
     <author>
@@ -310,7 +330,7 @@
 <p>比著發現原來存在著兩種金流串接]]>
     </summary>
     <title>[工具筆記] Prime Token vs MPG：兩種台灣電商金流模式的本質差異</title>
-    <updated>2026-06-27T23:35:22.374Z</updated>
+    <updated>2026-06-27T23:42:47.059Z</updated>
   </entry>
   <entry>
     <author>
@@ -328,7 +348,7 @@
       <![CDATA[<h2 id="前情提要"><a href="#前情提要" class="headerlink" title="前情提要"></a>前情提要</h2><p>想把個人 PBI 清單整合進 GitHub Projects，<br>同時設定 GitHub Actions 讓新 Issu]]>
     </summary>
     <title>[踩雷筆記] gh CLI 操作 GitHub Projects 與 Actions 的授權</title>
-    <updated>2026-06-27T23:35:22.373Z</updated>
+    <updated>2026-06-27T23:42:47.059Z</updated>
   </entry>
   <entry>
     <author>
@@ -346,7 +366,7 @@
       <![CDATA[<h2 id="前情提要"><a href="#前情提要" class="headerlink" title="前情提要"></a>前情提要</h2><p>用 LINE Bot 做系統通知，結果某天發現通知完全停了，重啟也沒用。<br>查了一圈才發現根本原因不是程式問題，這篇記錄]]>
     </summary>
     <title>[實作筆記] LINE Messaging API 用量查詢：免費額度怎麼看，以及為什麼通知會停止</title>
-    <updated>2026-06-27T23:35:22.373Z</updated>
+    <updated>2026-06-27T23:42:47.059Z</updated>
   </entry>
   <entry>
     <author>
@@ -365,25 +385,6 @@
 <li><a href="https://www.theverge.com/ai-artificial-intellig]]>
     </summary>
     <title>[AI生成]20260505 周報</title>
-    <updated>2026-06-27T23:35:22.373Z</updated>
-  </entry>
-  <entry>
-    <author>
-      <name>Marsen L.</name>
-      <email>admin@marsen.me</email>
-    </author>
-    <category term="AI生成" scheme="https://blog.marsen.me/tags/AI%E7%94%9F%E6%88%90/"/>
-    <content>
-      <![CDATA[<h2 id="本周要點"><a href="#本周要點" class="headerlink" title="本周要點"></a>本周要點</h2><ul><li><a href="https://www.theverge.com/ai-artificial-intelligence/922113/pentagon-ai-classified-openai-google-nvidia">五角大廈與 OpenAI、Google 及 Nvidia 達成機密 AI 協議，但不包括 Anthropic</a>：美國國防部與三家科技巨頭簽署軍事用途的機密 AI 合約，而 Anthropic 則未在名單之列。</li><li><a href="https://www.theverge.com/ai-artificial-intelligence/921546/elon-musk-xai-openai-trial-model-distillation">Elon Musk 證實 xAI 曾使用 OpenAI 的模型來訓練 Grok</a>：在法庭證詞中，Musk 承認 xAI 曾利用競爭對手的模型數據進行蒸餾訓練。</li><li><a href="https://www.theverge.com/news/921944/microsoft-word-legal-agent-ai">Microsoft 希望律師能信任 Word 文件中的新 AI 代理</a>：Microsoft 推出專為法律專業設計的 AI 功能，旨在協助處理複雜的法律文件與合約審閱。</li><li><a href="https://www.theverge.com/column/921599/ai-music-is-flooding-streaming-services-but-who-wants-it">AI 音樂正淹沒串流服務——但究竟誰想要這些音樂？</a>：探討當前串流平台充斥大量 AI 生成音軌的現象，以及市場對這些內容的真實需求。</li><li><a href="https://www.theverge.com/ai-artificial-intelligence/920775/evidence-exhibits-elon-musk-sam-altman-openai-trial">Musk 對決 Altman 案中目前揭露的所有證據</a>：整理了這場攸關 OpenAI 未來走向的世紀訴訟中，目前公開的所有關鍵證物與通訊記錄。</li><li><a href="https://www.theverge.com/ai-artificial-intelligence/920881/ai-generated-bible-videos-christian-creators-fiverr-slop">基督教內容創作者正將 AI 垃圾內容外包給 Fiverr 上的零工</a>：揭露創作者利用廉價勞動力結合 AI 工具，大量產出低品質宗教影片以賺取流量的生態。</li><li><a href="https://www.theverge.com/tech/921690/dualshot-recorder-iphone-camera-app-derrick-downey-jr">網路最受歡迎的松鼠爸爸如何打造 2026 年最火紅的相機 App</a>：介紹網紅 Derrick Downey Jr. 開發的 DualShot Recorder 如何在競爭激烈的 App 市場脫穎而出。</li></ul><h2 id="其他訊息"><a href="#其他訊息" class="headerlink" title="其他訊息"></a>其他訊息</h2><ul><li><a href="https://www.theverge.com/podcast/922009/musk-openai-trial-testimony-vergecast">Elon Musk 在法庭度過了糟糕的一週</a></li><li><a href="https://www.theverge.com/ai-artificial-intelligence/921713/musk-v-altman-jared-birchall-screw-up-xai">Musk 對決 Altman 案中最瘋狂的部分發生在陪審團離場時</a></li><li><a href="https://www.theverge.com/tech/917225/sam-altman-elon-musk-openai-lawsuit">Elon Musk 與 Sam Altman 爭奪 OpenAI 未來之法律戰的即時更新</a></li></ul><p>(fin)</p>]]>
-    </content>
-    <id>https://blog.marsen.me/2026/05/03/2026/ai-weekly-20260504/</id>
-    <link href="https://blog.marsen.me/2026/05/03/2026/ai-weekly-20260504/"/>
-    <published>2026-05-03T16:00:59.000Z</published>
-    <summary>
-      <![CDATA[<h2 id="本周要點"><a href="#本周要點" class="headerlink" title="本周要點"></a>本周要點</h2><ul>
-<li><a href="https://www.theverge.com/ai-artificial-intellig]]>
-    </summary>
-    <title>[AI生成]20260504 周報</title>
-    <updated>2026-06-27T23:35:22.373Z</updated>
+    <updated>2026-06-27T23:42:47.059Z</updated>
   </entry>
 </feed>
