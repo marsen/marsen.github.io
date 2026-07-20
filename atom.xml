@@ -12,25 +12,7 @@
   <rights>All rights reserved 2026, Marsen L.</rights>
   <subtitle>waiting to load</subtitle>
   <title>Marsen's Blog</title>
-  <updated>2026-07-20T09:26:58.270Z</updated>
-  <entry>
-    <author>
-      <name>Marsen L.</name>
-      <email>admin@marsen.me</email>
-    </author>
-    <category term="實作筆記" scheme="https://blog.marsen.me/tags/%E5%AF%A6%E4%BD%9C%E7%AD%86%E8%A8%98/"/>
-    <content>
-      <![CDATA[<h2 id="前情提要"><a href="#前情提要" class="headerlink" title="前情提要"></a>前情提要</h2><p>在幫 AIris（LINE 分身橋接專案）設定 CD pipeline，讓 GitHub Actions 可以用 Workload Identity Federation（WIF）換一個 service account 的身分，透過 IAP tunnel SSH 進 GCE VM 部署。權限明明照著給了，IAM 也三種方式驗證過都說「有權限」，VM 卻死咬著 <code>Permission denied</code>。查到最後發現是漏了一個沒那麼直覺的角色綁定，而且我自己中途還推了一個錯誤方向、代價還不小（要停機）。記錄一下踩坑過程。</p><h2 id="建置過程：WIF-service-account-IAP"><a href="#建置過程：WIF-service-account-IAP" class="headerlink" title="建置過程：WIF + service account + IAP"></a>建置過程：WIF + service account + IAP</h2><p>建了一個 WIF pool&#x2F;provider，綁定到 GitHub repo，再建一個專用的 service account <code>airis-deploy</code>，綁了兩個角色：</p><ul><li><code>roles/iap.tunnelResourceAccessor</code>（開 IAP tunnel）</li><li><code>roles/compute.osAdminLogin</code>（OS Login，含 sudo）</li></ul><p>VM 本身也確認過開著 OS Login（<code>enable-oslogin=TRUE</code>）。照著這樣設定，理論上 GitHub Actions 認證後應該能直接：</p><figure class="highlight bash"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br></pre></td><td class="code"><pre><span class="line">gcloud compute ssh ai-butler-vm00 --zone=us-east1-b --tunnel-through-iap \</span><br><span class="line">  --impersonate-service-account=<span class="string">&quot;airis-deploy@PROJECT.iam.gserviceaccount.com&quot;</span> \</span><br><span class="line">  --<span class="built_in">command</span>=<span class="string">&quot;whoami&quot;</span></span><br></pre></td></tr></table></figure><h2 id="症狀：IAM-說有權限，VM-說沒有"><a href="#症狀：IAM-說有權限，VM-說沒有" class="headerlink" title="症狀：IAM 說有權限，VM 說沒有"></a>症狀：IAM 說有權限，VM 說沒有</h2><p>實際跑起來，SSH 直接被拒絕：</p><figure class="highlight text"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">sa_103328536429727217784@compute.xxx: Permission denied (publickey).</span><br></pre></td></tr></table></figure><p>VM 上的 sshd log 更明確：</p><figure class="highlight text"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br></pre></td><td class="code"><pre><span class="line">sshd: google_authorized_keys: OS Login user sa_103328536429727217784 does not have login permission.</span><br><span class="line">sshd: google_authorized_keys: Could not grant access to organization user: sa_103328536429727217784.</span><br></pre></td></tr></table></figure><p>但問題是，我用三種不同方式直接跟 GCP API 確認過，這個 service account <strong>明明有</strong>登入權限：</p><figure class="highlight bash"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment"># Cloud Resource Manager API</span></span><br><span class="line">curl -X POST <span class="string">&quot;https://cloudresourcemanager.googleapis.com/v1/projects/PROJECT:testIamPermissions&quot;</span> \</span><br><span class="line">  -H <span class="string">&quot;Authorization: Bearer <span class="variable">$TOKEN</span>&quot;</span> \</span><br><span class="line">  -d <span class="string">&#x27;&#123;&quot;permissions&quot;:[&quot;compute.instances.osLogin&quot;,&quot;compute.instances.osAdminLogin&quot;]&#125;&#x27;</span></span><br><span class="line"><span class="comment"># → 兩個權限都回來了</span></span><br><span class="line"></span><br><span class="line"><span class="comment"># Compute API，instance 層級</span></span><br><span class="line">curl -X POST <span class="string">&quot;.../instances/ai-butler-vm00/testIamPermissions&quot;</span> ...</span><br><span class="line"><span class="comment"># → 一樣都有</span></span><br><span class="line"></span><br><span class="line"><span class="comment"># OS Login API 的 getLoginProfile</span></span><br><span class="line">gcloud compute os-login describe-profile --impersonate-service-account=<span class="string">&quot;airis-deploy@...&quot;</span></span><br><span class="line"><span class="comment"># → posixAccounts、sshPublicKeys 都在，account 是 primary</span></span><br></pre></td></tr></table></figure><p>三個角度都確認「這個身分有權限、SSH key 也確實註冊好了」，但 VM 端就是不認。中途試過：多等幾分鐘讓 IAM propagate、把 binding 移除再重新加一次想強制刷新，都沒用。</p><h2 id="錯誤推論：以為是-VM-的-OAuth-scope-不夠"><a href="#錯誤推論：以為是-VM-的-OAuth-scope-不夠" class="headerlink" title="錯誤推論：以為是 VM 的 OAuth scope 不夠"></a>錯誤推論：以為是 VM 的 OAuth scope 不夠</h2><p>看了一下 VM 自己掛的預設 service account（不是新建的 <code>airis-deploy</code>，是 VM 出生就有的那個）的 OAuth scope：</p><figure class="highlight text"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br></pre></td><td class="code"><pre><span class="line">devstorage.read_only</span><br><span class="line">logging.write</span><br><span class="line">monitoring.write</span><br><span class="line">pubsub</span><br><span class="line">service.management.readonly</span><br><span class="line">servicecontrol</span><br><span class="line">trace.append</span><br></pre></td></tr></table></figure><p>沒有任何 compute 相關的範圍。我當時的推論是：VM 收到登入請求時，得反過來拿自己的身分去問 Google「這個新身分有沒有權限」，但自己的 scope 不夠，這個反查就默默失敗了。</p><p>這個推論<strong>沒有查證過</strong>，而且修法的代價不小——GCE 的 instance scope 只能在<strong>停機狀態</strong>下改，代表要把這台跑著 n8n 的 VM 停機、改設定、重開機。</p><p>Marsen 問了一句「這是實驗還是確定的修改？」，這句話讓我停下來——在建議使用者為了一個沒把握的假設去承擔停機成本之前，應該先查證，不是先動手。</p><h2 id="真正的根因：漏了一個角色，而且要綁在別的資源上"><a href="#真正的根因：漏了一個角色，而且要綁在別的資源上" class="headerlink" title="真正的根因：漏了一個角色，而且要綁在別的資源上"></a>真正的根因：漏了一個角色，而且要綁在別的資源上</h2><p>用 WebSearch 查 GCP 官方文件才找到關鍵：</p><blockquote><p>If a user is granted the <code>roles/compute.osLogin</code> access role and the authorization output returns <code>{&quot;success&quot;: false}</code>, this indicates that the user might be missing the <code>roles/iam.serviceAccountUser</code> permission for the service account associated with the compute instance.</p></blockquote><p>重點是**「for the service account associated with the compute instance」**——這個角色要綁在「VM 本身掛載的那個 service account」上，member 是我們的 <code>airis-deploy</code>，不是綁在 project 或 VM instance 這兩個我原本驗證過的資源上：</p><figure class="highlight bash"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br></pre></td><td class="code"><pre><span class="line">gcloud iam service-accounts add-iam-policy-binding \</span><br><span class="line">  PROJECT_NUMBER-compute@developer.gserviceaccount.com \</span><br><span class="line">  --member=<span class="string">&quot;serviceAccount:airis-deploy@PROJECT.iam.gserviceaccount.com&quot;</span> \</span><br><span class="line">  --role=<span class="string">&quot;roles/iam.serviceAccountUser&quot;</span></span><br></pre></td></tr></table></figure><p>補上這個綁定，完全不用停機，等了 1-2 分鐘傳播後，SSH 跟 sudo 都成功了。</p><h2 id="為什麼三個-API-驗證都測不出這個問題"><a href="#為什麼三個-API-驗證都測不出這個問題" class="headerlink" title="為什麼三個 API 驗證都測不出這個問題"></a>為什麼三個 API 驗證都測不出這個問題</h2><p>因為那三個 API 檢查的都是「這個身分有沒有被授權」，資源分別是 project、VM instance、OS Login profile——都指向同一件事：<code>airis-deploy</code> 這個身分本身夠不夠格登入。</p><p>但漏掉的那個角色，檢查的是完全不同的資源：<strong>VM 的 service account</strong>，問的是另一個問題——「<code>airis-deploy</code> 能不能『使用』VM 這個身分登入的這整條鏈路」。這是 OS Login 底層驗證流程裡的一個環節，不在我原本驗證的三個檢查範圍內，所以怎麼測都測不出來。</p><h2 id="小結"><a href="#小結" class="headerlink" title="小結"></a>小結</h2><ul><li>IAM 權限「確認生效」跟「這個資源實際能不能用」是兩件事，尤其是 OS Login 這種還牽涉到 VM 自己反查權限的機制</li><li>缺的角色綁在完全不同的資源上（VM 的 service account），不是我以為的 project 或 VM instance，難怪測不出來</li><li>遇到「權限都給了還是不通」，先查官方 troubleshooting 文件，不要憑經驗推論一個代價更高（尤其是要別人承擔停機成本）的方案</li><li><code>roles/iam.serviceAccountUser</code> 這個角色常常是這類「明明權限給了卻卡住」問題的漏網之魚</li></ul><h2 id="資料來源"><a href="#資料來源" class="headerlink" title="資料來源"></a>資料來源</h2><ul><li><a href="https://docs.cloud.google.com/compute/docs/oslogin/set-up-oslogin">Set up OS Login | Compute Engine</a></li><li><a href="https://cloud.google.com/compute/docs/troubleshooting/troubleshoot-os-login">Troubleshooting OS Login | Compute Engine</a></li></ul><p>(fin)</p>]]>
-    </content>
-    <id>https://blog.marsen.me/2026/07/20/2026/gce-service-account-oslogin-iap-ssh-permission-denied/</id>
-    <link href="https://blog.marsen.me/2026/07/20/2026/gce-service-account-oslogin-iap-ssh-permission-denied/"/>
-    <published>2026-07-20T10:25:10.000Z</published>
-    <summary>
-      <![CDATA[<h2 id="前情提要"><a href="#前情提要" class="headerlink" title="前情提要"></a>前情提要</h2><p>在幫 AIris（LINE 分身橋接專案）設定 CD pipeline，讓 GitHub Actions 可以用 Workl]]>
-    </summary>
-    <title>[實作筆記] Service Account 用 IAP tunnel SSH 進 GCE，明明權限都給了還是 Permission denied</title>
-    <updated>2026-07-20T09:26:58.270Z</updated>
-  </entry>
+  <updated>2026-07-20T09:28:33.118Z</updated>
   <entry>
     <author>
       <name>Marsen L.</name>
@@ -48,7 +30,7 @@
 <h2 id="本周要點"><a href="#本周要點" class="headerlink" title="本周要點"></a>本周要]]>
     </summary>
     <title>[AI生成] 20260706 科技周報</title>
-    <updated>2026-07-20T09:26:58.270Z</updated>
+    <updated>2026-07-20T09:28:33.118Z</updated>
   </entry>
   <entry>
     <author>
@@ -68,7 +50,7 @@
     <title>
       <![CDATA[[實作筆記] 設定 Resend 自訂 Tracking Domain，開啟 Open & Click Tracking]]>
     </title>
-    <updated>2026-07-20T09:26:58.271Z</updated>
+    <updated>2026-07-20T09:28:33.119Z</updated>
   </entry>
   <entry>
     <author>
@@ -86,7 +68,7 @@
       <![CDATA[<h2 id="前情提要"><a href="#前情提要" class="headerlink" title="前情提要"></a>前情提要</h2><p>在串接藍新金流時，以為在正式站註冊完就能直接測試，結果找了半天都找不到沙盒設定。<br>記錄一下這個讓人繞路的細節。</p>]]>
     </summary>
     <title>[實作筆記] 藍新金流沙盒是獨立測試站，要另外申請</title>
-    <updated>2026-07-20T09:26:58.270Z</updated>
+    <updated>2026-07-20T09:28:33.118Z</updated>
   </entry>
   <entry>
     <author>
@@ -104,7 +86,7 @@
       <![CDATA[<h2 id="前情提要"><a href="#前情提要" class="headerlink" title="前情提要"></a>前情提要</h2><p>串接 ECPay MPG（多元收款）時，本機測試有幾個坑需要提前知道。<br>整理一下從申請沙盒帳號到 webhook 打進]]>
     </summary>
     <title>[實作筆記] ECPay 綠界沙盒串接：本機測試完整流程</title>
-    <updated>2026-07-20T09:26:58.270Z</updated>
+    <updated>2026-07-20T09:28:33.118Z</updated>
   </entry>
   <entry>
     <author>
@@ -122,7 +104,7 @@
       <![CDATA[<h2 id="前情提要"><a href="#前情提要" class="headerlink" title="前情提要"></a>前情提要</h2><p>在本機開發時，第三方金流（ECPay、TapPay）的 webhook 需要一個公開 URL 才能打回來。<br>我試了 l]]>
     </summary>
     <title>[工具筆記] 本地 webhook 測試：用 cloudflared，不要用 localtunnel</title>
-    <updated>2026-07-20T09:26:58.270Z</updated>
+    <updated>2026-07-20T09:28:33.118Z</updated>
   </entry>
   <entry>
     <author>
@@ -140,7 +122,7 @@
       <![CDATA[<h2 id="前情提要"><a href="#前情提要" class="headerlink" title="前情提要"></a>前情提要</h2><p>在串接 ECPay 金流時，一個 API Route 裡用了 <code>redirect()</code>（from <c]]>
     </summary>
     <title>[實作筆記] Next.js 錯誤處理的三層：middleware、try-catch、instrumentation.ts</title>
-    <updated>2026-07-20T09:26:58.271Z</updated>
+    <updated>2026-07-20T09:28:33.118Z</updated>
   </entry>
   <entry>
     <author>
@@ -159,7 +141,7 @@
 <p>所以我設計了多個不同的]]>
     </summary>
     <title>[實作筆記] 為什麼 InversifyJS 在 Next.js 不能用？SWC 相容性問題與 awilix 解法</title>
-    <updated>2026-07-20T09:26:58.270Z</updated>
+    <updated>2026-07-20T09:28:33.118Z</updated>
   </entry>
   <entry>
     <author>
@@ -178,7 +160,7 @@
 <figure class="highli]]>
     </summary>
     <title>[實作筆記] Next.js 16 — middleware 改名為 proxy 了</title>
-    <updated>2026-07-20T09:26:58.271Z</updated>
+    <updated>2026-07-20T09:28:33.119Z</updated>
   </entry>
   <entry>
     <author>
@@ -197,7 +179,7 @@
 <p>這個問題帶出了前端靜]]>
     </summary>
     <title>[實作筆記] 形象站滿版背景影片（一）：前端靜態資源放哪裡</title>
-    <updated>2026-07-20T09:26:58.270Z</updated>
+    <updated>2026-07-20T09:28:33.118Z</updated>
   </entry>
   <entry>
     <author>
@@ -216,7 +198,7 @@
 <h2 id="本周要點"><a href="#本周要點" class="headerlink" title="本周要點"></a>本周要]]>
     </summary>
     <title>[AI生成] 20260612 科技周報</title>
-    <updated>2026-07-20T09:26:58.270Z</updated>
+    <updated>2026-07-20T09:28:33.118Z</updated>
   </entry>
   <entry>
     <author>
@@ -234,7 +216,7 @@
       <![CDATA[<h2 id="前情提要"><a href="#前情提要" class="headerlink" title="前情提要"></a>前情提要</h2><p>AI Coding 工具迭代太快，半年就是一個世代。<br>趁 2026 年中把目前市場上的 Agent Coding 工具]]>
     </summary>
     <title>[工具筆記] 2026 年中 AI Agent Coding 工具盤點：Claude Code、Cursor、Codex 怎麼選</title>
-    <updated>2026-07-20T09:26:58.268Z</updated>
+    <updated>2026-07-20T09:28:33.116Z</updated>
   </entry>
   <entry>
     <author>
@@ -253,7 +235,7 @@
 <h2 id="本周要點"><a href="#本周要點" class="headerlink" title="本周要點"></a>本周要]]>
     </summary>
     <title>[AI生成] 20260610 科技周報</title>
-    <updated>2026-07-20T09:26:58.270Z</updated>
+    <updated>2026-07-20T09:28:33.118Z</updated>
   </entry>
   <entry>
     <author>
@@ -273,7 +255,7 @@
 <p>Hero 區塊是網頁最頂部的全版區塊，通]]>
     </summary>
     <title>[實作筆記] 形象站滿版背景影片（二）：流量、CDN 與播放器選型</title>
-    <updated>2026-07-20T09:26:58.270Z</updated>
+    <updated>2026-07-20T09:28:33.118Z</updated>
   </entry>
   <entry>
     <author>
@@ -291,7 +273,7 @@
       <![CDATA[<h2 id="前情提要"><a href="#前情提要" class="headerlink" title="前情提要"></a>前情提要</h2><p>我有個 n8n workflow，每週自動抓 AI 新聞 → Gemini 生週報 → 發一篇 IG，順便生一張配圖、也產一]]>
     </summary>
     <title>[實作筆記] n8n AI 週報踩坑記：一條接錯的線，與找免費生圖來源的旅程</title>
-    <updated>2026-07-20T09:26:58.270Z</updated>
+    <updated>2026-07-20T09:28:33.118Z</updated>
   </entry>
   <entry>
     <author>
@@ -310,7 +292,7 @@
 <h2 id="本周要點"><a href="#本周要點" class="headerlink" title="本周要點"></a>本周要]]>
     </summary>
     <title>[AI生成] 20260605 科技周報</title>
-    <updated>2026-07-20T09:26:58.270Z</updated>
+    <updated>2026-07-20T09:28:33.118Z</updated>
   </entry>
   <entry>
     <author>
@@ -329,7 +311,7 @@
 <figure class="hi]]>
     </summary>
     <title>[實作筆記] 盤點與清理自訂網域的 Email DNS 殘留（用郵件 header 當偵探）</title>
-    <updated>2026-07-20T09:26:58.270Z</updated>
+    <updated>2026-07-20T09:28:33.118Z</updated>
   </entry>
   <entry>
     <author>
@@ -348,7 +330,7 @@
 <fi]]>
     </summary>
     <title>[實作筆記] 個人自動化平台(番外) 更新自架在 GCP VM 上的 n8n（Docker 版）</title>
-    <updated>2026-07-20T09:26:58.270Z</updated>
+    <updated>2026-07-20T09:28:33.118Z</updated>
   </entry>
   <entry>
     <author>
@@ -367,7 +349,7 @@
 <p>比著發現原來存在著兩種金流串接]]>
     </summary>
     <title>[工具筆記] Prime Token vs MPG：兩種台灣電商金流模式的本質差異</title>
-    <updated>2026-07-20T09:26:58.271Z</updated>
+    <updated>2026-07-20T09:28:33.119Z</updated>
   </entry>
   <entry>
     <author>
@@ -385,6 +367,24 @@
       <![CDATA[<h2 id="前情提要"><a href="#前情提要" class="headerlink" title="前情提要"></a>前情提要</h2><p>想把個人 PBI 清單整合進 GitHub Projects，<br>同時設定 GitHub Actions 讓新 Issu]]>
     </summary>
     <title>[踩雷筆記] gh CLI 操作 GitHub Projects 與 Actions 的授權</title>
-    <updated>2026-07-20T09:26:58.270Z</updated>
+    <updated>2026-07-20T09:28:33.118Z</updated>
+  </entry>
+  <entry>
+    <author>
+      <name>Marsen L.</name>
+      <email>admin@marsen.me</email>
+    </author>
+    <category term="實作筆記" scheme="https://blog.marsen.me/tags/%E5%AF%A6%E4%BD%9C%E7%AD%86%E8%A8%98/"/>
+    <content>
+      <![CDATA[<h2 id="前情提要"><a href="#前情提要" class="headerlink" title="前情提要"></a>前情提要</h2><p>用 LINE Bot 做系統通知，結果某天發現通知完全停了，重啟也沒用。<br>查了一圈才發現根本原因不是程式問題，這篇記錄怎麼查用量、以及為什麼停的。</p><hr><h2 id="問題現象"><a href="#問題現象" class="headerlink" title="問題現象"></a>問題現象</h2><p>LINE Bot 的 push 通知在某個時間點之後完全靜默。<br>程式沒報錯，因為程式碼裡的 push 用了 <code>.catch(() =&gt; {})</code> 吃掉所有錯誤：</p><figure class="highlight ts"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">async</span> <span class="keyword">function</span> <span class="title function_">push</span>(<span class="params">text: <span class="built_in">string</span></span>) &#123;</span><br><span class="line">  <span class="keyword">await</span> lineClient.<span class="title function_">pushMessage</span>(<span class="variable constant_">ALLOWED_USER_ID</span>, msg).<span class="title function_">catch</span>(<span class="function">() =&gt;</span> &#123;&#125;)</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure><p>靜默失敗，完全看不出來哪裡出問題。</p><hr><h2 id="怎麼查用量"><a href="#怎麼查用量" class="headerlink" title="怎麼查用量"></a>怎麼查用量</h2><p>LINE 的用量統計不在 Developers Console，要去 <strong>LINE Official Account Manager</strong>：</p><ol><li>打開 <a href="https://manager.line.biz/">manager.line.biz</a></li><li>選你的 Official Account</li><li>左側 → <strong>分析</strong> → <strong>訊息</strong></li></ol><p>可以看到：</p><table><thead><tr><th>欄位</th><th>說明</th></tr></thead><tbody><tr><td>合計（所有訊息）</td><td>Reply + Push 總和</td></tr><tr><td>Push</td><td>主動推播的則數</td></tr><tr><td>Reply</td><td>回覆訊息的則數</td></tr></tbody></table><p>可以選日期範圍，最長 60 天。</p><hr><h2 id="免費額度是多少"><a href="#免費額度是多少" class="headerlink" title="免費額度是多少"></a>免費額度是多少</h2><p>LINE Messaging API 免費方案每月有 <strong>500 則</strong>免費訊息（Push + Reply 合計）。</p><p>超過之後每則需要付費，或者訊息會被擋下來（依帳號設定而定）。</p><p>500 則聽起來很多，但如果 Bot 跑 AI 對話，Claude 回應很長，常常一次就切成好幾則 push（每則上限 5000 字），很快就會耗光。</p><hr><h2 id="這次的真正原因"><a href="#這次的真正原因" class="headerlink" title="這次的真正原因"></a>這次的真正原因</h2><p>查完用量才發現：5&#x2F;1 用了 141 則，5&#x2F;2 用了 59 則，5&#x2F;3 之後全部是 0。</p><p>5&#x2F;3 之後不是「發了但被擋」，是根本沒有觸發 webhook。</p><p>原因是 LINE Bot 用 <strong>Webhook 模式</strong>，需要一個對外的 HTTPS URL。<br>我的架構是：</p><figure class="highlight text"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">LINE 伺服器 → HTTPS Webhook URL → Cloudflare Tunnel → 本機 Express server</span><br></pre></td></tr></table></figure><p>Cloudflare Tunnel 的 launchd service 在 5&#x2F;3 掛掉，LINE 打不到 webhook，所以什麼都沒發生。</p><hr><h2 id="Telegram-為什麼更穩"><a href="#Telegram-為什麼更穩" class="headerlink" title="Telegram 為什麼更穩"></a>Telegram 為什麼更穩</h2><p>Telegram 用 <strong>Long Polling</strong> 模式，bot 主動去 Telegram 伺服器拉訊息，不需要對外開放任何 URL。</p><table><thead><tr><th></th><th>LINE</th><th>Telegram</th></tr></thead><tbody><tr><td>連線模式</td><td>Webhook（需要 tunnel）</td><td>Long Polling（不需要）</td></tr><tr><td>斷線風險</td><td>tunnel 掛、IP 變、PORT 未開</td><td>幾乎沒有</td></tr><tr><td>免費額度</td><td>500 則&#x2F;月</td><td>無限制</td></tr></tbody></table><p>如果是用來做系統通知（不可中斷），Telegram 比 LINE 穩定很多。</p><hr><h2 id="小結"><a href="#小結" class="headerlink" title="小結"></a>小結</h2><ul><li>LINE 用量在 LINE Official Account Manager → 分析 → 訊息</li><li>免費方案 200 則&#x2F;月，用完靜默失敗</li><li>Webhook 模式依賴 tunnel，tunnel 掛掉通知就停</li><li>對穩定性要求高的通知場景，Telegram Long Polling 更適合</li></ul><p>(fin)</p>]]>
+    </content>
+    <id>https://blog.marsen.me/2026/05/06/2026/line-messaging-api-quota/</id>
+    <link href="https://blog.marsen.me/2026/05/06/2026/line-messaging-api-quota/"/>
+    <published>2026-05-06T11:00:49.000Z</published>
+    <summary>
+      <![CDATA[<h2 id="前情提要"><a href="#前情提要" class="headerlink" title="前情提要"></a>前情提要</h2><p>用 LINE Bot 做系統通知，結果某天發現通知完全停了，重啟也沒用。<br>查了一圈才發現根本原因不是程式問題，這篇記錄]]>
+    </summary>
+    <title>[實作筆記] LINE Messaging API 用量查詢：免費額度怎麼看，以及為什麼通知會停止</title>
+    <updated>2026-07-20T09:28:33.118Z</updated>
   </entry>
 </feed>
