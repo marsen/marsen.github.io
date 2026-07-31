@@ -1,0 +1,455 @@
+<!DOCTYPE html>
+<html>
+<head>
+  
+<!-- Google Tag Manager -->
+<script>(function(w,d,s,l,i){w[l]=w[l]||[];w[l].push({'gtm.start':
+new Date().getTime(),event:'gtm.js'});var f=d.getElementsByTagName(s)[0],
+j=d.createElement(s),dl=l!='dataLayer'?'&l='+l:'';j.async=true;j.src=
+'https://www.googletagmanager.com/gtm.js?id='+i+dl;f.parentNode.insertBefore(j,f);
+})(window,document,'script','dataLayer','GTM-NTDGNJZ');</script>
+<!-- End Google Tag Manager -->
+
+  
+<!-- Google Analytics -->
+<!-- Global site tag (gtag.js) - Google Analytics -->
+<script async src="https://www.googletagmanager.com/gtag/js?id=G-RF47NNRE5G"></script>
+<script>
+  window.dataLayer = window.dataLayer || [];
+  function gtag(){dataLayer.push(arguments);}
+  gtag('js', new Date());
+
+  gtag('config', 'G-RF47NNRE5G');
+</script>
+<!-- End Google Analytics -->
+
+  
+<!-- Google AdSense -->
+<script async src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-1885096025224905"
+     crossorigin="anonymous"></script>
+<!-- End Google AdSense -->
+
+
+
+  <meta charset="utf-8">
+  
+  <title>[實作筆記] 我的 AI 私人祕書　--- 架構設計 | Marsen&#39;s Blog</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
+  <meta name="description" content="前情提要 — AI 私人祕書 是什麼我想作個人智能秘書，願景是三件事：情緒第一線聽眾、第二大腦、路線守門人。 透過 LINE 與我對話，補捉我的個人思緒與想法，整理排序，追蹤進度 架構上要乾淨換可以抽換，例如 LINE 可以換成 Telegram ，Notion 可以換成 Obsidian。 真正的問題：不是捕捉不夠，是做不完情緒接住的部分參考 mymory，這塊也不簡單，先不展開，純粹的記錄就好">
+<meta property="og:type" content="article">
+<meta property="og:title" content="[實作筆記] 我的 AI 私人祕書　--- 架構設計">
+<meta property="og:url" content="https://blog.marsen.me/2026/07/31/2026/airis-second-brain-design/index.html">
+<meta property="og:site_name" content="Marsen&#39;s Blog">
+<meta property="og:description" content="前情提要 — AI 私人祕書 是什麼我想作個人智能秘書，願景是三件事：情緒第一線聽眾、第二大腦、路線守門人。 透過 LINE 與我對話，補捉我的個人思緒與想法，整理排序，追蹤進度 架構上要乾淨換可以抽換，例如 LINE 可以換成 Telegram ，Notion 可以換成 Obsidian。 真正的問題：不是捕捉不夠，是做不完情緒接住的部分參考 mymory，這塊也不簡單，先不展開，純粹的記錄就好">
+<meta property="og:locale" content="zh_TW">
+<meta property="article:published_time" content="2026-07-31T10:50:24.000Z">
+<meta property="article:modified_time" content="2026-07-31T11:17:42.418Z">
+<meta property="article:author" content="Marsen L.">
+<meta property="article:tag" content="實作筆記">
+<meta name="twitter:card" content="summary">
+  
+    <link rel="alternate" href="/atom.xml" title="Marsen&#39;s Blog" type="application/atom+xml">
+  
+  
+    <link rel="icon" href="/favicon.ico">
+  
+      
+    <link rel="preconnect" href="https://fonts.gstatic.com">
+    <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@300&display=swap" rel="stylesheet">
+  
+  
+<link rel="stylesheet" href="/css/style.css">
+
+  <meta property ="og:image" content="https://avatars1.githubusercontent.com/u/4269720?s=460&v=4" /> 
+<meta name="generator" content="Hexo 8.1.2"></head>
+
+<body>
+  <div id="container">
+    <div id="wrap">
+      <header id="header">
+  <div id="blog-banner"></div>
+  <div id="header-outer" class="outer">
+    <div id="header-title" class="inner">
+      <h1 id="logo-wrap">
+        <a href="/" id="logo">Marsen&#39;s Blog</a>
+      </h1>
+      
+        <h2 id="subtitle-wrap">
+          <a href="/" id="subtitle"></a>
+          <div>
+          <span style="width: 20px; height: 10px; background: linear-gradient(to bottom, #005BBB 50%, #FFD700 50%); text-align: center; color: white; font-size: 6px; font-weight: bold; line-height: 100px;">
+            #StandWithUkraine
+          </span>
+          </div>
+        </h2>
+      
+    </div>
+    <div id="header-inner" class="inner">
+      <nav id="main-nav">
+        <a id="main-nav-toggle" class="nav-icon"></a>
+        
+          <a class="main-nav-link" href="/">Home</a>
+        
+          <a class="main-nav-link" href="/archives">Archives</a>
+        
+      </nav>
+      <nav id="sub-nav">
+        
+          <a id="nav-rss-link" class="nav-icon" href="/atom.xml" title="RSS Feed"></a>
+        
+        <a id="nav-search-btn" class="nav-icon" title="搜尋"></a>
+      </nav>
+      <div id="search-form-wrap">
+        <form action="//google.com/search" method="get" accept-charset="UTF-8" class="search-form"><input type="search" name="q" class="search-form-input" placeholder="Search"><button type="submit" class="search-form-submit">&#xF002;</button><input type="hidden" name="sitesearch" value="https://blog.marsen.me"></form>
+      </div>
+    </div>
+  </div>
+</header>
+      <div class="outer">
+        <section id="main"><article id="post-2026/airis-second-brain-design" class="article article-type-post" itemscope itemprop="blogPost">
+  <div class="article-meta">
+    <a href="/2026/07/31/2026/airis-second-brain-design/" class="article-date">
+  <time datetime="2026-07-31T10:50:24.000Z" itemprop="datePublished">2026-07-31</time>
+</a>
+    
+  </div>
+  <div class="article-inner">
+    
+    
+      <header class="article-header">
+        
+  
+    <h1 class="article-title" itemprop="name">
+      [實作筆記] 我的 AI 私人祕書　--- 架構設計
+    </h1>
+  
+
+      </header>
+    
+    <div class="article-entry" itemprop="articleBody">
+      
+        <h2 id="前情提要-—-AI-私人祕書-是什麼"><a href="#前情提要-—-AI-私人祕書-是什麼" class="headerlink" title="前情提要 — AI 私人祕書 是什麼"></a>前情提要 — AI 私人祕書 是什麼</h2><p>我想作個人智能秘書，願景是三件事：情緒第一線聽眾、第二大腦、路線守門人。</p>
+<p>透過 LINE 與我對話，補捉我的個人思緒與想法，整理排序，追蹤進度</p>
+<p>架構上要乾淨換可以抽換，例如 LINE 可以換成 Telegram ，Notion 可以換成 Obsidian。</p>
+<h2 id="真正的問題：不是捕捉不夠，是做不完"><a href="#真正的問題：不是捕捉不夠，是做不完" class="headerlink" title="真正的問題：不是捕捉不夠，是做不完"></a>真正的問題：不是捕捉不夠，是做不完</h2><p>情緒接住的部分參考 mymory，這塊也不簡單，先不展開，純粹的記錄就好。</p>
+<p>第二大腦跟路線守門人就不一樣了——Notion、GTD、看板類工具都用過，不得心應手；</p>
+<p>路上想到的念頭常常來不及記就忘了；路線守門人上線用了幾次，效果也不好。</p>
+<p>真正的瓶頸不是「記不下來」，是<strong>存了一大堆資料，最後都沒去做</strong>。這代表問題不在捕捉端，在捕捉之後到真的執行之間那段落差。</p>
+<h2 id="業界怎麼處理這個落差"><a href="#業界怎麼處理這個落差" class="headerlink" title="業界怎麼處理這個落差"></a>業界怎麼處理這個落差</h2><p>查過一輪，沒有一套完整現成方案，因為這件事橫跨三個通常分開解決的產品類別：</p>
+<ul>
+<li>第二大腦類（Notion、Obsidian）只管儲存檢索</li>
+<li>任務排程類（Sunsama、Motion）要先有結構化任務才排得動，</li>
+<li>情緒陪伴類（Replika、Pi）完全不碰任務管理。</li>
+</ul>
+<p>就算只看「排優先順序」這一件事，多數工具也是繞過去的——靠使用者自己先講清楚，不是 AI 自己判斷。</p>
+<p>我會用到 GTD 跟 PARA 的概念來回答不同問題：GTD 答「這件事我該怎麼辦」，PARA 答「這份資料該歸檔在哪」，兩者互補。</p>
+<h2 id="設計出來的流程"><a href="#設計出來的流程" class="headerlink" title="設計出來的流程"></a>設計出來的流程</h2><h3 id="入口：只用-LINE，兩軌捕捉"><a href="#入口：只用-LINE，兩軌捕捉" class="headerlink" title="入口：只用 LINE，兩軌捕捉"></a>入口：只用 LINE，兩軌捕捉</h3><p>不是每種資料都需要「捕捉」。分兩類看：</p>
+<ul>
+<li><strong>有家的資料</strong>（GitHub issue、行事曆事件、Email、Notion、Blog）——本來就活在一個系統裡活得好好的，不需要捕捉，需要的是<strong>同步&#x2F;彙整</strong>，資料不搬家、不重複輸入</li>
+<li><strong>沒有家的資料</strong>（走路上冒出的念頭）——這才是真正需要捕捉的部分，也才需要單一入口</li>
+</ul>
+<p>入口只走 LINE，短期只做文字，語音跟圖像之後再補——路上想法用打字不方便，語音是真需求，但先求有再求好。</p>
+<h3 id="分類：GTD-為主"><a href="#分類：GTD-為主" class="headerlink" title="分類：GTD 為主"></a>分類：GTD 為主</h3><p>念頭會依成熟度在不同的家之間升級（Notion 粗胚 → GitHub 專案 → Blog 分享），不是一次性分類定死：</p>
+<table>
+<thead>
+<tr>
+<th>GTD 分類</th>
+<th>現有工具</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>Next Action &#x2F; Project</td>
+<td>GitHub Backlog</td>
+</tr>
+<tr>
+<td>Someday&#x2F;Maybe</td>
+<td>Notion</td>
+</tr>
+<tr>
+<td>Reference</td>
+<td>Notion</td>
+</tr>
+<tr>
+<td>Waiting For</td>
+<td>Google Tasks + 行事曆指定追蹤日期</td>
+</tr>
+<tr>
+<td>有時間地點</td>
+<td>Google Calendar</td>
+</tr>
+<tr>
+<td>外部通訊</td>
+<td>Gmail</td>
+</tr>
+<tr>
+<td>提煉完成、要分享</td>
+<td>這個 Blog</td>
+</tr>
+</tbody></table>
+<h3 id="卡住的情況-—-兩種處理方式不同"><a href="#卡住的情況-—-兩種處理方式不同" class="headerlink" title="卡住的情況 — 兩種處理方式不同"></a>卡住的情況 — 兩種處理方式不同</h3><ul>
+<li><strong>等外部條件</strong>（等別人回覆、等權限過期重新授權）——這是硬卡，優先序再高也沒用，掛進 Waiting For，指定日期追蹤(可以用 Google Tasks)</li>
+<li><strong>範圍膨脹卡住</strong>（像 AI 私人祕書 專案本身，想法越滾越大失控）——這不是等待，是複雜度需要拆解，需要的是像這次一樣的一問一答梳理。這種深度引導<strong>不是 AI 私人祕書 的工作</strong>，那是需要完整推理脈絡的事，該回到專家處理。</li>
+<li>AI 私人祕書 的角色只是偵測「太久沒進展」然後提醒，不自己下場解決</li>
+</ul>
+<h3 id="優先序：三自由原則-保護今天的-3-件事"><a href="#優先序：三自由原則-保護今天的-3-件事" class="headerlink" title="優先序：三自由原則 + 保護今天的 3 件事"></a>優先序：三自由原則 + 保護今天的 3 件事</h3><p>排序不是 AI 自己想像什麼重要，是套用明確講好的規則：<strong>三自由原則</strong>——這件事能不能讓你在金錢、時間、情感上更自由，今年偏重情感。</p>
+<p>概念上日常運作是一個有防護的佇列：手上永遠保護 3 件事（Focus），</p>
+<p>新的可執行事項進來，先照三自由原則跟手上 3 件比一次——AI 可以做這層機械式比較，沒把握才問人。比較贏了，能馬上做的（兩分鐘內，人自己當下判斷，不用問 AI）就做，</p>
+<p>能丟給別人的丟出去掛 Waiting For，只能自己做的就換掉手上一件；</p>
+<p>比較輸了，開 PBI 放後面，太多的話濃縮成 idea 丟進 Resource，不是每個念頭都直接開票，免得 Backlog 變成新的一坨。</p>
+<p>被換掉的那件事完成時，才把被換下來的舊任務拿出來重新比一次。</p>
+<p>這裡刻意不做「等越久優先度自動加分」的機制，重要度才是作不作的理由，放多久不是。</p>
+<h3 id="習慣：另一種類型，另一種頻率"><a href="#習慣：另一種類型，另一種頻率" class="headerlink" title="習慣：另一種類型，另一種頻率"></a>習慣：另一種類型，另一種頻率</h3><p>健身、學語言、看書這種沒有終點、只能長期維持的事，跟有明確終點的 Project 是不同類型，需要的是定期打卡，與回頭看一下，不是完成&#x2F;未完成。</p>
+<p>檢核方式：可以排進行事曆固定時段（健身這種具體可排程的），也可以只是口頭跟 AI 私人祕書 說（語言、看書這種隨時能做的），</p>
+<p>事後 AI 私人祕書 讀行事曆或記著你說過的，主動確認做了沒。</p>
+<p>頻率上，一個月一次就夠——貼心不是追蹤得完整，是不讓人有壓力。</p>
+<p>問法也要留退路：不是「你做了嗎」的是非題逼問，是「有做到記得說一聲，沒空也沒關係」；</p>
+<p>連續沒做到不會加碼追問，改成關心式的開放問句，不然只會累積羞愧感，讓人更想逃避。</p>
+<p>但我還不是很確定是否可行？</p>
+<h3 id="早安簡報：把-Rule-of-3-套在訊息本身"><a href="#早安簡報：把-Rule-of-3-套在訊息本身" class="headerlink" title="早安簡報：把 Rule of 3 套在訊息本身"></a>早安簡報：把 Rule of 3 套在訊息本身</h3><p>前面設計的每一件事——Focus、Waiting For 警示、卡住提醒、習慣打卡——如果全部原封不動塞進每天的簡報，只會讓「一股腦丟出來」的老問題更嚴重。</p>
+<p>所以 Rule of 3 不只用來挑今天做哪 3 個 GitHub Project，也要套用在整則訊息上：<strong>每天早上只放今天的 Focus（3 件事），加上真的觸發才出現的例外警示</strong>。其他全部移出每天必推的內容，改成「你問才講」（收件匣、情緒記錄）或「併進週回顧才講」（習慣打卡、跟進事項全貌）。</p>
+<h2 id="小結"><a href="#小結" class="headerlink" title="小結"></a>小結</h2><p>這篇文章本身就是設計方法的示範：</p>
+<p>沒有一步是套用某個現成理論解決的，是持續追問，把「想要 AI 私人祕書 更好」這種模糊的念頭，</p>
+<p>一步步拆成可以動手的具體決定——跟文中「範圍膨脹卡住需要一問一答梳理」講的是同一件事。</p>
+<p>這套流程接下來會走 PBI&#x2F;Spec&#x2F;Design 正式定案，實作細節留給之後的踩坑筆記。</p>
+<p>(fin)</p>
+
+      
+    </div>
+    <footer class="article-footer">
+      <a data-url="https://blog.marsen.me/2026/07/31/2026/airis-second-brain-design/" data-id="cuidz9Rpctl9VKZo6oqkpGIp-" class="article-share-link">Share</a>
+      
+        <a href="https://blog.marsen.me/2026/07/31/2026/airis-second-brain-design/#disqus_thread" class="article-comment-link">留言</a>
+      
+      
+  <ul class="article-tag-list" itemprop="keywords"><li class="article-tag-list-item"><a class="article-tag-list-link" href="/tags/%E5%AF%A6%E4%BD%9C%E7%AD%86%E8%A8%98/" rel="tag">實作筆記</a></li></ul>
+
+    </footer>
+  </div>
+  
+    
+<nav id="article-nav">
+  
+  
+    <a href="/2026/07/24/2026/ai-weekly-20260724/" id="article-nav-older" class="article-nav-link-wrap">
+      <strong class="article-nav-caption">Older</strong>
+      <div class="article-nav-title">[AI生成] 20260724 科技周報</div>
+    </a>
+  
+</nav>
+
+  
+</article>
+
+
+<section id="comments">
+  
+    <div id="gitalk-container" >
+  Please enable JavaScript to view the Gitalk. :D
+</div>
+<link rel="stylesheet" href="https://unpkg.com/gitalk/dist/gitalk.css">
+<script src="https://unpkg.com/gitalk/dist/gitalk.min.js"></script>  
+<script src="https://cdnjs.cloudflare.com/ajax/libs/blueimp-md5/2.18.0/js/md5.min.js"></script>
+<script>
+  (function(){
+    const gitalk = new Gitalk({
+      'clientID': '386c8c11178846ff9a31',
+      'clientSecret': '969a7543f3dc518b9e540d1e335df2fcb9c2df57',
+      'repo': 'marsen.github.io',
+      'owner': 'marsen',
+      'admin': ['marsen'],
+      'id': md5(location.pathname),      // Ensure uniqueness and length less than 50( use md5)
+      'distractionFreeMode': false  // Facebook-like distraction free mode
+    })
+
+    gitalk.render('gitalk-container')
+  })();
+</script>
+
+  
+  
+    <div id="likecoin">
+Please enable JavaScript to view the LikeCoin. :P
+</div>
+<script>
+
+  (function(){
+    var ifrm = document.createElement("iframe");
+    ifrm.setAttribute("src", "https://button.like.co/in/embed/marsenlin/button?referrer=https%3A%2F%2Fblog.marsen.me%2F2026%2F07%2F31%2F2026%2Fairis-second-brain-design%2F");      
+    ifrm.setAttribute("sandbox","allow-scripts allow-same-origin allow-popups allow-popups-to-escape-sandbox");
+    ifrm.frameborder = "0";
+    ifrm.scrolling = "no";
+    (document.getElementById("likecoin").replaceChild(ifrm, document.getElementById("likecoin").childNodes[0]));
+  })();
+
+</script>
+  
+  <div id="disqus_thread">
+    <noscript>Please enable JavaScript to view the <a target="_blank" rel="noopener" href="//disqus.com/?ref_noscript">comments powered by Disqus.</a></noscript>
+  </div>
+</section>
+</section>
+        
+          <aside id="sidebar">
+  
+    
+  <div class="widget-wrap">
+    <h3 class="widget-title">最新文章</h3>
+    <div class="widget">
+      <ul>
+        
+          <li>
+            <a href="/2026/07/31/2026/airis-second-brain-design/">[實作筆記] 我的 AI 私人祕書　--- 架構設計</a>
+          </li>
+        
+          <li>
+            <a href="/2026/07/24/2026/ai-weekly-20260724/">[AI生成] 20260724 科技周報</a>
+          </li>
+        
+          <li>
+            <a href="/2026/07/17/2026/ai-weekly-20260717/">[AI生成] 20260717 科技周報</a>
+          </li>
+        
+          <li>
+            <a href="/2026/07/05/2026/ai-weekly-20260706/">[AI生成] 20260706 科技周報</a>
+          </li>
+        
+          <li>
+            <a href="/2026/06/23/2026/resend-custom-tracking-domain/">[實作筆記] 設定 Resend 自訂 Tracking Domain，開啟 Open &amp; Click Tracking</a>
+          </li>
+        
+      </ul>
+    </div>
+  </div>
+
+  
+    
+  <div class="widget-wrap">
+    <h3 class="widget-title">彙整</h3>
+    <div class="widget">
+      <ul class="archive-list"><li class="archive-list-item"><a class="archive-list-link" href="/archives/2026/07/">七月 2026</a><span class="archive-list-count">4</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2026/06/">六月 2026</a><span class="archive-list-count">15</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2026/05/">五月 2026</a><span class="archive-list-count">7</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2026/04/">四月 2026</a><span class="archive-list-count">12</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2026/03/">三月 2026</a><span class="archive-list-count">5</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2026/02/">二月 2026</a><span class="archive-list-count">2</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2025/12/">十二月 2025</a><span class="archive-list-count">1</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2025/11/">十一月 2025</a><span class="archive-list-count">1</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2025/10/">十月 2025</a><span class="archive-list-count">2</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2025/09/">九月 2025</a><span class="archive-list-count">4</span></li><span id='list_archives2' style='display:none'><li class="archive-list-item"><a class="archive-list-link" href="/archives/2025/08/">八月 2025</a><span class="archive-list-count">3</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2025/07/">七月 2025</a><span class="archive-list-count">4</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2025/06/">六月 2025</a><span class="archive-list-count">4</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2025/05/">五月 2025</a><span class="archive-list-count">5</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2025/04/">四月 2025</a><span class="archive-list-count">1</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2025/03/">三月 2025</a><span class="archive-list-count">2</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2025/02/">二月 2025</a><span class="archive-list-count">4</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2025/01/">一月 2025</a><span class="archive-list-count">3</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2024/12/">十二月 2024</a><span class="archive-list-count">3</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2024/11/">十一月 2024</a><span class="archive-list-count">3</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2024/10/">十月 2024</a><span class="archive-list-count">4</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2024/09/">九月 2024</a><span class="archive-list-count">5</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2024/08/">八月 2024</a><span class="archive-list-count">4</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2024/07/">七月 2024</a><span class="archive-list-count">3</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2024/06/">六月 2024</a><span class="archive-list-count">2</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2024/05/">五月 2024</a><span class="archive-list-count">1</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2024/04/">四月 2024</a><span class="archive-list-count">2</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2024/03/">三月 2024</a><span class="archive-list-count">3</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2024/02/">二月 2024</a><span class="archive-list-count">2</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2024/01/">一月 2024</a><span class="archive-list-count">4</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2023/12/">十二月 2023</a><span class="archive-list-count">2</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2023/11/">十一月 2023</a><span class="archive-list-count">3</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2023/10/">十月 2023</a><span class="archive-list-count">2</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2023/09/">九月 2023</a><span class="archive-list-count">3</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2023/08/">八月 2023</a><span class="archive-list-count">2</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2023/07/">七月 2023</a><span class="archive-list-count">6</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2023/06/">六月 2023</a><span class="archive-list-count">6</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2023/05/">五月 2023</a><span class="archive-list-count">1</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2023/04/">四月 2023</a><span class="archive-list-count">10</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2023/03/">三月 2023</a><span class="archive-list-count">5</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2023/02/">二月 2023</a><span class="archive-list-count">2</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2023/01/">一月 2023</a><span class="archive-list-count">2</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2022/12/">十二月 2022</a><span class="archive-list-count">1</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2022/10/">十月 2022</a><span class="archive-list-count">2</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2022/09/">九月 2022</a><span class="archive-list-count">6</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2022/08/">八月 2022</a><span class="archive-list-count">3</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2022/07/">七月 2022</a><span class="archive-list-count">2</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2022/06/">六月 2022</a><span class="archive-list-count">3</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2022/05/">五月 2022</a><span class="archive-list-count">7</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2022/04/">四月 2022</a><span class="archive-list-count">3</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2022/03/">三月 2022</a><span class="archive-list-count">3</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2022/02/">二月 2022</a><span class="archive-list-count">2</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2022/01/">一月 2022</a><span class="archive-list-count">3</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2021/12/">十二月 2021</a><span class="archive-list-count">2</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2021/11/">十一月 2021</a><span class="archive-list-count">2</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2021/10/">十月 2021</a><span class="archive-list-count">2</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2021/09/">九月 2021</a><span class="archive-list-count">1</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2021/08/">八月 2021</a><span class="archive-list-count">2</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2021/07/">七月 2021</a><span class="archive-list-count">4</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2021/06/">六月 2021</a><span class="archive-list-count">1</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2021/05/">五月 2021</a><span class="archive-list-count">2</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2021/04/">四月 2021</a><span class="archive-list-count">3</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2021/03/">三月 2021</a><span class="archive-list-count">3</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2021/02/">二月 2021</a><span class="archive-list-count">1</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2021/01/">一月 2021</a><span class="archive-list-count">7</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2020/12/">十二月 2020</a><span class="archive-list-count">1</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2020/11/">十一月 2020</a><span class="archive-list-count">2</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2020/10/">十月 2020</a><span class="archive-list-count">5</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2020/09/">九月 2020</a><span class="archive-list-count">5</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2020/08/">八月 2020</a><span class="archive-list-count">2</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2020/07/">七月 2020</a><span class="archive-list-count">3</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2020/06/">六月 2020</a><span class="archive-list-count">3</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2020/05/">五月 2020</a><span class="archive-list-count">3</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2020/04/">四月 2020</a><span class="archive-list-count">4</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2020/03/">三月 2020</a><span class="archive-list-count">1</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2020/02/">二月 2020</a><span class="archive-list-count">1</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2020/01/">一月 2020</a><span class="archive-list-count">5</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2019/12/">十二月 2019</a><span class="archive-list-count">1</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2019/11/">十一月 2019</a><span class="archive-list-count">2</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2019/10/">十月 2019</a><span class="archive-list-count">1</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2019/09/">九月 2019</a><span class="archive-list-count">2</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2019/08/">八月 2019</a><span class="archive-list-count">5</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2019/07/">七月 2019</a><span class="archive-list-count">1</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2019/06/">六月 2019</a><span class="archive-list-count">1</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2019/05/">五月 2019</a><span class="archive-list-count">3</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2019/04/">四月 2019</a><span class="archive-list-count">3</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2019/03/">三月 2019</a><span class="archive-list-count">1</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2019/02/">二月 2019</a><span class="archive-list-count">3</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2019/01/">一月 2019</a><span class="archive-list-count">4</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2018/12/">十二月 2018</a><span class="archive-list-count">5</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2018/11/">十一月 2018</a><span class="archive-list-count">7</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2018/10/">十月 2018</a><span class="archive-list-count">6</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2018/09/">九月 2018</a><span class="archive-list-count">3</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2018/08/">八月 2018</a><span class="archive-list-count">2</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2018/07/">七月 2018</a><span class="archive-list-count">6</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2018/06/">六月 2018</a><span class="archive-list-count">2</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2018/05/">五月 2018</a><span class="archive-list-count">1</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2018/04/">四月 2018</a><span class="archive-list-count">5</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2018/03/">三月 2018</a><span class="archive-list-count">5</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2018/02/">二月 2018</a><span class="archive-list-count">1</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2018/01/">一月 2018</a><span class="archive-list-count">5</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2017/12/">十二月 2017</a><span class="archive-list-count">3</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2017/11/">十一月 2017</a><span class="archive-list-count">1</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2017/10/">十月 2017</a><span class="archive-list-count">3</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2017/09/">九月 2017</a><span class="archive-list-count">2</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2017/08/">八月 2017</a><span class="archive-list-count">1</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2017/07/">七月 2017</a><span class="archive-list-count">2</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2017/05/">五月 2017</a><span class="archive-list-count">1</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2017/04/">四月 2017</a><span class="archive-list-count">2</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2017/03/">三月 2017</a><span class="archive-list-count">1</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2017/02/">二月 2017</a><span class="archive-list-count">1</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2017/01/">一月 2017</a><span class="archive-list-count">6</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2016/12/">十二月 2016</a><span class="archive-list-count">1</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2016/11/">十一月 2016</a><span class="archive-list-count">3</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2016/10/">十月 2016</a><span class="archive-list-count">4</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2016/09/">九月 2016</a><span class="archive-list-count">1</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2016/08/">八月 2016</a><span class="archive-list-count">6</span></li></span><span id=''></span><span onclick="var d=document.getElementById('list_archives2'); d.style.display===''?d.style='display:none':d.style=''">toggle...</span></ul>
+    </div>
+  </div>
+
+
+  
+    <a rel="license noopener" target="_blank" href="http://creativecommons.org/licenses/by-nc-nd/3.0/tw/">
+  <img alt="Creative Commons License" style="border-width:0" src="https://i.creativecommons.org/l/by-nc-nd/3.0/tw/88x31.png" />
+</a>
+  <br />
+This work is licensed under a 
+<a rel="license noopener" target="_blank" href="http://creativecommons.org/licenses/by-nc-nd/3.0/tw/">Creative Commons Attribution-NonCommercial-NoDerivs 3.0 Taiwan License</a>
+  
+    
+  <div class="widget-wrap">
+    <h3 class="widget-title">標籤雲</h3>
+    <div class="widget tagcloud">
+      <a href="/tags/Net-Framework/" style="font-size: 15.29px;">.Net Framework</a> <a href="/tags/AI%E7%94%9F%E6%88%90/" style="font-size: 14.71px;">AI生成</a> <a href="/tags/API/" style="font-size: 11.18px;">API</a> <a href="/tags/ASP-NET/" style="font-size: 10px;">ASP.NET</a> <a href="/tags/AWS/" style="font-size: 13.53px;">AWS</a> <a href="/tags/Agile/" style="font-size: 17.06px;">Agile</a> <a href="/tags/CI-CD/" style="font-size: 19.41px;">CI/CD</a> <a href="/tags/Cache/" style="font-size: 10px;">Cache</a> <a href="/tags/Coding-Standard/" style="font-size: 10px;">Coding Standard</a> <a href="/tags/Container/" style="font-size: 11.76px;">Container</a> <a href="/tags/Database/" style="font-size: 12.94px;">Database</a> <a href="/tags/Design-Pattern/" style="font-size: 10.59px;">Design Pattern</a> <a href="/tags/Docker/" style="font-size: 11.76px;">Docker</a> <a href="/tags/ESLint/" style="font-size: 10px;">ESLint</a> <a href="/tags/Entity-Framework/" style="font-size: 10.59px;">Entity Framework</a> <a href="/tags/Firebase/" style="font-size: 10px;">Firebase</a> <a href="/tags/GCP/" style="font-size: 10px;">GCP</a> <a href="/tags/Git/" style="font-size: 10.59px;">Git</a> <a href="/tags/Golang/" style="font-size: 11.18px;">Golang</a> <a href="/tags/Google/" style="font-size: 11.18px;">Google</a> <a href="/tags/GulpJs/" style="font-size: 10.59px;">GulpJs</a> <a href="/tags/HTTP/" style="font-size: 10px;">HTTP</a> <a href="/tags/Hexo/" style="font-size: 15.29px;">Hexo</a> <a href="/tags/IIS/" style="font-size: 10px;">IIS</a> <a href="/tags/IO/" style="font-size: 10px;">IO</a> <a href="/tags/Integrated-Testing/" style="font-size: 10px;">Integrated Testing</a> <a href="/tags/Jenkins/" style="font-size: 11.76px;">Jenkins</a> <a href="/tags/Kubernetes/" style="font-size: 10px;">Kubernetes</a> <a href="/tags/Linux/" style="font-size: 10.59px;">Linux</a> <a href="/tags/Mongodb/" style="font-size: 10px;">Mongodb</a> <a href="/tags/MsSQL/" style="font-size: 11.18px;">MsSQL</a> <a href="/tags/MsTest/" style="font-size: 10px;">MsTest</a> <a href="/tags/Mutation-Testing/" style="font-size: 10px;">Mutation Testing</a> <a href="/tags/Nodejs/" style="font-size: 15.29px;">Nodejs</a> <a href="/tags/OAuth/" style="font-size: 10px;">OAuth</a> <a href="/tags/OOP/" style="font-size: 11.18px;">OOP</a> <a href="/tags/Openshift/" style="font-size: 10.59px;">Openshift</a> <a href="/tags/PowerShell/" style="font-size: 11.18px;">PowerShell</a> <a href="/tags/React/" style="font-size: 12.35px;">React</a> <a href="/tags/Redis/" style="font-size: 11.18px;">Redis</a> <a href="/tags/SQL/" style="font-size: 11.76px;">SQL</a> <a href="/tags/Scrum/" style="font-size: 16.47px;">Scrum</a> <a href="/tags/Shell/" style="font-size: 10.59px;">Shell</a> <a href="/tags/Specflow/" style="font-size: 10px;">Specflow</a> <a href="/tags/StyleCop/" style="font-size: 10px;">StyleCop</a> <a href="/tags/TDD/" style="font-size: 15.88px;">TDD</a> <a href="/tags/Testing/" style="font-size: 14.12px;">Testing</a> <a href="/tags/Thread/" style="font-size: 10.59px;">Thread</a> <a href="/tags/Trello/" style="font-size: 10px;">Trello</a> <a href="/tags/TypeScript/" style="font-size: 14.12px;">TypeScript</a> <a href="/tags/Unit-Testing/" style="font-size: 18.82px;">Unit Testing</a> <a href="/tags/Unix/" style="font-size: 10.59px;">Unix</a> <a href="/tags/Vim/" style="font-size: 10px;">Vim</a> <a href="/tags/Visual-Studio/" style="font-size: 10px;">Visual Studio</a> <a href="/tags/html/" style="font-size: 10px;">html</a> <a href="/tags/post/" style="font-size: 10px;">post</a> <a href="/tags/%E5%AD%B8%E7%BF%92%E7%AD%86%E8%A8%98/" style="font-size: 18.24px;">學習筆記</a> <a href="/tags/%E5%AF%A6%E4%BD%9C%E7%AD%86%E8%A8%98/" style="font-size: 20px;">實作筆記</a> <a href="/tags/%E5%B7%A5%E5%85%B7%E7%AD%86%E8%A8%98/" style="font-size: 11.76px;">工具筆記</a> <a href="/tags/%E6%99%82%E9%96%93%E7%AE%A1%E7%90%86/" style="font-size: 10.59px;">時間管理</a> <a href="/tags/%E6%B4%BB%E5%8B%95%E7%AD%86%E8%A8%98/" style="font-size: 12.94px;">活動筆記</a> <a href="/tags/%E7%94%9F%E6%B4%BB%E7%AD%86%E8%A8%98/" style="font-size: 17.65px;">生活筆記</a> <a href="/tags/%E7%94%A2%E6%A5%AD%E5%A0%B1%E5%91%8A/" style="font-size: 10px;">產業報告</a> <a href="/tags/%E8%A8%98%E9%8C%84/" style="font-size: 11.18px;">記錄</a> <a href="/tags/%E8%AE%80%E6%9B%B8%E7%AD%86%E8%A8%98/" style="font-size: 10px;">讀書筆記</a> <a href="/tags/%E8%B8%A9%E9%9B%B7%E7%AD%86%E8%A8%98/" style="font-size: 15.88px;">踩雷筆記</a> <a href="/tags/%E9%87%8D%E6%A7%8B/" style="font-size: 12.35px;">重構</a> <a href="/tags/%E9%96%B1%E8%AE%80%E7%AD%86%E8%A8%98/" style="font-size: 17.65px;">閱讀筆記</a>
+    </div>
+  </div>
+
+  
+    
+  <div class="widget-wrap">
+    <h3 class="widget-title">標籤</h3>
+    <div class="widget">
+      <ul class="tag-list" itemprop="keywords"><li class="tag-list-item"><a class="tag-list-link" href="/tags/Net-Framework/" rel="tag">.Net Framework</a><span class="tag-list-count">10</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/AI%E7%94%9F%E6%88%90/" rel="tag">AI生成</a><span class="tag-list-count">9</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/API/" rel="tag">API</a><span class="tag-list-count">3</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/ASP-NET/" rel="tag">ASP.NET</a><span class="tag-list-count">1</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/AWS/" rel="tag">AWS</a><span class="tag-list-count">7</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/Agile/" rel="tag">Agile</a><span class="tag-list-count">14</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/CI-CD/" rel="tag">CI&#x2F;CD</a><span class="tag-list-count">24</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/Cache/" rel="tag">Cache</a><span class="tag-list-count">1</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/Coding-Standard/" rel="tag">Coding Standard</a><span class="tag-list-count">1</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/Container/" rel="tag">Container</a><span class="tag-list-count">4</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/Database/" rel="tag">Database</a><span class="tag-list-count">6</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/Design-Pattern/" rel="tag">Design Pattern</a><span class="tag-list-count">2</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/Docker/" rel="tag">Docker</a><span class="tag-list-count">4</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/ESLint/" rel="tag">ESLint</a><span class="tag-list-count">1</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/Entity-Framework/" rel="tag">Entity Framework</a><span class="tag-list-count">2</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/Firebase/" rel="tag">Firebase</a><span class="tag-list-count">1</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/GCP/" rel="tag">GCP</a><span class="tag-list-count">1</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/Git/" rel="tag">Git</a><span class="tag-list-count">2</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/Golang/" rel="tag">Golang</a><span class="tag-list-count">3</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/Google/" rel="tag">Google</a><span class="tag-list-count">3</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/GulpJs/" rel="tag">GulpJs</a><span class="tag-list-count">2</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/HTTP/" rel="tag">HTTP</a><span class="tag-list-count">1</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/Hexo/" rel="tag">Hexo</a><span class="tag-list-count">10</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/IIS/" rel="tag">IIS</a><span class="tag-list-count">1</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/IO/" rel="tag">IO</a><span class="tag-list-count">1</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/Integrated-Testing/" rel="tag">Integrated Testing</a><span class="tag-list-count">1</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/Jenkins/" rel="tag">Jenkins</a><span class="tag-list-count">4</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/Kubernetes/" rel="tag">Kubernetes</a><span class="tag-list-count">1</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/Linux/" rel="tag">Linux</a><span class="tag-list-count">2</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/Mongodb/" rel="tag">Mongodb</a><span class="tag-list-count">1</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/MsSQL/" rel="tag">MsSQL</a><span class="tag-list-count">3</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/MsTest/" rel="tag">MsTest</a><span class="tag-list-count">1</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/Mutation-Testing/" rel="tag">Mutation Testing</a><span class="tag-list-count">1</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/Nodejs/" rel="tag">Nodejs</a><span class="tag-list-count">10</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/OAuth/" rel="tag">OAuth</a><span class="tag-list-count">1</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/OOP/" rel="tag">OOP</a><span class="tag-list-count">3</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/Openshift/" rel="tag">Openshift</a><span class="tag-list-count">2</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/PowerShell/" rel="tag">PowerShell</a><span class="tag-list-count">3</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/React/" rel="tag">React</a><span class="tag-list-count">5</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/Redis/" rel="tag">Redis</a><span class="tag-list-count">3</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/SQL/" rel="tag">SQL</a><span class="tag-list-count">4</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/Scrum/" rel="tag">Scrum</a><span class="tag-list-count">13</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/Shell/" rel="tag">Shell</a><span class="tag-list-count">2</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/Specflow/" rel="tag">Specflow</a><span class="tag-list-count">1</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/StyleCop/" rel="tag">StyleCop</a><span class="tag-list-count">1</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/TDD/" rel="tag">TDD</a><span class="tag-list-count">11</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/Testing/" rel="tag">Testing</a><span class="tag-list-count">8</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/Thread/" rel="tag">Thread</a><span class="tag-list-count">2</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/Trello/" rel="tag">Trello</a><span class="tag-list-count">1</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/TypeScript/" rel="tag">TypeScript</a><span class="tag-list-count">8</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/Unit-Testing/" rel="tag">Unit Testing</a><span class="tag-list-count">19</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/Unix/" rel="tag">Unix</a><span class="tag-list-count">2</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/Vim/" rel="tag">Vim</a><span class="tag-list-count">1</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/Visual-Studio/" rel="tag">Visual Studio</a><span class="tag-list-count">1</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/html/" rel="tag">html</a><span class="tag-list-count">1</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/post/" rel="tag">post</a><span class="tag-list-count">1</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/%E5%AD%B8%E7%BF%92%E7%AD%86%E8%A8%98/" rel="tag">學習筆記</a><span class="tag-list-count">16</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/%E5%AF%A6%E4%BD%9C%E7%AD%86%E8%A8%98/" rel="tag">實作筆記</a><span class="tag-list-count">163</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/%E5%B7%A5%E5%85%B7%E7%AD%86%E8%A8%98/" rel="tag">工具筆記</a><span class="tag-list-count">4</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/%E6%99%82%E9%96%93%E7%AE%A1%E7%90%86/" rel="tag">時間管理</a><span class="tag-list-count">2</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/%E6%B4%BB%E5%8B%95%E7%AD%86%E8%A8%98/" rel="tag">活動筆記</a><span class="tag-list-count">6</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/%E7%94%9F%E6%B4%BB%E7%AD%86%E8%A8%98/" rel="tag">生活筆記</a><span class="tag-list-count">15</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/%E7%94%A2%E6%A5%AD%E5%A0%B1%E5%91%8A/" rel="tag">產業報告</a><span class="tag-list-count">1</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/%E8%A8%98%E9%8C%84/" rel="tag">記錄</a><span class="tag-list-count">3</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/%E8%AE%80%E6%9B%B8%E7%AD%86%E8%A8%98/" rel="tag">讀書筆記</a><span class="tag-list-count">1</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/%E8%B8%A9%E9%9B%B7%E7%AD%86%E8%A8%98/" rel="tag">踩雷筆記</a><span class="tag-list-count">11</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/%E9%87%8D%E6%A7%8B/" rel="tag">重構</a><span class="tag-list-count">5</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/%E9%96%B1%E8%AE%80%E7%AD%86%E8%A8%98/" rel="tag">閱讀筆記</a><span class="tag-list-count">15</span></li></ul>
+    </div>
+  </div>
+
+
+  
+    
+
+  
+    <div class="widget-wrap">
+    <h3 class="widget-title">多語系</h3>
+    <div class="widget">
+        <div id="ytWidget"></div>
+    </div>
+</div>
+<script src="https://translate.yandex.net/website-widget/v1/widget.js?widgetId=ytWidget&pageLang=zh&widgetTheme=dark&autoMode=false" type="text/javascript"></script>
+  
+    <div class="widget-wrap">
+    <h3 class="widget-title">BADGES</h3>
+    <div class="widget">
+        <a target="_blank" rel="noopener" href="https://bcert.me/bc/html/show-badge.html?b=uufxvngl">
+            <img src="/images/2018/csm/seal-csm.png" alt="Certified ScrumMaster®">
+        </a>
+    </div>
+</div>
+  
+</aside>
+        
+      </div>
+      <footer id="footer">
+  
+  <div class="outer">
+    <div id="footer-info" class="inner">
+      &copy; 2026 Marsen L.<br>
+      Powered by <a href="http://hexo.io/" target="_blank">Hexo</a>
+    </div>
+  </div>
+</footer>
+    </div>
+    <nav id="mobile-nav">
+  
+    <a href="/" class="mobile-nav-link">Home</a>
+  
+    <a href="/archives" class="mobile-nav-link">Archives</a>
+  
+</nav>
+    <script src="//ajax.googleapis.com/ajax/libs/jquery/2.0.3/jquery.min.js"></script>
+
+  
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/fancybox/3.5.7/jquery.fancybox.min.css">
+
+  
+<script src="https://cdnjs.cloudflare.com/ajax/libs/fancybox/3.5.7/jquery.fancybox.min.js"></script>
+
+
+
+<script src="/js/sayings.js?v=0.js"></script>
+  
+
+<script src="/js/script.js?v=0.js"></script>
+
+<div id="likecoin">
+Please enable JavaScript to view the LikeCoin. :P
+</div>
+<script>
+
+  (function(){
+    var ifrm = document.createElement("iframe");
+    ifrm.setAttribute("src", "https://button.like.co/in/embed/marsenlin/button?referrer=https%3A%2F%2Fblog.marsen.me%2F2026%2F07%2F31%2F2026%2Fairis-second-brain-design%2F");      
+    ifrm.setAttribute("sandbox","allow-scripts allow-same-origin allow-popups allow-popups-to-escape-sandbox");
+    ifrm.frameborder = "0";
+    ifrm.scrolling = "no";
+    (document.getElementById("likecoin").replaceChild(ifrm, document.getElementById("likecoin").childNodes[0]));
+  })();
+
+</script>
+<script>
+
+  var disqus_shortname = 'marsenlin';
+  
+  var disqus_url = 'https://blog.marsen.me/2026/07/31/2026/airis-second-brain-design/';
+  
+  (function(){
+    var dsq = document.createElement('script');
+    dsq.type = 'text/javascript';
+    dsq.async = true;
+    dsq.src = '//' + disqus_shortname + '.disqus.com/embed.js';
+    (document.getElementsByTagName('head')[0] || document.getElementsByTagName('body')[0]).appendChild(dsq);
+  })();
+
+</script>
+
+  </div>
+    
+<!-- Google Tag Manager (noscript) -->
+<noscript><iframe src="https://www.googletagmanager.com/ns.html?id=GTM-NTDGNJZ"
+height="0" width="0" style="display:none;visibility:hidden"></iframe></noscript>
+<!-- End Google Tag Manager (noscript) -->
+
+</body>
+</html>
