@@ -12,7 +12,7 @@
   <rights>All rights reserved 2026, Marsen L.</rights>
   <subtitle>waiting to load</subtitle>
   <title>Marsen's Blog</title>
-  <updated>2026-07-31T11:39:02.371Z</updated>
+  <updated>2026-08-05T19:02:40.169Z</updated>
   <entry>
     <author>
       <name>Marsen L.</name>
@@ -29,7 +29,7 @@
       <![CDATA[<h2 id="前情提要-—-AI-私人祕書-是什麼"><a href="#前情提要-—-AI-私人祕書-是什麼" class="headerlink" title="前情提要 — AI 私人祕書 是什麼"></a>前情提要 — AI 私人祕書 是什麼</h2><p>我想作個人智]]>
     </summary>
     <title>[實作筆記] 我的 AI 私人祕書　--- 架構設計</title>
-    <updated>2026-07-31T11:39:02.371Z</updated>
+    <updated>2026-08-05T19:02:40.169Z</updated>
   </entry>
   <entry>
     <author>
@@ -48,7 +48,25 @@
 <h2 id="本周要點"><a href="#本周要點" class="headerlink" title="本周要點"></a>本周要]]>
     </summary>
     <title>[AI生成] 20260731 科技周報</title>
-    <updated>2026-07-31T11:39:02.371Z</updated>
+    <updated>2026-08-05T19:02:40.169Z</updated>
+  </entry>
+  <entry>
+    <author>
+      <name>Marsen L.</name>
+      <email>admin@marsen.me</email>
+    </author>
+    <category term="實作筆記" scheme="https://blog.marsen.me/tags/%E5%AF%A6%E4%BD%9C%E7%AD%86%E8%A8%98/"/>
+    <content>
+      <![CDATA[<h2 id="前情提要"><a href="#前情提要" class="headerlink" title="前情提要"></a>前情提要</h2><p>我想要為我的 AI 私人祕書加上「標記信件已讀&#x2F;封存」的功能，但是查詢官方文件後，要達到這個能力的權限，比我想像的大的多</p><p>也就是說授權出去的 token，技術上就是有寄信能力，即使我的程式碼永遠不會呼叫寄信的 API。</p><p>這種情況下，「我知道怎麼把這個授權收回來」就變成必要的，本篇記錄一下我學到的事。</p><h2 id="去哪看、去哪撤銷"><a href="#去哪看、去哪撤銷" class="headerlink" title="去哪看、去哪撤銷"></a>去哪看、去哪撤銷</h2><p>Google 帳號 → <strong>安全性</strong> → <strong>第三方應用程式和服務</strong>，網址直接是：</p><figure class="highlight text"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">https://myaccount.google.com/permissions</span><br></pre></td></tr></table></figure><p>進去會看到每一個曾經授權過的 App（用 OAuth Client 名稱顯示），點進去可以看到：</p><ul><li>這個 App 實際拿到的<strong>確切 scope 清單</strong>（不是猜的，是 Google 記錄的真實授權範圍）</li><li>**「移除存取權」**按鈕——按下去，這個 App 手上所有 access token 跟 refresh token 立刻全部失效，之後它想再打 API 一律拿到 <code>invalid_grant</code>，要重新走一次完整的授權流程才能恢復</li></ul><p>查找一下 <code>AIris</code> 這是我的 App 名稱，可以使用確定我們使用的權限，也可以移除存取權。</p><h2 id="Refresh-token-會不會自動過期"><a href="#Refresh-token-會不會自動過期" class="headerlink" title="Refresh token 會不會自動過期"></a>Refresh token 會不會自動過期</h2><p>會，但條件很明確，Google 官方文件列了幾種情況，整理成表：</p><table><thead><tr><th>情況</th><th>說明</th></tr></thead><tbody><tr><td>6 個月沒被換發</td><td>不是「沒被呼叫 API」，是 refresh token 拿去跟 Google 換新 access token 這個動作 6 個月沒發生過。正常運作中的服務每次呼叫底層都會自動換發，不會踩到</td></tr><tr><td>使用者主動撤銷</td><td>就是上面那個「移除存取權」按鈕</td></tr><tr><td>改密碼</td><td>如果 token 帶 Gmail scope，帳號密碼一改，該 token 就失效</td></tr><tr><td>超過 100 組上限</td><td>同一個 OAuth Client 對同一個帳號核發超過 100 組 refresh token，最舊的自動作廢</td></tr><tr><td>OAuth Client 還在 Testing 發布狀態</td><td>不管有沒有用，7 天強制過期——這個坑之前踩過一次，見〈<a href="/2026/google-oauth-testing-mode-7-day-refresh-token/">Google OAuth Refresh Token（一）：Testing 模式卡住，只活 7 天</a>〉，AI 私人祕書這個專案已經發布成 Production，不會再犯</td></tr></tbody></table><p>前三種是正常使用下該知道的行為；後兩種是個人專案容易忽略的邊界情況。</p><h2 id="參考"><a href="#參考" class="headerlink" title="參考"></a>參考</h2><ul><li><a href="https://developers.google.com/identity/protocols/oauth2">Using OAuth 2.0 to Access Google APIs — Refresh token expiration（官方文件）</a></li><li><a href="/2026/google-oauth-testing-mode-7-day-refresh-token/">Google OAuth Refresh Token（一）：Testing 模式卡住，只活 7 天</a></li><li><a href="/2026/google-oauth-desktop-client-loopback-refresh-token/">Google OAuth Refresh Token（二）：Desktop Client 用 loopback 位址手動換 token</a></li></ul><p>(fin)</p>]]>
+    </content>
+    <id>https://blog.marsen.me/2026/07/26/2026/google-oauth-revoke-third-party-access/</id>
+    <link href="https://blog.marsen.me/2026/07/26/2026/google-oauth-revoke-third-party-access/"/>
+    <published>2026-07-26T11:23:29.000Z</published>
+    <summary>
+      <![CDATA[<h2 id="前情提要"><a href="#前情提要" class="headerlink" title="前情提要"></a>前情提要</h2><p>我想要為我的 AI 私人祕書加上「標記信件已讀&#x2F;封存」的功能，但是查詢官方文件後，要達到這個能力的權限，比我想像的]]>
+    </summary>
+    <title>[實作筆記] Google OAuth Refresh Token（三）：第三方應用權限撤銷入口與自動失效條件</title>
+    <updated>2026-08-05T19:02:40.170Z</updated>
   </entry>
   <entry>
     <author>
@@ -67,7 +85,7 @@
 <h2 id="本周要點"><a href="#本周要點" class="headerlink" title="本周要點"></a>本周要]]>
     </summary>
     <title>[AI生成] 20260724 科技周報</title>
-    <updated>2026-07-31T11:39:02.371Z</updated>
+    <updated>2026-08-05T19:02:40.169Z</updated>
   </entry>
   <entry>
     <author>
@@ -86,7 +104,44 @@
 <h2 id="本周要點"><a href="#本周要點" class="headerlink" title="本周要點"></a>本周要]]>
     </summary>
     <title>[AI生成] 20260717 科技周報</title>
-    <updated>2026-07-31T11:39:02.371Z</updated>
+    <updated>2026-08-05T19:02:40.169Z</updated>
+  </entry>
+  <entry>
+    <author>
+      <name>Marsen L.</name>
+      <email>admin@marsen.me</email>
+    </author>
+    <category term="實作筆記" scheme="https://blog.marsen.me/tags/%E5%AF%A6%E4%BD%9C%E7%AD%86%E8%A8%98/"/>
+    <content>
+      <![CDATA[<h2 id="前情提要"><a href="#前情提要" class="headerlink" title="前情提要"></a>前情提要</h2><p>接續<a href="/2026/google-oauth-testing-mode-7-day-refresh-token/">上篇</a>，想說最快的方式是用 <a href="https://developers.google.com/oauthplayground/">OAuth 2.0 Playground</a> 重新走一次授權，結果又卡住了。</p><p><strong>這個 OAuth client 的類型是 Desktop app，不是 Web application</strong>。記錄一下 Desktop 類型該怎麼手動拿 refresh token。</p><h2 id="為什麼-OAuth-Playground-用不了"><a href="#為什麼-OAuth-Playground-用不了" class="headerlink" title="為什麼 OAuth Playground 用不了"></a>為什麼 OAuth Playground 用不了</h2><p>OAuth Playground 的做法是把自己的網址（<code>https://developers.google.com/oauthplayground</code>）註冊成你的 OAuth client 的「Authorized redirect URI」，然後借用你的 client 走一次真實授權。</p><p>問題是：Google Cloud Console 裡的 OAuth client 分兩種類型，能不能自由登記 redirect URI 是不一樣的行為：</p><table><thead><tr><th>Client 類型</th><th>Redirect URI 規則</th></tr></thead><tbody><tr><td>Web application</td><td>可以登記任意 HTTPS 網址（例如 OAuth Playground 那個）</td></tr><tr><td>Desktop app</td><td>只能用 <code>http://localhost:任意port</code> 或 <code>http://127.0.0.1:任意port</code>，不能登記其他網址</td></tr></tbody></table><p><strong>為什麼會有這條規則</strong>：Desktop app 沒有一台自己控制的伺服器可以拿來註冊網址，Google 沒辦法驗證這個網址真的屬於這支程式。Loopback（<code>localhost</code>&#x2F;<code>127.0.0.1</code>）解決了這個問題：只有跑在同一台機器上的程式才能監聽這個位址，不用註冊網址，也能保證接到重導向的一定是你自己的程式。這是 Google 官方認可的解法，見文件裡的 <a href="https://developers.google.com/identity/protocols/oauth2/native-app">Loopback IP address 章節</a>。</p><p>AI 私人祕書這個 client 是一個 Desktop app，不是 Web Application，所以沒辦法把 OAuth Playground 的網址加進去。</p><h2 id="Desktop-app-的解法：loopback-位址流程"><a href="#Desktop-app-的解法：loopback-位址流程" class="headerlink" title="Desktop app 的解法：loopback 位址流程"></a>Desktop app 的解法：loopback 位址流程</h2><p>Google 對 Desktop&#x2F;CLI 這類「沒有公開伺服器」的程式，設計了專屬流程：redirect_uri 直接指向 <code>localhost</code> 的任意 port，</p><p>不用預先登記，Google 就是允許這樣做。</p><p>拿到新 refresh token 分三步：</p><h3 id="1-組出授權網址，瀏覽器打開"><a href="#1-組出授權網址，瀏覽器打開" class="headerlink" title="1. 組出授權網址，瀏覽器打開"></a>1. 組出授權網址，瀏覽器打開</h3><figure class="highlight text"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br></pre></td><td class="code"><pre><span class="line">https://accounts.google.com/o/oauth2/v2/auth?</span><br><span class="line">  client_id=你的CLIENT_ID</span><br><span class="line">  &amp;redirect_uri=http://localhost:8080</span><br><span class="line">  &amp;response_type=code</span><br><span class="line">  &amp;scope=https://www.googleapis.com/auth/calendar.readonly https://www.googleapis.com/auth/gmail.readonly</span><br><span class="line">  &amp;access_type=offline</span><br><span class="line">  &amp;prompt=consent</span><br></pre></td></tr></table></figure><p>幾個參數的用意：</p><ul><li><code>scope</code>：只填程式碼實際會用到的唯讀範圍，不多要權限</li><li><code>access_type=offline</code>：預設（<code>online</code>）只給一小時就過期的 access token，沒有 refresh token；要拿 refresh token 一定要加這個</li><li><code>prompt=consent</code>：同一個 client + scope + 帳號，Google 通常只在「第一次」同意時發 refresh token，之後重複走流程可能會偷懶不給新的；強制加這個保證這次一定拿到新的</li></ul><h3 id="2-從網址列複製-code，不用管頁面內容"><a href="#2-從網址列複製-code，不用管頁面內容" class="headerlink" title="2. 從網址列複製 code，不用管頁面內容"></a>2. 從網址列複製 code，不用管頁面內容</h3><p>登入帳號、按「允許」之後，瀏覽器會被導去 <code>http://localhost:8080/?code=xxxxx</code>。</p><p>這個頁面會顯示「無法連上這個網站」——完全正常，因為根本沒有東西在監聽 8080 這個 port。但沒關係，Google 是先把 <code>code</code> 塞進網址列、瀏覽器才嘗試連線，所以連線失敗不影響拿到 code：直接從網址列複製 <code>code=</code> 後面那一串就好。</p><h3 id="3-用-code-換正式的-token"><a href="#3-用-code-換正式的-token" class="headerlink" title="3. 用 code 換正式的 token"></a>3. 用 code 換正式的 token</h3><figure class="highlight bash"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br></pre></td><td class="code"><pre><span class="line">curl -X POST https://oauth2.googleapis.com/token \</span><br><span class="line">  -d <span class="string">&quot;client_id=你的CLIENT_ID&quot;</span> \</span><br><span class="line">  -d <span class="string">&quot;client_secret=你的CLIENT_SECRET&quot;</span> \</span><br><span class="line">  -d <span class="string">&quot;code=剛剛複製的那串&quot;</span> \</span><br><span class="line">  -d <span class="string">&quot;grant_type=authorization_code&quot;</span> \</span><br><span class="line">  -d <span class="string">&quot;redirect_uri=http://localhost:8080&quot;</span></span><br></pre></td></tr></table></figure><p><code>redirect_uri</code> 要跟第一步組網址時完全一致，Google 會拿來比對。回應的 JSON 裡 <code>refresh_token</code> 欄位就是新值，直接拿去換掉 <code>.env</code> 裡的舊值。</p><p><code>client_secret</code> 全程只出現在這個 <code>curl</code> 呼叫裡——這是刻意的：<code>client_secret</code> 不能出現在瀏覽器網址列或任何前端看得到的地方，只能在「後端對後端」（這裡用 <code>curl</code> 模擬）的請求裡使用，這也是為什麼拿 code 換 token 一定要多這一步，不能讓瀏覽器直接拿到最終的 token。</p><h2 id="小結"><a href="#小結" class="headerlink" title="小結"></a>小結</h2><p>Desktop 類型的 OAuth client 拿 refresh token，</p><p>不能套用 Web app 常見的「拿一個現成的第三方工具（像 OAuth Playground）代勞」這條路，因為 redirect URI 的規則不一樣。</p><p>老實走一次 loopback 位址流程（開網址 → 從網址列複製 code → curl 換 token）三步就搞定，</p><p>不需要真的架一個 server 去接那個 redirect。</p><h2 id="參考"><a href="#參考" class="headerlink" title="參考"></a>參考</h2><ul><li><a href="https://developers.google.com/identity/protocols/oauth2/native-app">OAuth 2.0 for iOS &amp; Desktop Apps — Loopback IP address（官方文件）</a></li><li><a href="https://www.rfc-editor.org/rfc/rfc8252">RFC 8252: OAuth 2.0 for Native Apps（IETF 標準）</a></li><li><a href="/2026/google-oauth-testing-mode-7-day-refresh-token/">Google OAuth Refresh Token（一）：Testing 模式卡住，只活 7 天</a></li><li><a href="/2026/google-oauth-revoke-third-party-access/">Google OAuth Refresh Token（三）：第三方應用權限撤銷入口與自動失效條件</a></li></ul><p>(fin)</p>]]>
+    </content>
+    <id>https://blog.marsen.me/2026/07/15/2026/google-oauth-desktop-client-loopback-refresh-token/</id>
+    <link href="https://blog.marsen.me/2026/07/15/2026/google-oauth-desktop-client-loopback-refresh-token/"/>
+    <published>2026-07-15T17:48:23.000Z</published>
+    <summary>
+      <![CDATA[<h2 id="前情提要"><a href="#前情提要" class="headerlink" title="前情提要"></a>前情提要</h2><p>接續<a href="/2026/google-oauth-testing-mode-7-day-refresh-token]]>
+    </summary>
+    <title>[實作筆記] Google OAuth Refresh Token（二）：Desktop Client 用 loopback 位址手動換 token</title>
+    <updated>2026-08-05T19:02:40.170Z</updated>
+  </entry>
+  <entry>
+    <author>
+      <name>Marsen L.</name>
+      <email>admin@marsen.me</email>
+    </author>
+    <category term="實作筆記" scheme="https://blog.marsen.me/tags/%E5%AF%A6%E4%BD%9C%E7%AD%86%E8%A8%98/"/>
+    <content>
+      <![CDATA[<h2 id="前情提要"><a href="#前情提要" class="headerlink" title="前情提要"></a>前情提要</h2><p>本來正常 AI 私人祕書晨報功能突然失效了，記錄一下追查的記錄與原因。</p><h2 id="檢查過程"><a href="#檢查過程" class="headerlink" title="檢查過程"></a>檢查過程</h2><p>查詢 API 的呼叫 logs ，發現是 <code>invalid_grant</code>。</p><p>簡單說就是 token 失效，但正常情況下不會這麼快失效才對？</p><p>直接拿 <code>.env</code> 裡的 <code>GOOGLE_REFRESH_TOKEN</code> 打 Google 的 token endpoint 測：</p><figure class="highlight bash"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br></pre></td><td class="code"><pre><span class="line">curl -s -X POST https://oauth2.googleapis.com/token \</span><br><span class="line">  -d <span class="string">&quot;client_id=<span class="variable">$GOOGLE_CLIENT_ID</span>&quot;</span> \</span><br><span class="line">  -d <span class="string">&quot;client_secret=<span class="variable">$GOOGLE_CLIENT_SECRET</span>&quot;</span> \</span><br><span class="line">  -d <span class="string">&quot;refresh_token=<span class="variable">$GOOGLE_REFRESH_TOKEN</span>&quot;</span> \</span><br><span class="line">  -d <span class="string">&quot;grant_type=refresh_token&quot;</span></span><br></pre></td></tr></table></figure><p>回應：</p><figure class="highlight json"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br></pre></td><td class="code"><pre><span class="line"><span class="punctuation">&#123;</span></span><br><span class="line">  <span class="attr">&quot;error&quot;</span><span class="punctuation">:</span> <span class="string">&quot;invalid_grant&quot;</span><span class="punctuation">,</span></span><br><span class="line">  <span class="attr">&quot;error_description&quot;</span><span class="punctuation">:</span> <span class="string">&quot;Token has been expired or revoked.&quot;</span></span><br><span class="line"><span class="punctuation">&#125;</span></span><br></pre></td></tr></table></figure><p>不是網路問題、不是程式碼問題——Google 自己說這把 token 已經過期或被撤銷。</p><h2 id="雷點：過期的原因"><a href="#雷點：過期的原因" class="headerlink" title="雷點：過期的原因"></a>雷點：過期的原因</h2><p>Google Cloud Console 的 OAuth consent screen（新介面叫 <strong>Google Auth Platform</strong>）有個「Publishing status」欄位，兩種狀態：</p><ul><li><strong>Testing</strong>：refresh token 效期固定 <strong>7 天</strong>，不管有沒有呼叫過 API，時間到就是死</li><li><strong>In production</strong>：refresh token 效期正常，不會這樣莫名其妙過期</li></ul><p>去 <code>console.cloud.google.com</code> → 選對的專案 → 左側選單「Google Auth Platform」→「Audience」，</p><p>就能看到目前的 Publishing status。</p><p>檢查後，這個專案果然是 <strong>Testing</strong>——難怪 refresh token 活不過一週。</p><h2 id="怎麼解"><a href="#怎麼解" class="headerlink" title="怎麼解"></a>怎麼解</h2><p>同一頁下面就有「Publish app」按鈕，點下去確認就會變成「In production」，refresh token 的 7 天限制就解除了。</p><p>幾個原本擔心、後來確認不成立的疑慮：</p><ul><li><strong>會不會收費？</strong> 不會。發布狀態本身完全免費。只有用到 restricted scope、服務大量外部使用者時，才需要走 Google 的第三方資安審查（CASA），那個才要花錢，跟這裡無關。</li><li><strong>要不要走完整審核？</strong> 單一使用者、個人用途，不需要。發布後最多是每次授權畫面多一個「Google hasn’t verified this app」的警示，點「Advanced → 繼續前往」就過去了，純粹是多一次點擊，不影響功能。</li><li><strong>User cap 100 人的限制會不會卡到？</strong> 那是 Testing 模式底下才有的限制，是「測試使用者清單當下能放幾人」的容量上限，不是整個專案生命週期累計加過的人數——刪一個舊的、補一個新的沒問題。單一使用者用途完全用不到。</li></ul><h2 id="參考"><a href="#參考" class="headerlink" title="參考"></a>參考</h2><ul><li><a href="https://developers.google.com/identity/protocols/oauth2">Using OAuth 2.0 to Access Google APIs — Refresh token expiration（官方文件）</a></li><li><a href="/2026/google-oauth-desktop-client-loopback-refresh-token/">Google OAuth Refresh Token（二）：Desktop Client 用 loopback 位址手動換 token</a></li><li><a href="/2026/google-oauth-revoke-third-party-access/">Google OAuth Refresh Token（三）：第三方應用權限撤銷入口與自動失效條件</a></li></ul><p>(fin)</p>]]>
+    </content>
+    <id>https://blog.marsen.me/2026/07/15/2026/google-oauth-testing-mode-7-day-refresh-token/</id>
+    <link href="https://blog.marsen.me/2026/07/15/2026/google-oauth-testing-mode-7-day-refresh-token/"/>
+    <published>2026-07-15T17:37:22.000Z</published>
+    <summary>
+      <![CDATA[<h2 id="前情提要"><a href="#前情提要" class="headerlink" title="前情提要"></a>前情提要</h2><p>本來正常 AI 私人祕書晨報功能突然失效了，記錄一下追查的記錄與原因。</p>
+<h2 id="檢查過程"><a href=]]>
+    </summary>
+    <title>[實作筆記] Google OAuth Refresh Token（一）：Testing 模式卡住，只活 7 天</title>
+    <updated>2026-08-05T19:02:40.170Z</updated>
   </entry>
   <entry>
     <author>
@@ -104,7 +159,7 @@
       <![CDATA[<h2 id="前情提要"><a href="#前情提要" class="headerlink" title="前情提要"></a>前情提要</h2><p>AI 私人祕書 的 LINE 雙向對話（讓她能記事、能查資料）需要 LLM 呼叫兩個自訂動作：<code>create_re]]>
     </summary>
     <title>[實作筆記] Tool Calling 是什麼：從一次介面改版學到的事</title>
-    <updated>2026-07-31T11:39:02.371Z</updated>
+    <updated>2026-08-05T19:02:40.170Z</updated>
   </entry>
   <entry>
     <author>
@@ -123,7 +178,7 @@
 <h2 id="本周要點"><a href="#本周要點" class="headerlink" title="本周要點"></a>本周要]]>
     </summary>
     <title>[AI生成] 20260706 科技周報</title>
-    <updated>2026-07-31T11:39:02.371Z</updated>
+    <updated>2026-08-05T19:02:40.169Z</updated>
   </entry>
   <entry>
     <author>
@@ -143,7 +198,7 @@
     <title>
       <![CDATA[[實作筆記] 設定 Resend 自訂 Tracking Domain，開啟 Open & Click Tracking]]>
     </title>
-    <updated>2026-07-31T11:39:02.372Z</updated>
+    <updated>2026-08-05T19:02:40.172Z</updated>
   </entry>
   <entry>
     <author>
@@ -161,7 +216,7 @@
       <![CDATA[<h2 id="前情提要"><a href="#前情提要" class="headerlink" title="前情提要"></a>前情提要</h2><p>在串接藍新金流時，以為在正式站註冊完就能直接測試，結果找了半天都找不到沙盒設定。<br>記錄一下這個讓人繞路的細節。</p>]]>
     </summary>
     <title>[實作筆記] 藍新金流沙盒是獨立測試站，要另外申請</title>
-    <updated>2026-07-31T11:39:02.372Z</updated>
+    <updated>2026-08-05T19:02:40.171Z</updated>
   </entry>
   <entry>
     <author>
@@ -179,7 +234,7 @@
       <![CDATA[<h2 id="前情提要"><a href="#前情提要" class="headerlink" title="前情提要"></a>前情提要</h2><p>串接 ECPay MPG（多元收款）時，本機測試有幾個坑需要提前知道。<br>整理一下從申請沙盒帳號到 webhook 打進]]>
     </summary>
     <title>[實作筆記] ECPay 綠界沙盒串接：本機測試完整流程</title>
-    <updated>2026-07-31T11:39:02.371Z</updated>
+    <updated>2026-08-05T19:02:40.170Z</updated>
   </entry>
   <entry>
     <author>
@@ -197,7 +252,7 @@
       <![CDATA[<h2 id="前情提要"><a href="#前情提要" class="headerlink" title="前情提要"></a>前情提要</h2><p>在本機開發時，第三方金流（ECPay、TapPay）的 webhook 需要一個公開 URL 才能打回來。<br>我試了 l]]>
     </summary>
     <title>[工具筆記] 本地 webhook 測試：用 cloudflared，不要用 localtunnel</title>
-    <updated>2026-07-31T11:39:02.371Z</updated>
+    <updated>2026-08-05T19:02:40.169Z</updated>
   </entry>
   <entry>
     <author>
@@ -215,7 +270,7 @@
       <![CDATA[<h2 id="前情提要"><a href="#前情提要" class="headerlink" title="前情提要"></a>前情提要</h2><p>在串接 ECPay 金流時，一個 API Route 裡用了 <code>redirect()</code>（from <c]]>
     </summary>
     <title>[實作筆記] Next.js 錯誤處理的三層：middleware、try-catch、instrumentation.ts</title>
-    <updated>2026-07-31T11:39:02.372Z</updated>
+    <updated>2026-08-05T19:02:40.171Z</updated>
   </entry>
   <entry>
     <author>
@@ -234,7 +289,7 @@
 <p>所以我設計了多個不同的]]>
     </summary>
     <title>[實作筆記] 為什麼 InversifyJS 在 Next.js 不能用？SWC 相容性問題與 awilix 解法</title>
-    <updated>2026-07-31T11:39:02.371Z</updated>
+    <updated>2026-08-05T19:02:40.169Z</updated>
   </entry>
   <entry>
     <author>
@@ -253,7 +308,7 @@
 <figure class="highli]]>
     </summary>
     <title>[實作筆記] Next.js 16 — middleware 改名為 proxy 了</title>
-    <updated>2026-07-31T11:39:02.372Z</updated>
+    <updated>2026-08-05T19:02:40.171Z</updated>
   </entry>
   <entry>
     <author>
@@ -272,7 +327,7 @@
 <p>這個問題帶出了前端靜]]>
     </summary>
     <title>[實作筆記] 形象站滿版背景影片（一）：前端靜態資源放哪裡</title>
-    <updated>2026-07-31T11:39:02.371Z</updated>
+    <updated>2026-08-05T19:02:40.170Z</updated>
   </entry>
   <entry>
     <author>
@@ -291,7 +346,7 @@
 <h2 id="本周要點"><a href="#本周要點" class="headerlink" title="本周要點"></a>本周要]]>
     </summary>
     <title>[AI生成] 20260612 科技周報</title>
-    <updated>2026-07-31T11:39:02.371Z</updated>
+    <updated>2026-08-05T19:02:40.169Z</updated>
   </entry>
   <entry>
     <author>
@@ -309,7 +364,7 @@
       <![CDATA[<h2 id="前情提要"><a href="#前情提要" class="headerlink" title="前情提要"></a>前情提要</h2><p>AI Coding 工具迭代太快，半年就是一個世代。<br>趁 2026 年中把目前市場上的 Agent Coding 工具]]>
     </summary>
     <title>[工具筆記] 2026 年中 AI Agent Coding 工具盤點：Claude Code、Cursor、Codex 怎麼選</title>
-    <updated>2026-07-31T11:39:02.370Z</updated>
+    <updated>2026-08-05T19:02:40.169Z</updated>
   </entry>
   <entry>
     <author>
@@ -328,63 +383,6 @@
 <h2 id="本周要點"><a href="#本周要點" class="headerlink" title="本周要點"></a>本周要]]>
     </summary>
     <title>[AI生成] 20260610 科技周報</title>
-    <updated>2026-07-31T11:39:02.371Z</updated>
-  </entry>
-  <entry>
-    <author>
-      <name>Marsen L.</name>
-      <email>admin@marsen.me</email>
-    </author>
-    <category term="實作筆記" scheme="https://blog.marsen.me/tags/%E5%AF%A6%E4%BD%9C%E7%AD%86%E8%A8%98/"/>
-    <content>
-      <![CDATA[<h2 id="前情提要"><a href="#前情提要" class="headerlink" title="前情提要"></a>前情提要</h2><p>Hero 要放一支滿版自動播放的背景影片。</p><blockquote><p>Hero 區塊是網頁最頂部的全版區塊，通常含標題、說明文字與背景，是訪客進站看到的第一眼。</p></blockquote><p>素材要放哪，已在<a href="/2026/frontend-static-assets-public-vs-src-assets/">上一篇</a>整理好了，結論是放 <code>public/</code>，URL 字串直接用。</p><p>這篇專注在另外兩個問題：</p><ol><li><strong>流量控管</strong>：滿版自動播放背景影片是首頁最吃流量的東西，怎麼估、怎麼省？</li><li><strong>UI 體驗</strong>：背景影片要無控制列、自動播放、靜音、循環——原生 <code>&lt;video&gt;</code> 還是嵌入 YouTube／Vimeo？</li></ol><h2 id="自存影片：會吃多少流量？"><a href="#自存影片：會吃多少流量？" class="headerlink" title="自存影片：會吃多少流量？"></a>自存影片：會吃多少流量？</h2><p>會，而且<strong>滿版自動播放的背景影片，是整頁最吃流量的東西</strong>。</p><p>粗估一下：一支壓到 SD 的背景影片約 3.5MB，每個訪客每次載入首頁就抓一次（瀏覽器會快取，回訪者不重抓）。</p><figure class="highlight text"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">3.5MB × 10,000 次造訪/月 ≈ 35GB/月</span><br></pre></td></tr></table></figure><p>對小型品牌站通常還在額度內，但要注意兩件事：</p><ol><li>行動裝置上，這 3.5MB 是吃<strong>訪客自己</strong>的行動數據，UX 不友善。</li><li>影片越大支越可怕，HD 1080p 動輒 12MB 起跳。</li></ol><h3 id="重點觀念：走-CDN-≠-不算流量"><a href="#重點觀念：走-CDN-≠-不算流量" class="headerlink" title="重點觀念：走 CDN ≠ 不算流量"></a>重點觀念：走 CDN ≠ 不算流量</h3><p>很多人以為「丟到平台、平台有 CDN」就沒事了。</p><p>以主流部署平台來說，<code>public/</code> 的靜態檔確實會由它的 Edge Network（CDN）快取分送——<strong>但傳輸量仍然計入你的方案額度</strong>。</p><p>CDN 解決的是「分送速度與快取」，不是「免費流量」。要真正卸載流量，得換 host。</p><h2 id="要省流量：CDN-影音-host-比較"><a href="#要省流量：CDN-影音-host-比較" class="headerlink" title="要省流量：CDN &#x2F; 影音 host 比較"></a>要省流量：CDN &#x2F; 影音 host 比較</h2><p>影片放在 <code>public/</code> 的話，流量算在部署平台的額度裡。</p><p>以我們用的平台　Vercel 免費方案只有 100GB&#x2F;月，一支背景影片流量大的時候很快就吃光。</p><p>解法是把影片搬到外部 host，讓別人的伺服器去扛流量。</p><p>好消息是，只要程式碼只用 URL 字串引用影片，換 host 就是換那個字串，<strong>不用改程式碼</strong>：</p><figure class="highlight text"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br></pre></td><td class="code"><pre><span class="line">// 原本放 public/</span><br><span class="line">&lt;video src=&quot;/hero.mp4&quot; /&gt;</span><br><span class="line"></span><br><span class="line">// 搬到 R2 後，只改這一行</span><br><span class="line">&lt;video src=&quot;https://pub-xxx.r2.dev/hero.mp4&quot; /&gt;</span><br></pre></td></tr></table></figure><p>兩條路線：</p><h3 id="路線一：自己存，外部-CDN-來送（Cloudflare-R2"><a href="#路線一：自己存，外部-CDN-來送（Cloudflare-R2" class="headerlink" title="路線一：自己存，外部 CDN 來送（Cloudflare R2"></a>路線一：自己存，外部 CDN 來送（Cloudflare R2</h3><p>把影片傳到 R2，egress（流出流量）免費，只付儲存費（$0.015&#x2F;GB&#x2F;月）。一支 5MB 影片幾乎是 $0，部署平台那邊完全不計這筆流量。</p><h3 id="路線二：讓別人的平台吸收（Vimeo-Youtube）"><a href="#路線二：讓別人的平台吸收（Vimeo-Youtube）" class="headerlink" title="路線二：讓別人的平台吸收（Vimeo&#x2F;Youtube）"></a>路線二：讓別人的平台吸收（Vimeo&#x2F;Youtube）</h3><p>影片上傳到 Vimeo，你的伺服器完全不出流量，由 Vimeo 負責送給訪客。代價是多了第三方依賴，免費方案有上傳量限制。</p><table><thead><tr><th>方案</th><th>流量誰扛</th><th>備註</th></tr></thead><tbody><tr><td>Cloudflare R2</td><td>R2（egress 免費）</td><td>自己管檔案，換 URL 即可</td></tr><tr><td>Cloudflare Stream &#x2F; Mux</td><td>平台</td><td>專業影音串流，自動轉檔、自適應位元率</td></tr><tr><td>Cloudinary</td><td>平台</td><td>媒體優化 + CDN</td></tr><tr><td>Vimeo</td><td>Vimeo</td><td>免費方案有上傳限制，背景模式乾淨</td></tr><tr><td>YouTube 嵌入</td><td>YouTube（完全免費）</td><td>有播放器外觀問題（下節詳述）</td></tr></tbody></table><p>形象站的滿版背景，<strong>通常不會用 YouTube</strong>，原因看下面。</p><h2 id="YouTube-當「無播放器」背景？hack-與代價"><a href="#YouTube-當「無播放器」背景？hack-與代價" class="headerlink" title="YouTube 當「無播放器」背景？hack 與代價"></a>YouTube 當「無播放器」背景？hack 與代價</h2><p>YouTube 這麼主流，能不能拿來當乾淨背景？</p><p><strong>沒有官方乾淨方案</strong>，主流做法都是 hack，而且 YouTube 近年反而把「藏品牌」收得更緊。</p><p>做法是 IFrame Player API + 參數 + CSS：</p><figure class="highlight text"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">autoplay=1&amp;mute=1&amp;loop=1&amp;playlist=VIDEO_ID&amp;controls=0&amp;playsinline=1&amp;rel=0&amp;disablekb=1&amp;iv_load_policy=3</span><br></pre></td></tr></table></figure><figure class="highlight css"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment">/* 把 iframe 放大超出視窗、置中裁切，藏掉黑邊與殘留 UI */</span></span><br><span class="line"><span class="selector-class">.bg-wrap</span> &#123; <span class="attribute">position</span>: absolute; inset: <span class="number">0</span>; <span class="attribute">overflow</span>: hidden; &#125;</span><br><span class="line"><span class="selector-class">.bg-wrap</span> <span class="selector-tag">iframe</span> &#123;</span><br><span class="line">  <span class="attribute">position</span>: absolute; <span class="attribute">top</span>: <span class="number">50%</span>; <span class="attribute">left</span>: <span class="number">50%</span>;</span><br><span class="line">  <span class="attribute">width</span>: <span class="number">150vw</span>; <span class="attribute">height</span>: <span class="number">150vh</span>;        <span class="comment">/* 刻意超出 */</span></span><br><span class="line">  <span class="attribute">transform</span>: <span class="built_in">translate</span>(-<span class="number">50%</span>, -<span class="number">50%</span>);</span><br><span class="line">  <span class="attribute">pointer-events</span>: none;                <span class="comment">/* 防止點到跳出控制列 */</span></span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure><p>代價很實際：</p><ul><li><code>modestbranding</code> 已被 YouTube 淡化／移除，載入、暫停、結束仍可能<strong>閃一下 logo／標題</strong>。</li><li>單片循環要用 <code>loop=1&amp;playlist=ID</code> 的 trick，<strong>接點會黑屏跳一下</strong>（要用 API <code>seekTo(0)</code> 才順）。</li><li>16:9 硬裁成滿版 → <strong>邊緣被切掉</strong>。</li><li>比原生 <code>&lt;video&gt;</code> <strong>重很多</strong>（要載播放器 JS、追蹤 cookie，除非用 <code>youtube-nocookie</code>）。</li><li><strong>手機（尤其 iOS）自動播放不穩</strong>。</li><li>「完全藏品牌」本身遊走在 ToS 邊緣。</li></ul><h2 id="真正乾淨的主流解"><a href="#真正乾淨的主流解" class="headerlink" title="真正乾淨的主流解"></a>真正乾淨的主流解</h2><h3 id="1-Vimeo-背景模式"><a href="#1-Vimeo-背景模式" class="headerlink" title="1. Vimeo 背景模式"></a>1. Vimeo 背景模式</h3><p>Vimeo 的嵌入支援 <code>background=1</code> 參數，這是<strong>官方為背景影片設計</strong>的模式：自動播放、循環、靜音、<strong>全程無控制列、無品牌</strong>。</p><figure class="highlight text"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">https://player.vimeo.com/video/VIDEO_ID?background=1&amp;muted=1&amp;autoplay=1&amp;loop=1</span><br></pre></td></tr></table></figure><p>要 iframe 又要乾淨，這才是該選的，比 YouTube hack 乾淨太多。</p><h3 id="2-影音-CDN-的-mp4-原生-video"><a href="#2-影音-CDN-的-mp4-原生-video" class="headerlink" title="2. 影音 CDN 的 mp4 + 原生 video"></a>2. 影音 CDN 的 mp4 + 原生 video</h3><p>把影片放 Stream &#x2F; Mux &#x2F; R2，拿到真正的 mp4／HLS URL，用原生 <code>&lt;video&gt;</code> 播。</p><p>最乾淨、最可控，也最好做手機降級（poster、<code>preload</code>、小螢幕只給圖）。</p><h2 id="架構建議：媒體以-URL-為主"><a href="#架構建議：媒體以-URL-為主" class="headerlink" title="架構建議：媒體以 URL 為主"></a>架構建議：媒體以 URL 為主</h2><p>把這些湊起來，得到一個簡單原則：<strong>渲染層不要綁死 host。</strong></p><ul><li>媒體只存一個 URL 字串（哪來的都行：自家 <code>public/</code>、R2、Mux、Vimeo iframe）。</li><li>範例／預設素材放 <code>public/</code>，跟使用者貼的網址走同一條路徑。</li><li>正式上線要換成 CDN？<strong>貼上新 URL 即可，不用改程式碼。</strong></li><li>要支援 iframe 型（Vimeo／YouTube）就多開一種「媒體類型」，渲染分流到 iframe，原生影片仍走 <code>&lt;video&gt;</code>。</li></ul><p>這樣早期可以自存 demo、之後無痛換成專業影音 CDN，決策成本最低。</p><h2 id="參考"><a href="#參考" class="headerlink" title="參考"></a>參考</h2><ul><li><a href="/2026/frontend-static-assets-public-vs-src-assets/">形象站滿版背景影片（一）：前端靜態資源放哪裡</a></li></ul><h2 id="小結"><a href="#小結" class="headerlink" title="小結"></a>小結</h2><ul><li>滿版自動播放背景影片最吃流量；CDN 加速 ≠ 免費流量，傳輸仍算額度。</li><li>省流量靠換 host：R2（egress 免費）&#x2F; Stream &#x2F; Mux &#x2F; Cloudinary。</li><li>YouTube 無播放器背景只能 hack，缺點一堆；要 iframe 乾淨解請用 <strong>Vimeo <code>background=1</code></strong>。</li><li>最乾淨：影音 CDN 的 mp4 + 原生 <code>&lt;video&gt;</code>。</li><li>架構上讓媒體「只認 URL」，換 host 就是換字串，不用動程式碼。</li></ul><p>(fin)</p>]]>
-    </content>
-    <id>https://blog.marsen.me/2026/06/07/2026/hero-background-video-hosting/</id>
-    <link href="https://blog.marsen.me/2026/06/07/2026/hero-background-video-hosting/"/>
-    <published>2026-06-07T16:27:00.000Z</published>
-    <summary>
-      <![CDATA[<h2 id="前情提要"><a href="#前情提要" class="headerlink" title="前情提要"></a>前情提要</h2><p>Hero 要放一支滿版自動播放的背景影片。</p>
-<blockquote>
-<p>Hero 區塊是網頁最頂部的全版區塊，通]]>
-    </summary>
-    <title>[實作筆記] 形象站滿版背景影片（二）：流量、CDN 與播放器選型</title>
-    <updated>2026-07-31T11:39:02.371Z</updated>
-  </entry>
-  <entry>
-    <author>
-      <name>Marsen L.</name>
-      <email>admin@marsen.me</email>
-    </author>
-    <category term="實作筆記" scheme="https://blog.marsen.me/tags/%E5%AF%A6%E4%BD%9C%E7%AD%86%E8%A8%98/"/>
-    <content>
-      <![CDATA[<h2 id="前情提要"><a href="#前情提要" class="headerlink" title="前情提要"></a>前情提要</h2><p>我有個 n8n workflow，每週自動抓 AI 新聞 → Gemini 生週報 → 發一篇 IG，順便生一張配圖、也產一篇 Blog 週報開 PR。</p><p>跑了一陣子，兩個毛病：</p><ol><li><strong>每次發兩篇 IG</strong>，一篇正常、一篇是空的。</li><li><strong>配圖每週都是動物</strong>，跟當週主題八竿子打不著。</li></ol><p>本來以為是兩個獨立問題，結果查下去——<strong>根因是同一條接錯的線</strong>。這篇記錄整個排查過程，還有後面為了「免費生圖」繞的一大圈。</p><hr><h2 id="流程長怎樣"><a href="#流程長怎樣" class="headerlink" title="流程長怎樣"></a>流程長怎樣</h2><p>出問題時的原始架構：</p><figure class="highlight text"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br></pre></td><td class="code"><pre><span class="line">Schedule → RSS×4 → Filter → Edit Fields → Aggregate</span><br><span class="line">  ├─ 文字生成(Gemini)        → IG 準備發文 → IG 發佈</span><br><span class="line">  ├─ 生成圖片 Prompt(Gemini)  → IG 準備發文   ↑（兩條線都接這）</span><br><span class="line">  └─ Blog 生成(Gemini)       → GitHub 建 branch → commit → 開 PR</span><br></pre></td></tr></table></figure><p>配圖用 <code>image.pollinations.ai</code> 生成，圖片 URL 直接餵給 IG。</p><h2 id="問題一：一次發兩篇-IG"><a href="#問題一：一次發兩篇-IG" class="headerlink" title="問題一：一次發兩篇 IG"></a>問題一：一次發兩篇 IG</h2><h3 id="根因"><a href="#根因" class="headerlink" title="根因"></a>根因</h3><p>讀 workflow JSON 畫連線，發現 <code>IG 準備發文</code> 這個節點的<strong>同一個輸入埠（input 0）被兩條線餵</strong>：<code>文字生成</code> 和 <code>生成圖片 Prompt</code> 都接進去。</p><p>n8n（executionOrder v1）在「同一輸入埠收到多條來源連線」時，<strong>每條來源各觸發一次</strong>該節點 → <code>IG 準備發文</code> 跑兩次 → 發兩篇。這是 n8n 經典陷阱：該用 Merge 合併分支的地方，直接把兩條線併到同一個 input。</p><p>順便還抓到一個 bug：IG 那個 httpRequest 的 body 參數名是 <code>&quot; image_url&quot;</code>，<strong>開頭多一個空格</strong>，IG 收到的 key 變成 <code> image_url</code> 被忽略 → 圖片沒帶進去 → 空貼文。</p><h3 id="修法"><a href="#修法" class="headerlink" title="修法"></a>修法</h3><p>把「並聯」改成「串聯」：</p><figure class="highlight text"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">Aggregate → 文字生成 → 生成圖片 Prompt → IG 準備發文</span><br></pre></td></tr></table></figure><ul><li><code>IG 準備發文</code> 只剩一條 input → 跑一次 → 發一篇</li><li>順手把 <code>&quot; image_url&quot;</code> 的空格拿掉</li></ul><h2 id="問題二：圖片每週都動物"><a href="#問題二：圖片每週都動物" class="headerlink" title="問題二：圖片每週都動物"></a>問題二：圖片每週都動物</h2><h3 id="根因（其實還是那條線）"><a href="#根因（其實還是那條線）" class="headerlink" title="根因（其實還是那條線）"></a>根因（其實還是那條線）</h3><p>Pollinations 要的是「視覺場景描述」（英文、具體畫面），餵新聞摘要長文它抓不到重點 → 退化成安全牌，而動物是文字生圖最常見的 fallback。</p><p>但更前面的根因是：workflow 裡<strong>其實已經有</strong>一個「生成圖片 Prompt」的 Gemini 節點，prompt 也寫得不錯（挑最有畫面感的一則、用英文描述場景）。問題是它<strong>接錯位置</strong>——從 <code>Aggregate</code> 進來，而 Aggregate 輸出的是 <code>&#123; data: [...] &#125;</code>，<strong>沒有 <code>.text</code></strong>。節點模板寫 <code>&#123;&#123; $json.text &#125;&#125;</code> → 拿到 undefined → 等於餵空內容 → 圖當然爛。</p><p>所以<strong>同一個接線錯誤</strong>：既讓 <code>生成圖片 Prompt</code> 拿不到週報內容，又跟 <code>文字生成</code> 併線造成重複發文。</p><h3 id="修法-1"><a href="#修法-1" class="headerlink" title="修法"></a>修法</h3><p>問題一的串接修法，順便就解了問題二——<code>生成圖片 Prompt</code> 接在 <code>文字生成</code> 之後，<code>$json.text</code> 真的拿得到週報全文了。再把它的 prompt 強化（固定畫風關鍵字 <code>digital illustration, vibrant colors, no text, no logo</code>、排除人名品牌、加 SFW 防護）。</p><blockquote><p>教訓：兩個看起來無關的 bug，根因可能是同一個。先畫連線圖再動手。</p></blockquote><h2 id="插曲一：Blog-分支同天重跑撞名（422）"><a href="#插曲一：Blog-分支同天重跑撞名（422）" class="headerlink" title="插曲一：Blog 分支同天重跑撞名（422）"></a>插曲一：Blog 分支同天重跑撞名（422）</h2><p>修完去重跑驗證，Blog 那條噴 <code>422 Reference already exists</code>。</p><p>根因：branch 名固定用 <code>weekly/&#123;&#123;yyyyMMdd&#125;&#125;</code>，同一天手動重跑就撞到自己上次建的 branch。正常每週排程日期不同不會撞，但測試時會。</p><p>修法：</p><ul><li>branch 名改成 <code>weekly/&#123;&#123;yyyyMMdd-HHmmss&#125;&#125;</code>，同天重跑不撞</li><li>後面 commit &#x2F; 開 PR 的節點，branch 改成<strong>讀「建 branch」實際回傳的 ref</strong>（<code>.ref.replace(&#39;refs/heads/&#39;,&#39;&#39;)</code>），保證三個節點用同一個名字，不會各自用 <code>$now</code> 重算而漂移</li></ul><h2 id="插曲二：4-個-RSS-來源讓整條鏈跑多次"><a href="#插曲二：4-個-RSS-來源讓整條鏈跑多次" class="headerlink" title="插曲二：4 個 RSS 來源讓整條鏈跑多次"></a>插曲二：4 個 RSS 來源讓整條鏈跑多次</h2><p>上線後跑了一次排程，GitHub 吐出 PR #65 和 PR #66——同一週跑出兩個週報 PR，IG 也連帶發了兩篇。</p><p>根因跟問題一其實是同一個模式：4 個 RSS 來源（Theverge、OpenAI、Google AI、Hackernews）各自直接連到 Filter 的 input 0，n8n 把每條來源視為獨立執行分支，Filter → Edit Fields → Aggregate 以下的整條鏈跑了 4 次，GitHub Create PR 就出現了 4 次（有的因 branch 撞名被 422 擋掉，但 IG 發文的那幾次成功了）。</p><p>修法：在 4 個 RSS Read 之後加一個 <strong>Merge RSS 節點（append mode）</strong>，把 4 條分支匯聚成一條再進 Filter，確保下游只跑一次。</p><figure class="highlight text"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">RSS×4 → Merge RSS（append）→ Filter → Edit Fields → Aggregate → ...</span><br></pre></td></tr></table></figure><p>Merge 節點已加入，等下次排程（每週三）實際跑一次驗證。</p><h2 id="大冒險：到底哪裡能免費生圖？"><a href="#大冒險：到底哪裡能免費生圖？" class="headerlink" title="大冒險：到底哪裡能免費生圖？"></a>大冒險：到底哪裡能免費生圖？</h2><p>IG 兩個原始 bug 修好上線了，但配圖來源出事——這段繞最久。</p><p>關鍵限制：<strong>IG Graph API 是用「它自己的伺服器」去抓 <code>image_url</code></strong>。所以不管我這邊怎麼生圖，只要那個 URL 被擋，IG 就抓不到。</p><table><thead><tr><th>來源</th><th>結果</th></tr></thead><tbody><tr><td>Pollinations 匿名</td><td><strong>402</strong> Payment Required。它改政策了：匿名並發限 1，超過就回 JSON 錯誤（還夾帶 x402 加密貨幣付款，要付 USDC 繞過）</td></tr><tr><td>Pollinations 註冊 token</td><td>舊的 <code>auth.pollinations.ai</code> 網域<strong>已下線</strong>（DNS 查無），現行入口是付費 Console</td></tr><tr><td>Gemini 圖片（我現有的 key）</td><td><strong>429，free tier limit: 0</strong>。文字免費、圖片要開帳單付費層</td></tr><tr><td>Replicate flux</td><td>沒有正式免費額度，試用後<strong>要綁信用卡</strong>（約 $0.003&#x2F;張）</td></tr></tbody></table><p>繞一圈結論：<strong>「真正免費、不綁卡、又能讓第三方抓圖」的組合幾乎絕跡。</strong></p><h3 id="最終解：Cloudflare-Workers-AI-GitHub-托管-一圖共用"><a href="#最終解：Cloudflare-Workers-AI-GitHub-托管-一圖共用" class="headerlink" title="最終解：Cloudflare Workers AI + GitHub 托管 + 一圖共用"></a>最終解：Cloudflare Workers AI + GitHub 托管 + 一圖共用</h3><p>先講結論：用 <strong>Cloudflare Workers AI 的 <code>flux-1-schnell</code></strong> 生圖（免費、不綁卡），把圖 <strong>commit 進 Hexo repo</strong>，<strong>文章嵌入它、IG 也用同一張的 raw URL</strong>。</p><p><strong>為什麼是 Cloudflare Workers AI</strong></p><ul><li>免費層每天 10,000 neurons，<strong>不用綁信用卡</strong>，只要免費 Cloudflare 帳號</li><li>一週一張圖，額度永遠用不完 → 實質 $0</li><li>實測 OK：回合法 1024×1024 JPEG（base64）</li></ul><p><strong>為什麼一定要自己托管圖（這步躲不掉）</strong></p><p>IG 發「照片」貼文時，是給它一個<strong>公開 URL、它自己伺服器去抓</strong>——不能直接上傳圖片 bytes（只有 Reels／影片能 binary 上傳）。而 flux 回的是 bytes 不是 URL。所以中間一定要有個「把 bytes 變成公開 URL」的托管處。</p><p>評估過 R2 &#x2F; GCS &#x2F; Imgur &#x2F; 備份 repo，最後選 <strong>Hexo 的 public repo</strong>：</p><ul><li>GitHub 憑證<strong>早就接在 n8n 裡</strong>、repo 又是 public → 零新帳號、零成本、IG 抓 <code>raw.githubusercontent.com</code> 很穩</li><li>備份 repo 不能用（private + 內含明文 token，不能公開）</li><li>巧合：flux 回 base64、GitHub Contents API 剛好也吃 base64，中間免轉檔</li></ul><p><strong>一圖共用（這次的重點設計）</strong></p><p>原本 Blog 與 IG 是兩條平行分支。為了「文章嵌圖 + IG 用同一張」，把它們<strong>串成一條</strong>：生一次圖 → commit 到該週分支 → 文章 md 嵌入 <code>![](/images/...)</code> → IG 用同一張的 raw URL。一次生圖、零重複、圖也進了 blog。</p><figure class="highlight text"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br></pre></td><td class="code"><pre><span class="line">Aggregate → Blog生成 → 文字生成 → 生成圖片Prompt → CF生圖(flux,base64)</span><br><span class="line">→ 取main SHA → 建分支(weekly/&lt;日期-時間&gt;) → 上傳圖到GitHub</span><br><span class="line">→ Blog建檔(嵌圖) → Blog Post → 開PR → IG準備發文(同一張raw URL) → Wait → IG發佈</span><br></pre></td></tr></table></figure><p>代價：兩條從「獨立」變「耦合」（中間任一步失敗，後面不跑）。換來一圖共用。</p><h3 id="接的時候又踩的坑"><a href="#接的時候又踩的坑" class="headerlink" title="接的時候又踩的坑"></a>接的時候又踩的坑</h3><ul><li><strong>n8n Header Auth 憑證填錯欄位 → 401</strong>：<code>Name</code> 要填 <code>Authorization</code>（不是憑證用途名），<code>Value</code> 要 <code>Bearer &lt;token&gt;</code>（不是只貼 token）。</li><li><strong>CLI import vs UI 編輯互相蓋</strong>：用 CLI 匯入改的是 DB，但若瀏覽器還開著舊畫布，一存就把匯入蓋掉。改之前先關掉所有編輯分頁、改完再 refresh。</li><li><strong>Gemini 503 過載</strong>：<code>gemini-flash-latest</code> 遇大尖峰整個 workflow 掛。加 <code>retryOnFail</code>（4 次／5 秒）擋小尖峰；大範圍過載只能換模型（換成 <code>gemini-flash-lite-latest</code>）。已記成 backlog，想做「多模型自動 fallback」。</li><li><strong>Blog CI 競態</strong>：repo 的 <code>ci.yml</code> 在 <code>pull_request</code> 也跑，會在 PR 的 detached HEAD 上把 <code>ncu -u</code> 結果推回 main → 必然 <code>! [rejected] (fetch first)</code>，每開一個週報 PR 就失敗一次。修法：拿掉 <code>pull_request</code> 觸發 + 加 <code>concurrency</code>。</li></ul><h2 id="小結"><a href="#小結" class="headerlink" title="小結"></a>小結</h2><ul><li>兩個看似獨立的 bug（發兩篇、圖都動物），根因是<strong>同一條接錯的線</strong>。排查 n8n 先畫連線圖。</li><li>n8n「同一輸入埠接多條線會重複觸發」，要合併分支用 Merge、別直接併線。</li><li>跨節點共用的值（branch 名）<strong>算一次、其他節點引用</strong>，別各自 <code>$now</code> 重算。</li><li>免費服務會退化：Pollinations 從「免簽免 key」變 402 + 加密付款；Gemini 圖片免費層 limit&#x3D;0。架構別把命脈押在單一免費服務上。</li><li>IG 發照片<strong>一定要公開圖床</strong>（它自己抓 URL），逼你先想清楚托管在哪。</li><li><strong>動手前先驗證</strong>（列得出模型 ≠ 生得出圖、free tier 可能 limit&#x3D;0），而且<strong>會花錢／動到別人系統的事先問過再做</strong>。</li></ul><p>（Merge RSS 節點已加，等下次排程實際跑過驗證。之後補上實際成品圖。）</p><h2 id="參考"><a href="#參考" class="headerlink" title="參考"></a>參考</h2><ul><li><a href="/2026/04/17/2026/n8n-1-in-gcp-free-tier-vm/">個人自動化平台(一) 用 GCP 免費 VM 跑 n8n</a></li><li><a href="/2026/04/17/2026/n8n-2-cloudflared-and-tunnel/">個人自動化平台(二) Cloudflare Access &amp; Cloudflare Tunnel</a></li><li><a href="/2026/04/20/2026/n8n-3-pipeline-overview/">個人自動化平台(三) 收集、處理、輸出：三層可插拔管道設計</a></li><li><a href="/2026/04/18/2026/n8n-3.1-rebuild-infromation/">個人自動化平台(番外) 拆掉重建 GCP VM &amp; Cloudflared Tunnel &amp; Cloudflare Access</a></li><li><a href="/2026/04/20/2026/n8n-4-pipeline-fetch/">個人自動化平台(四) n8n 實作：收集層，RSS 資料來源</a></li><li><a href="/2026/04/27/2026/n8n-5-pipeline-process/">個人自動化平台(五) n8n 實作：處理層，Aggregate + Gemini 週報整理</a></li><li><a href="/2026/04/22/2026/n8n-6-pipeline-output/">個人自動化平台(六) n8n 實作：輸出層，Instagram API 取得 Token 全記錄</a></li><li><a href="/2026/04/27/2026/n8n-6.1-google-oauth-redirect-uri-debug/">個人自動化平台(番外) Google OAuth redirect_uri_mismatch 除錯記錄</a></li><li><a href="/2026/04/30/2026/n8n-7-backup-automation/">個人自動化平台(七) n8n 自動備份：CLI export + git</a></li><li><a href="/2026/05/29/2026/n8n-7.1-docker-update-on-gcp-vm/">個人自動化平台(番外) 更新自架在 GCP VM 上的 n8n（Docker 版）</a></li></ul><p>(fin)</p>]]>
-    </content>
-    <id>https://blog.marsen.me/2026/06/05/2026/n8n-ai-weekly-ig-debug-free-image-gen/</id>
-    <link href="https://blog.marsen.me/2026/06/05/2026/n8n-ai-weekly-ig-debug-free-image-gen/"/>
-    <published>2026-06-05T04:02:20.000Z</published>
-    <summary>
-      <![CDATA[<h2 id="前情提要"><a href="#前情提要" class="headerlink" title="前情提要"></a>前情提要</h2><p>我有個 n8n workflow，每週自動抓 AI 新聞 → Gemini 生週報 → 發一篇 IG，順便生一張配圖、也產一]]>
-    </summary>
-    <title>[實作筆記] n8n AI 週報踩坑記：一條接錯的線，與找免費生圖來源的旅程</title>
-    <updated>2026-07-31T11:39:02.372Z</updated>
-  </entry>
-  <entry>
-    <author>
-      <name>Marsen L.</name>
-      <email>admin@marsen.me</email>
-    </author>
-    <category term="AI生成" scheme="https://blog.marsen.me/tags/AI%E7%94%9F%E6%88%90/"/>
-    <content>
-      <![CDATA[<p><img src="/images/ai-weekly/20260605-045626.jpg" alt="AI 週報配圖"></p><h2 id="本周要點"><a href="#本周要點" class="headerlink" title="本周要點"></a>本周要點</h2><ul><li><a href="https://openai.com/index/openai-frontier-models-and-codex-are-now-available-on-aws">OpenAI 前沿模型與 Codex 現已登陸 AWS</a>：OpenAI 宣布其前沿模型與 Codex 系列正式整合至 AWS 平台，協助企業開發者更高效地構建 AI 應用。 <a href="https://openai.com/index/openai-frontier-models-and-codex-are-now-available-on-AWS">more</a></li><li><a href="https://openai.com/index/chatgpt-memory-dreaming">ChatGPT 的記憶優化計畫：Dreaming</a>：OpenAI 推出「Dreaming」機制，旨在強化 ChatGPT 的記憶功能，使其能更精準且具備連貫性地提供使用者所需的協助。 <a href="https://openai.com/index/chatgpt-memory-dreaming">more</a></li><li><a href="https://openai.com/index/frontier-safety-blueprint">為前沿 AI 建立民主化治理藍圖</a>：OpenAI 提出一套關於前沿 AI 治理的藍圖，強調在發展尖端技術的同時，必須確保其安全性、透明度與全球性的民主參與。 <a href="https://openai.com/index/frontier-safety-blueprint">more</a></li><li><a href="https://openai.com/index/stargate-michigan-data-center">在密西根州構建智慧時代的基礎設施</a>：OpenAI 宣布將在密西根州建立大型數據中心項目 Stargate，為 AI 運算需求提供強大的硬體支持。 <a href="https://openai.com/index/stargate-michigan-data-center">more</a></li><li><a href="https://openai.com/index/endava-frontiers">Endava 如何圍繞 AI Agents 重塑軟體交付</a>：Endava 透過引入 AI Agents 技術，徹底改變了傳統軟體開發與交付的流程，大幅提升了開發效率。 <a href="https://openai.com/index/endava-frontiers">more</a></li><li><a href="https://openai.com/index/boston-childrens-hospital">波士頓兒童醫院利用 AI 開啟新的診斷路徑</a>：波士頓兒童醫院正應用 OpenAI 的技術輔助醫師進行複雜病例的診斷，為醫療領域帶來了新的突破。 <a href="https://openai.com/index/boston-childrens-hospital">more</a></li><li><a href="https://openai.com/index/travelers">Travelers 保險公司在全國範圍部署 AI 理賠系統</a>：保險巨頭 Travelers 與 OpenAI 合作，全面部署 AI 驅動的理賠處理流程，顯著縮短了客戶等待時間。 <a href="https://openai.com/index/travelers">more</a></li></ul><h2 id="其他訊息"><a href="#其他訊息" class="headerlink" title="其他訊息"></a>其他訊息</h2><ul><li><a href="https://openai.com/index/biodefense-in-the-intelligence-age">智慧時代的生物防禦</a></li><li><a href="https://openai.com/index/introducing-new-capabilities-to-gpt-rosalind">為 GPT-Rosalind 引入全新能力</a></li><li><a href="https://openai.com/index/wasmer">Wasmer 如何利用 Codex 建構 Edge 端的 Node.js 運行時</a></li><li><a href="https://openai.com/index/public-policy-agenda">OpenAI 公共政策議程</a></li><li><a href="https://openai.com/index/codex-for-every-role-tool-workflow">Codex 適用於所有職位、工具與工作流</a></li><li><a href="https://openai.com/index/advancing-youth-safety-and-opportunity-through-global-leadership">透過全球領導力推動青年安全與機遇</a></li><li><a href="https://openai.com/index/codex-for-knowledge-work">Codex 正成為全民生產力工具</a></li><li><a href="https://openai.com/index/our-views-on-ai-policy-and-political-advocacy">我們對 AI 政策與政治倡議的觀點</a></li><li><a href="https://openai.com/index/braintrust">Braintrust 如何利用 Codex 將客戶需求轉化為程式碼</a></li></ul><p>(fin)</p>]]>
-    </content>
-    <id>https://blog.marsen.me/2026/06/04/2026/ai-weekly-20260605/</id>
-    <link href="https://blog.marsen.me/2026/06/04/2026/ai-weekly-20260605/"/>
-    <published>2026-06-04T20:56:17.000Z</published>
-    <summary>
-      <![CDATA[<p><img src="/images/ai-weekly/20260605-045626.jpg" alt="AI 週報配圖"></p>
-<h2 id="本周要點"><a href="#本周要點" class="headerlink" title="本周要點"></a>本周要]]>
-    </summary>
-    <title>[AI生成] 20260605 科技周報</title>
-    <updated>2026-07-31T11:39:02.371Z</updated>
+    <updated>2026-08-05T19:02:40.169Z</updated>
   </entry>
 </feed>

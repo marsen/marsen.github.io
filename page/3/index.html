@@ -103,6 +103,372 @@ j=d.createElement(s),dl=l!='dataLayer'?'&l='+l:'';j.async=true;j.src=
       <div class="outer">
         <section id="main">
   
+    <article id="post-2026/hero-background-video-hosting" class="article article-type-post" itemscope itemprop="blogPost">
+  <div class="article-meta">
+    <a href="/2026/06/07/2026/hero-background-video-hosting/" class="article-date">
+  <time datetime="2026-06-07T16:27:00.000Z" itemprop="datePublished">2026-06-08</time>
+</a>
+    
+  </div>
+  <div class="article-inner">
+    
+    
+      <header class="article-header">
+        
+  
+    <h1 itemprop="name">
+      <a class="article-title" href="/2026/06/07/2026/hero-background-video-hosting/">[實作筆記] 形象站滿版背景影片（二）：流量、CDN 與播放器選型</a>
+    </h1>
+  
+
+      </header>
+    
+    <div class="article-entry" itemprop="articleBody">
+      
+        <h2 id="前情提要"><a href="#前情提要" class="headerlink" title="前情提要"></a>前情提要</h2><p>Hero 要放一支滿版自動播放的背景影片。</p>
+<blockquote>
+<p>Hero 區塊是網頁最頂部的全版區塊，通常含標題、說明文字與背景，是訪客進站看到的第一眼。</p>
+</blockquote>
+<p>素材要放哪，已在<a href="/2026/frontend-static-assets-public-vs-src-assets/">上一篇</a>整理好了，結論是放 <code>public/</code>，URL 字串直接用。</p>
+<p>這篇專注在另外兩個問題：</p>
+<ol>
+<li><strong>流量控管</strong>：滿版自動播放背景影片是首頁最吃流量的東西，怎麼估、怎麼省？</li>
+<li><strong>UI 體驗</strong>：背景影片要無控制列、自動播放、靜音、循環——原生 <code>&lt;video&gt;</code> 還是嵌入 YouTube／Vimeo？</li>
+</ol>
+<h2 id="自存影片：會吃多少流量？"><a href="#自存影片：會吃多少流量？" class="headerlink" title="自存影片：會吃多少流量？"></a>自存影片：會吃多少流量？</h2><p>會，而且<strong>滿版自動播放的背景影片，是整頁最吃流量的東西</strong>。</p>
+<p>粗估一下：一支壓到 SD 的背景影片約 3.5MB，每個訪客每次載入首頁就抓一次（瀏覽器會快取，回訪者不重抓）。</p>
+<figure class="highlight text"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">3.5MB × 10,000 次造訪/月 ≈ 35GB/月</span><br></pre></td></tr></table></figure>
+
+<p>對小型品牌站通常還在額度內，但要注意兩件事：</p>
+<ol>
+<li>行動裝置上，這 3.5MB 是吃<strong>訪客自己</strong>的行動數據，UX 不友善。</li>
+<li>影片越大支越可怕，HD 1080p 動輒 12MB 起跳。</li>
+</ol>
+<h3 id="重點觀念：走-CDN-≠-不算流量"><a href="#重點觀念：走-CDN-≠-不算流量" class="headerlink" title="重點觀念：走 CDN ≠ 不算流量"></a>重點觀念：走 CDN ≠ 不算流量</h3><p>很多人以為「丟到平台、平台有 CDN」就沒事了。</p>
+<p>以主流部署平台來說，<code>public/</code> 的靜態檔確實會由它的 Edge Network（CDN）快取分送——<strong>但傳輸量仍然計入你的方案額度</strong>。</p>
+<p>CDN 解決的是「分送速度與快取」，不是「免費流量」。要真正卸載流量，得換 host。</p>
+<h2 id="要省流量：CDN-影音-host-比較"><a href="#要省流量：CDN-影音-host-比較" class="headerlink" title="要省流量：CDN &#x2F; 影音 host 比較"></a>要省流量：CDN &#x2F; 影音 host 比較</h2><p>影片放在 <code>public/</code> 的話，流量算在部署平台的額度裡。</p>
+<p>以我們用的平台　Vercel 免費方案只有 100GB&#x2F;月，一支背景影片流量大的時候很快就吃光。</p>
+<p>解法是把影片搬到外部 host，讓別人的伺服器去扛流量。</p>
+<p>好消息是，只要程式碼只用 URL 字串引用影片，換 host 就是換那個字串，<strong>不用改程式碼</strong>：</p>
+<figure class="highlight text"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br></pre></td><td class="code"><pre><span class="line">// 原本放 public/</span><br><span class="line">&lt;video src=&quot;/hero.mp4&quot; /&gt;</span><br><span class="line"></span><br><span class="line">// 搬到 R2 後，只改這一行</span><br><span class="line">&lt;video src=&quot;https://pub-xxx.r2.dev/hero.mp4&quot; /&gt;</span><br></pre></td></tr></table></figure>
+
+<p>兩條路線：</p>
+<h3 id="路線一：自己存，外部-CDN-來送（Cloudflare-R2"><a href="#路線一：自己存，外部-CDN-來送（Cloudflare-R2" class="headerlink" title="路線一：自己存，外部 CDN 來送（Cloudflare R2"></a>路線一：自己存，外部 CDN 來送（Cloudflare R2</h3><p>把影片傳到 R2，egress（流出流量）免費，只付儲存費（$0.015&#x2F;GB&#x2F;月）。一支 5MB 影片幾乎是 $0，部署平台那邊完全不計這筆流量。</p>
+<h3 id="路線二：讓別人的平台吸收（Vimeo-Youtube）"><a href="#路線二：讓別人的平台吸收（Vimeo-Youtube）" class="headerlink" title="路線二：讓別人的平台吸收（Vimeo&#x2F;Youtube）"></a>路線二：讓別人的平台吸收（Vimeo&#x2F;Youtube）</h3><p>影片上傳到 Vimeo，你的伺服器完全不出流量，由 Vimeo 負責送給訪客。代價是多了第三方依賴，免費方案有上傳量限制。</p>
+<table>
+<thead>
+<tr>
+<th>方案</th>
+<th>流量誰扛</th>
+<th>備註</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>Cloudflare R2</td>
+<td>R2（egress 免費）</td>
+<td>自己管檔案，換 URL 即可</td>
+</tr>
+<tr>
+<td>Cloudflare Stream &#x2F; Mux</td>
+<td>平台</td>
+<td>專業影音串流，自動轉檔、自適應位元率</td>
+</tr>
+<tr>
+<td>Cloudinary</td>
+<td>平台</td>
+<td>媒體優化 + CDN</td>
+</tr>
+<tr>
+<td>Vimeo</td>
+<td>Vimeo</td>
+<td>免費方案有上傳限制，背景模式乾淨</td>
+</tr>
+<tr>
+<td>YouTube 嵌入</td>
+<td>YouTube（完全免費）</td>
+<td>有播放器外觀問題（下節詳述）</td>
+</tr>
+</tbody></table>
+<p>形象站的滿版背景，<strong>通常不會用 YouTube</strong>，原因看下面。</p>
+<h2 id="YouTube-當「無播放器」背景？hack-與代價"><a href="#YouTube-當「無播放器」背景？hack-與代價" class="headerlink" title="YouTube 當「無播放器」背景？hack 與代價"></a>YouTube 當「無播放器」背景？hack 與代價</h2><p>YouTube 這麼主流，能不能拿來當乾淨背景？</p>
+<p><strong>沒有官方乾淨方案</strong>，主流做法都是 hack，而且 YouTube 近年反而把「藏品牌」收得更緊。</p>
+<p>做法是 IFrame Player API + 參數 + CSS：</p>
+<figure class="highlight text"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">autoplay=1&amp;mute=1&amp;loop=1&amp;playlist=VIDEO_ID&amp;controls=0&amp;playsinline=1&amp;rel=0&amp;disablekb=1&amp;iv_load_policy=3</span><br></pre></td></tr></table></figure>
+
+<figure class="highlight css"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment">/* 把 iframe 放大超出視窗、置中裁切，藏掉黑邊與殘留 UI */</span></span><br><span class="line"><span class="selector-class">.bg-wrap</span> &#123; <span class="attribute">position</span>: absolute; inset: <span class="number">0</span>; <span class="attribute">overflow</span>: hidden; &#125;</span><br><span class="line"><span class="selector-class">.bg-wrap</span> <span class="selector-tag">iframe</span> &#123;</span><br><span class="line">  <span class="attribute">position</span>: absolute; <span class="attribute">top</span>: <span class="number">50%</span>; <span class="attribute">left</span>: <span class="number">50%</span>;</span><br><span class="line">  <span class="attribute">width</span>: <span class="number">150vw</span>; <span class="attribute">height</span>: <span class="number">150vh</span>;        <span class="comment">/* 刻意超出 */</span></span><br><span class="line">  <span class="attribute">transform</span>: <span class="built_in">translate</span>(-<span class="number">50%</span>, -<span class="number">50%</span>);</span><br><span class="line">  <span class="attribute">pointer-events</span>: none;                <span class="comment">/* 防止點到跳出控制列 */</span></span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+<p>代價很實際：</p>
+<ul>
+<li><code>modestbranding</code> 已被 YouTube 淡化／移除，載入、暫停、結束仍可能<strong>閃一下 logo／標題</strong>。</li>
+<li>單片循環要用 <code>loop=1&amp;playlist=ID</code> 的 trick，<strong>接點會黑屏跳一下</strong>（要用 API <code>seekTo(0)</code> 才順）。</li>
+<li>16:9 硬裁成滿版 → <strong>邊緣被切掉</strong>。</li>
+<li>比原生 <code>&lt;video&gt;</code> <strong>重很多</strong>（要載播放器 JS、追蹤 cookie，除非用 <code>youtube-nocookie</code>）。</li>
+<li><strong>手機（尤其 iOS）自動播放不穩</strong>。</li>
+<li>「完全藏品牌」本身遊走在 ToS 邊緣。</li>
+</ul>
+<h2 id="真正乾淨的主流解"><a href="#真正乾淨的主流解" class="headerlink" title="真正乾淨的主流解"></a>真正乾淨的主流解</h2><h3 id="1-Vimeo-背景模式"><a href="#1-Vimeo-背景模式" class="headerlink" title="1. Vimeo 背景模式"></a>1. Vimeo 背景模式</h3><p>Vimeo 的嵌入支援 <code>background=1</code> 參數，這是<strong>官方為背景影片設計</strong>的模式：自動播放、循環、靜音、<strong>全程無控制列、無品牌</strong>。</p>
+<figure class="highlight text"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">https://player.vimeo.com/video/VIDEO_ID?background=1&amp;muted=1&amp;autoplay=1&amp;loop=1</span><br></pre></td></tr></table></figure>
+
+<p>要 iframe 又要乾淨，這才是該選的，比 YouTube hack 乾淨太多。</p>
+<h3 id="2-影音-CDN-的-mp4-原生-video"><a href="#2-影音-CDN-的-mp4-原生-video" class="headerlink" title="2. 影音 CDN 的 mp4 + 原生 video"></a>2. 影音 CDN 的 mp4 + 原生 video</h3><p>把影片放 Stream &#x2F; Mux &#x2F; R2，拿到真正的 mp4／HLS URL，用原生 <code>&lt;video&gt;</code> 播。</p>
+<p>最乾淨、最可控，也最好做手機降級（poster、<code>preload</code>、小螢幕只給圖）。</p>
+<h2 id="架構建議：媒體以-URL-為主"><a href="#架構建議：媒體以-URL-為主" class="headerlink" title="架構建議：媒體以 URL 為主"></a>架構建議：媒體以 URL 為主</h2><p>把這些湊起來，得到一個簡單原則：<strong>渲染層不要綁死 host。</strong></p>
+<ul>
+<li>媒體只存一個 URL 字串（哪來的都行：自家 <code>public/</code>、R2、Mux、Vimeo iframe）。</li>
+<li>範例／預設素材放 <code>public/</code>，跟使用者貼的網址走同一條路徑。</li>
+<li>正式上線要換成 CDN？<strong>貼上新 URL 即可，不用改程式碼。</strong></li>
+<li>要支援 iframe 型（Vimeo／YouTube）就多開一種「媒體類型」，渲染分流到 iframe，原生影片仍走 <code>&lt;video&gt;</code>。</li>
+</ul>
+<p>這樣早期可以自存 demo、之後無痛換成專業影音 CDN，決策成本最低。</p>
+<h2 id="參考"><a href="#參考" class="headerlink" title="參考"></a>參考</h2><ul>
+<li><a href="/2026/frontend-static-assets-public-vs-src-assets/">形象站滿版背景影片（一）：前端靜態資源放哪裡</a></li>
+</ul>
+<h2 id="小結"><a href="#小結" class="headerlink" title="小結"></a>小結</h2><ul>
+<li>滿版自動播放背景影片最吃流量；CDN 加速 ≠ 免費流量，傳輸仍算額度。</li>
+<li>省流量靠換 host：R2（egress 免費）&#x2F; Stream &#x2F; Mux &#x2F; Cloudinary。</li>
+<li>YouTube 無播放器背景只能 hack，缺點一堆；要 iframe 乾淨解請用 <strong>Vimeo <code>background=1</code></strong>。</li>
+<li>最乾淨：影音 CDN 的 mp4 + 原生 <code>&lt;video&gt;</code>。</li>
+<li>架構上讓媒體「只認 URL」，換 host 就是換字串，不用動程式碼。</li>
+</ul>
+<p>(fin)</p>
+
+      
+    </div>
+    <footer class="article-footer">
+      <a data-url="https://blog.marsen.me/2026/06/07/2026/hero-background-video-hosting/" data-id="cuidJnxBJbd0UFT9FgaUHNQ7s" class="article-share-link">Share</a>
+      
+        <a href="https://blog.marsen.me/2026/06/07/2026/hero-background-video-hosting/#disqus_thread" class="article-comment-link">留言</a>
+      
+      
+  <ul class="article-tag-list" itemprop="keywords"><li class="article-tag-list-item"><a class="article-tag-list-link" href="/tags/%E5%AF%A6%E4%BD%9C%E7%AD%86%E8%A8%98/" rel="tag">實作筆記</a></li></ul>
+
+    </footer>
+  </div>
+  
+</article>
+
+
+  
+    <article id="post-2026/n8n-ai-weekly-ig-debug-free-image-gen" class="article article-type-post" itemscope itemprop="blogPost">
+  <div class="article-meta">
+    <a href="/2026/06/05/2026/n8n-ai-weekly-ig-debug-free-image-gen/" class="article-date">
+  <time datetime="2026-06-05T04:02:20.000Z" itemprop="datePublished">2026-06-05</time>
+</a>
+    
+  </div>
+  <div class="article-inner">
+    
+    
+      <header class="article-header">
+        
+  
+    <h1 itemprop="name">
+      <a class="article-title" href="/2026/06/05/2026/n8n-ai-weekly-ig-debug-free-image-gen/">[實作筆記] n8n AI 週報踩坑記：一條接錯的線，與找免費生圖來源的旅程</a>
+    </h1>
+  
+
+      </header>
+    
+    <div class="article-entry" itemprop="articleBody">
+      
+        <h2 id="前情提要"><a href="#前情提要" class="headerlink" title="前情提要"></a>前情提要</h2><p>我有個 n8n workflow，每週自動抓 AI 新聞 → Gemini 生週報 → 發一篇 IG，順便生一張配圖、也產一篇 Blog 週報開 PR。</p>
+<p>跑了一陣子，兩個毛病：</p>
+<ol>
+<li><strong>每次發兩篇 IG</strong>，一篇正常、一篇是空的。</li>
+<li><strong>配圖每週都是動物</strong>，跟當週主題八竿子打不著。</li>
+</ol>
+<p>本來以為是兩個獨立問題，結果查下去——<strong>根因是同一條接錯的線</strong>。這篇記錄整個排查過程，還有後面為了「免費生圖」繞的一大圈。</p>
+<hr>
+<h2 id="流程長怎樣"><a href="#流程長怎樣" class="headerlink" title="流程長怎樣"></a>流程長怎樣</h2><p>出問題時的原始架構：</p>
+<figure class="highlight text"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br></pre></td><td class="code"><pre><span class="line">Schedule → RSS×4 → Filter → Edit Fields → Aggregate</span><br><span class="line">  ├─ 文字生成(Gemini)        → IG 準備發文 → IG 發佈</span><br><span class="line">  ├─ 生成圖片 Prompt(Gemini)  → IG 準備發文   ↑（兩條線都接這）</span><br><span class="line">  └─ Blog 生成(Gemini)       → GitHub 建 branch → commit → 開 PR</span><br></pre></td></tr></table></figure>
+
+<p>配圖用 <code>image.pollinations.ai</code> 生成，圖片 URL 直接餵給 IG。</p>
+<h2 id="問題一：一次發兩篇-IG"><a href="#問題一：一次發兩篇-IG" class="headerlink" title="問題一：一次發兩篇 IG"></a>問題一：一次發兩篇 IG</h2><h3 id="根因"><a href="#根因" class="headerlink" title="根因"></a>根因</h3><p>讀 workflow JSON 畫連線，發現 <code>IG 準備發文</code> 這個節點的<strong>同一個輸入埠（input 0）被兩條線餵</strong>：<code>文字生成</code> 和 <code>生成圖片 Prompt</code> 都接進去。</p>
+<p>n8n（executionOrder v1）在「同一輸入埠收到多條來源連線」時，<strong>每條來源各觸發一次</strong>該節點 → <code>IG 準備發文</code> 跑兩次 → 發兩篇。這是 n8n 經典陷阱：該用 Merge 合併分支的地方，直接把兩條線併到同一個 input。</p>
+<p>順便還抓到一個 bug：IG 那個 httpRequest 的 body 參數名是 <code>&quot; image_url&quot;</code>，<strong>開頭多一個空格</strong>，IG 收到的 key 變成 <code> image_url</code> 被忽略 → 圖片沒帶進去 → 空貼文。</p>
+<h3 id="修法"><a href="#修法" class="headerlink" title="修法"></a>修法</h3><p>把「並聯」改成「串聯」：</p>
+<figure class="highlight text"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">Aggregate → 文字生成 → 生成圖片 Prompt → IG 準備發文</span><br></pre></td></tr></table></figure>
+
+<ul>
+<li><code>IG 準備發文</code> 只剩一條 input → 跑一次 → 發一篇</li>
+<li>順手把 <code>&quot; image_url&quot;</code> 的空格拿掉</li>
+</ul>
+<h2 id="問題二：圖片每週都動物"><a href="#問題二：圖片每週都動物" class="headerlink" title="問題二：圖片每週都動物"></a>問題二：圖片每週都動物</h2><h3 id="根因（其實還是那條線）"><a href="#根因（其實還是那條線）" class="headerlink" title="根因（其實還是那條線）"></a>根因（其實還是那條線）</h3><p>Pollinations 要的是「視覺場景描述」（英文、具體畫面），餵新聞摘要長文它抓不到重點 → 退化成安全牌，而動物是文字生圖最常見的 fallback。</p>
+<p>但更前面的根因是：workflow 裡<strong>其實已經有</strong>一個「生成圖片 Prompt」的 Gemini 節點，prompt 也寫得不錯（挑最有畫面感的一則、用英文描述場景）。問題是它<strong>接錯位置</strong>——從 <code>Aggregate</code> 進來，而 Aggregate 輸出的是 <code>&#123; data: [...] &#125;</code>，<strong>沒有 <code>.text</code></strong>。節點模板寫 <code>&#123;&#123; $json.text &#125;&#125;</code> → 拿到 undefined → 等於餵空內容 → 圖當然爛。</p>
+<p>所以<strong>同一個接線錯誤</strong>：既讓 <code>生成圖片 Prompt</code> 拿不到週報內容，又跟 <code>文字生成</code> 併線造成重複發文。</p>
+<h3 id="修法-1"><a href="#修法-1" class="headerlink" title="修法"></a>修法</h3><p>問題一的串接修法，順便就解了問題二——<code>生成圖片 Prompt</code> 接在 <code>文字生成</code> 之後，<code>$json.text</code> 真的拿得到週報全文了。再把它的 prompt 強化（固定畫風關鍵字 <code>digital illustration, vibrant colors, no text, no logo</code>、排除人名品牌、加 SFW 防護）。</p>
+<blockquote>
+<p>教訓：兩個看起來無關的 bug，根因可能是同一個。先畫連線圖再動手。</p>
+</blockquote>
+<h2 id="插曲一：Blog-分支同天重跑撞名（422）"><a href="#插曲一：Blog-分支同天重跑撞名（422）" class="headerlink" title="插曲一：Blog 分支同天重跑撞名（422）"></a>插曲一：Blog 分支同天重跑撞名（422）</h2><p>修完去重跑驗證，Blog 那條噴 <code>422 Reference already exists</code>。</p>
+<p>根因：branch 名固定用 <code>weekly/&#123;&#123;yyyyMMdd&#125;&#125;</code>，同一天手動重跑就撞到自己上次建的 branch。正常每週排程日期不同不會撞，但測試時會。</p>
+<p>修法：</p>
+<ul>
+<li>branch 名改成 <code>weekly/&#123;&#123;yyyyMMdd-HHmmss&#125;&#125;</code>，同天重跑不撞</li>
+<li>後面 commit &#x2F; 開 PR 的節點，branch 改成<strong>讀「建 branch」實際回傳的 ref</strong>（<code>.ref.replace(&#39;refs/heads/&#39;,&#39;&#39;)</code>），保證三個節點用同一個名字，不會各自用 <code>$now</code> 重算而漂移</li>
+</ul>
+<h2 id="插曲二：4-個-RSS-來源讓整條鏈跑多次"><a href="#插曲二：4-個-RSS-來源讓整條鏈跑多次" class="headerlink" title="插曲二：4 個 RSS 來源讓整條鏈跑多次"></a>插曲二：4 個 RSS 來源讓整條鏈跑多次</h2><p>上線後跑了一次排程，GitHub 吐出 PR #65 和 PR #66——同一週跑出兩個週報 PR，IG 也連帶發了兩篇。</p>
+<p>根因跟問題一其實是同一個模式：4 個 RSS 來源（Theverge、OpenAI、Google AI、Hackernews）各自直接連到 Filter 的 input 0，n8n 把每條來源視為獨立執行分支，Filter → Edit Fields → Aggregate 以下的整條鏈跑了 4 次，GitHub Create PR 就出現了 4 次（有的因 branch 撞名被 422 擋掉，但 IG 發文的那幾次成功了）。</p>
+<p>修法：在 4 個 RSS Read 之後加一個 <strong>Merge RSS 節點（append mode）</strong>，把 4 條分支匯聚成一條再進 Filter，確保下游只跑一次。</p>
+<figure class="highlight text"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">RSS×4 → Merge RSS（append）→ Filter → Edit Fields → Aggregate → ...</span><br></pre></td></tr></table></figure>
+
+<p>Merge 節點已加入，等下次排程（每週三）實際跑一次驗證。</p>
+<h2 id="大冒險：到底哪裡能免費生圖？"><a href="#大冒險：到底哪裡能免費生圖？" class="headerlink" title="大冒險：到底哪裡能免費生圖？"></a>大冒險：到底哪裡能免費生圖？</h2><p>IG 兩個原始 bug 修好上線了，但配圖來源出事——這段繞最久。</p>
+<p>關鍵限制：<strong>IG Graph API 是用「它自己的伺服器」去抓 <code>image_url</code></strong>。所以不管我這邊怎麼生圖，只要那個 URL 被擋，IG 就抓不到。</p>
+<table>
+<thead>
+<tr>
+<th>來源</th>
+<th>結果</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>Pollinations 匿名</td>
+<td><strong>402</strong> Payment Required。它改政策了：匿名並發限 1，超過就回 JSON 錯誤（還夾帶 x402 加密貨幣付款，要付 USDC 繞過）</td>
+</tr>
+<tr>
+<td>Pollinations 註冊 token</td>
+<td>舊的 <code>auth.pollinations.ai</code> 網域<strong>已下線</strong>（DNS 查無），現行入口是付費 Console</td>
+</tr>
+<tr>
+<td>Gemini 圖片（我現有的 key）</td>
+<td><strong>429，free tier limit: 0</strong>。文字免費、圖片要開帳單付費層</td>
+</tr>
+<tr>
+<td>Replicate flux</td>
+<td>沒有正式免費額度，試用後<strong>要綁信用卡</strong>（約 $0.003&#x2F;張）</td>
+</tr>
+</tbody></table>
+<p>繞一圈結論：<strong>「真正免費、不綁卡、又能讓第三方抓圖」的組合幾乎絕跡。</strong></p>
+<h3 id="最終解：Cloudflare-Workers-AI-GitHub-托管-一圖共用"><a href="#最終解：Cloudflare-Workers-AI-GitHub-托管-一圖共用" class="headerlink" title="最終解：Cloudflare Workers AI + GitHub 托管 + 一圖共用"></a>最終解：Cloudflare Workers AI + GitHub 托管 + 一圖共用</h3><p>先講結論：用 <strong>Cloudflare Workers AI 的 <code>flux-1-schnell</code></strong> 生圖（免費、不綁卡），把圖 <strong>commit 進 Hexo repo</strong>，<strong>文章嵌入它、IG 也用同一張的 raw URL</strong>。</p>
+<p><strong>為什麼是 Cloudflare Workers AI</strong></p>
+<ul>
+<li>免費層每天 10,000 neurons，<strong>不用綁信用卡</strong>，只要免費 Cloudflare 帳號</li>
+<li>一週一張圖，額度永遠用不完 → 實質 $0</li>
+<li>實測 OK：回合法 1024×1024 JPEG（base64）</li>
+</ul>
+<p><strong>為什麼一定要自己托管圖（這步躲不掉）</strong></p>
+<p>IG 發「照片」貼文時，是給它一個<strong>公開 URL、它自己伺服器去抓</strong>——不能直接上傳圖片 bytes（只有 Reels／影片能 binary 上傳）。而 flux 回的是 bytes 不是 URL。所以中間一定要有個「把 bytes 變成公開 URL」的托管處。</p>
+<p>評估過 R2 &#x2F; GCS &#x2F; Imgur &#x2F; 備份 repo，最後選 <strong>Hexo 的 public repo</strong>：</p>
+<ul>
+<li>GitHub 憑證<strong>早就接在 n8n 裡</strong>、repo 又是 public → 零新帳號、零成本、IG 抓 <code>raw.githubusercontent.com</code> 很穩</li>
+<li>備份 repo 不能用（private + 內含明文 token，不能公開）</li>
+<li>巧合：flux 回 base64、GitHub Contents API 剛好也吃 base64，中間免轉檔</li>
+</ul>
+<p><strong>一圖共用（這次的重點設計）</strong></p>
+<p>原本 Blog 與 IG 是兩條平行分支。為了「文章嵌圖 + IG 用同一張」，把它們<strong>串成一條</strong>：生一次圖 → commit 到該週分支 → 文章 md 嵌入 <code>![](/images/...)</code> → IG 用同一張的 raw URL。一次生圖、零重複、圖也進了 blog。</p>
+<figure class="highlight text"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br></pre></td><td class="code"><pre><span class="line">Aggregate → Blog生成 → 文字生成 → 生成圖片Prompt → CF生圖(flux,base64)</span><br><span class="line">→ 取main SHA → 建分支(weekly/&lt;日期-時間&gt;) → 上傳圖到GitHub</span><br><span class="line">→ Blog建檔(嵌圖) → Blog Post → 開PR → IG準備發文(同一張raw URL) → Wait → IG發佈</span><br></pre></td></tr></table></figure>
+
+<p>代價：兩條從「獨立」變「耦合」（中間任一步失敗，後面不跑）。換來一圖共用。</p>
+<h3 id="接的時候又踩的坑"><a href="#接的時候又踩的坑" class="headerlink" title="接的時候又踩的坑"></a>接的時候又踩的坑</h3><ul>
+<li><strong>n8n Header Auth 憑證填錯欄位 → 401</strong>：<code>Name</code> 要填 <code>Authorization</code>（不是憑證用途名），<code>Value</code> 要 <code>Bearer &lt;token&gt;</code>（不是只貼 token）。</li>
+<li><strong>CLI import vs UI 編輯互相蓋</strong>：用 CLI 匯入改的是 DB，但若瀏覽器還開著舊畫布，一存就把匯入蓋掉。改之前先關掉所有編輯分頁、改完再 refresh。</li>
+<li><strong>Gemini 503 過載</strong>：<code>gemini-flash-latest</code> 遇大尖峰整個 workflow 掛。加 <code>retryOnFail</code>（4 次／5 秒）擋小尖峰；大範圍過載只能換模型（換成 <code>gemini-flash-lite-latest</code>）。已記成 backlog，想做「多模型自動 fallback」。</li>
+<li><strong>Blog CI 競態</strong>：repo 的 <code>ci.yml</code> 在 <code>pull_request</code> 也跑，會在 PR 的 detached HEAD 上把 <code>ncu -u</code> 結果推回 main → 必然 <code>! [rejected] (fetch first)</code>，每開一個週報 PR 就失敗一次。修法：拿掉 <code>pull_request</code> 觸發 + 加 <code>concurrency</code>。</li>
+</ul>
+<h2 id="小結"><a href="#小結" class="headerlink" title="小結"></a>小結</h2><ul>
+<li>兩個看似獨立的 bug（發兩篇、圖都動物），根因是<strong>同一條接錯的線</strong>。排查 n8n 先畫連線圖。</li>
+<li>n8n「同一輸入埠接多條線會重複觸發」，要合併分支用 Merge、別直接併線。</li>
+<li>跨節點共用的值（branch 名）<strong>算一次、其他節點引用</strong>，別各自 <code>$now</code> 重算。</li>
+<li>免費服務會退化：Pollinations 從「免簽免 key」變 402 + 加密付款；Gemini 圖片免費層 limit&#x3D;0。架構別把命脈押在單一免費服務上。</li>
+<li>IG 發照片<strong>一定要公開圖床</strong>（它自己抓 URL），逼你先想清楚托管在哪。</li>
+<li><strong>動手前先驗證</strong>（列得出模型 ≠ 生得出圖、free tier 可能 limit&#x3D;0），而且<strong>會花錢／動到別人系統的事先問過再做</strong>。</li>
+</ul>
+<p>（Merge RSS 節點已加，等下次排程實際跑過驗證。之後補上實際成品圖。）</p>
+<h2 id="參考"><a href="#參考" class="headerlink" title="參考"></a>參考</h2><ul>
+<li><a href="/2026/04/17/2026/n8n-1-in-gcp-free-tier-vm/">個人自動化平台(一) 用 GCP 免費 VM 跑 n8n</a></li>
+<li><a href="/2026/04/17/2026/n8n-2-cloudflared-and-tunnel/">個人自動化平台(二) Cloudflare Access &amp; Cloudflare Tunnel</a></li>
+<li><a href="/2026/04/20/2026/n8n-3-pipeline-overview/">個人自動化平台(三) 收集、處理、輸出：三層可插拔管道設計</a></li>
+<li><a href="/2026/04/18/2026/n8n-3.1-rebuild-infromation/">個人自動化平台(番外) 拆掉重建 GCP VM &amp; Cloudflared Tunnel &amp; Cloudflare Access</a></li>
+<li><a href="/2026/04/20/2026/n8n-4-pipeline-fetch/">個人自動化平台(四) n8n 實作：收集層，RSS 資料來源</a></li>
+<li><a href="/2026/04/27/2026/n8n-5-pipeline-process/">個人自動化平台(五) n8n 實作：處理層，Aggregate + Gemini 週報整理</a></li>
+<li><a href="/2026/04/22/2026/n8n-6-pipeline-output/">個人自動化平台(六) n8n 實作：輸出層，Instagram API 取得 Token 全記錄</a></li>
+<li><a href="/2026/04/27/2026/n8n-6.1-google-oauth-redirect-uri-debug/">個人自動化平台(番外) Google OAuth redirect_uri_mismatch 除錯記錄</a></li>
+<li><a href="/2026/04/30/2026/n8n-7-backup-automation/">個人自動化平台(七) n8n 自動備份：CLI export + git</a></li>
+<li><a href="/2026/05/29/2026/n8n-7.1-docker-update-on-gcp-vm/">個人自動化平台(番外) 更新自架在 GCP VM 上的 n8n（Docker 版）</a></li>
+</ul>
+<p>(fin)</p>
+
+      
+    </div>
+    <footer class="article-footer">
+      <a data-url="https://blog.marsen.me/2026/06/05/2026/n8n-ai-weekly-ig-debug-free-image-gen/" data-id="cuiduuBKGoJcbAH98ext2JbRP" class="article-share-link">Share</a>
+      
+        <a href="https://blog.marsen.me/2026/06/05/2026/n8n-ai-weekly-ig-debug-free-image-gen/#disqus_thread" class="article-comment-link">留言</a>
+      
+      
+  <ul class="article-tag-list" itemprop="keywords"><li class="article-tag-list-item"><a class="article-tag-list-link" href="/tags/%E5%AF%A6%E4%BD%9C%E7%AD%86%E8%A8%98/" rel="tag">實作筆記</a></li></ul>
+
+    </footer>
+  </div>
+  
+</article>
+
+
+  
+    <article id="post-2026/ai-weekly-20260605" class="article article-type-post" itemscope itemprop="blogPost">
+  <div class="article-meta">
+    <a href="/2026/06/04/2026/ai-weekly-20260605/" class="article-date">
+  <time datetime="2026-06-04T20:56:17.000Z" itemprop="datePublished">2026-06-05</time>
+</a>
+    
+  </div>
+  <div class="article-inner">
+    
+    
+      <header class="article-header">
+        
+  
+    <h1 itemprop="name">
+      <a class="article-title" href="/2026/06/04/2026/ai-weekly-20260605/">[AI生成] 20260605 科技周報</a>
+    </h1>
+  
+
+      </header>
+    
+    <div class="article-entry" itemprop="articleBody">
+      
+        <p><img src="/images/ai-weekly/20260605-045626.jpg" alt="AI 週報配圖"></p>
+<h2 id="本周要點"><a href="#本周要點" class="headerlink" title="本周要點"></a>本周要點</h2><ul>
+<li><a target="_blank" rel="noopener" href="https://openai.com/index/openai-frontier-models-and-codex-are-now-available-on-aws">OpenAI 前沿模型與 Codex 現已登陸 AWS</a>：OpenAI 宣布其前沿模型與 Codex 系列正式整合至 AWS 平台，協助企業開發者更高效地構建 AI 應用。 <a target="_blank" rel="noopener" href="https://openai.com/index/openai-frontier-models-and-codex-are-now-available-on-AWS">more</a></li>
+<li><a target="_blank" rel="noopener" href="https://openai.com/index/chatgpt-memory-dreaming">ChatGPT 的記憶優化計畫：Dreaming</a>：OpenAI 推出「Dreaming」機制，旨在強化 ChatGPT 的記憶功能，使其能更精準且具備連貫性地提供使用者所需的協助。 <a target="_blank" rel="noopener" href="https://openai.com/index/chatgpt-memory-dreaming">more</a></li>
+<li><a target="_blank" rel="noopener" href="https://openai.com/index/frontier-safety-blueprint">為前沿 AI 建立民主化治理藍圖</a>：OpenAI 提出一套關於前沿 AI 治理的藍圖，強調在發展尖端技術的同時，必須確保其安全性、透明度與全球性的民主參與。 <a target="_blank" rel="noopener" href="https://openai.com/index/frontier-safety-blueprint">more</a></li>
+<li><a target="_blank" rel="noopener" href="https://openai.com/index/stargate-michigan-data-center">在密西根州構建智慧時代的基礎設施</a>：OpenAI 宣布將在密西根州建立大型數據中心項目 Stargate，為 AI 運算需求提供強大的硬體支持。 <a target="_blank" rel="noopener" href="https://openai.com/index/stargate-michigan-data-center">more</a></li>
+<li><a target="_blank" rel="noopener" href="https://openai.com/index/endava-frontiers">Endava 如何圍繞 AI Agents 重塑軟體交付</a>：Endava 透過引入 AI Agents 技術，徹底改變了傳統軟體開發與交付的流程，大幅提升了開發效率。 <a target="_blank" rel="noopener" href="https://openai.com/index/endava-frontiers">more</a></li>
+<li><a target="_blank" rel="noopener" href="https://openai.com/index/boston-childrens-hospital">波士頓兒童醫院利用 AI 開啟新的診斷路徑</a>：波士頓兒童醫院正應用 OpenAI 的技術輔助醫師進行複雜病例的診斷，為醫療領域帶來了新的突破。 <a target="_blank" rel="noopener" href="https://openai.com/index/boston-childrens-hospital">more</a></li>
+<li><a target="_blank" rel="noopener" href="https://openai.com/index/travelers">Travelers 保險公司在全國範圍部署 AI 理賠系統</a>：保險巨頭 Travelers 與 OpenAI 合作，全面部署 AI 驅動的理賠處理流程，顯著縮短了客戶等待時間。 <a target="_blank" rel="noopener" href="https://openai.com/index/travelers">more</a></li>
+</ul>
+<h2 id="其他訊息"><a href="#其他訊息" class="headerlink" title="其他訊息"></a>其他訊息</h2><ul>
+<li><a target="_blank" rel="noopener" href="https://openai.com/index/biodefense-in-the-intelligence-age">智慧時代的生物防禦</a></li>
+<li><a target="_blank" rel="noopener" href="https://openai.com/index/introducing-new-capabilities-to-gpt-rosalind">為 GPT-Rosalind 引入全新能力</a></li>
+<li><a target="_blank" rel="noopener" href="https://openai.com/index/wasmer">Wasmer 如何利用 Codex 建構 Edge 端的 Node.js 運行時</a></li>
+<li><a target="_blank" rel="noopener" href="https://openai.com/index/public-policy-agenda">OpenAI 公共政策議程</a></li>
+<li><a target="_blank" rel="noopener" href="https://openai.com/index/codex-for-every-role-tool-workflow">Codex 適用於所有職位、工具與工作流</a></li>
+<li><a target="_blank" rel="noopener" href="https://openai.com/index/advancing-youth-safety-and-opportunity-through-global-leadership">透過全球領導力推動青年安全與機遇</a></li>
+<li><a target="_blank" rel="noopener" href="https://openai.com/index/codex-for-knowledge-work">Codex 正成為全民生產力工具</a></li>
+<li><a target="_blank" rel="noopener" href="https://openai.com/index/our-views-on-ai-policy-and-political-advocacy">我們對 AI 政策與政治倡議的觀點</a></li>
+<li><a target="_blank" rel="noopener" href="https://openai.com/index/braintrust">Braintrust 如何利用 Codex 將客戶需求轉化為程式碼</a></li>
+</ul>
+<p>(fin)</p>
+
+      
+    </div>
+    <footer class="article-footer">
+      <a data-url="https://blog.marsen.me/2026/06/04/2026/ai-weekly-20260605/" data-id="cuid18102uD42DQuww4WgaCd-" class="article-share-link">Share</a>
+      
+        <a href="https://blog.marsen.me/2026/06/04/2026/ai-weekly-20260605/#disqus_thread" class="article-comment-link">留言</a>
+      
+      
+  <ul class="article-tag-list" itemprop="keywords"><li class="article-tag-list-item"><a class="article-tag-list-link" href="/tags/AI%E7%94%9F%E6%88%90/" rel="tag">AI生成</a></li></ul>
+
+    </footer>
+  </div>
+  
+</article>
+
+
+  
     <article id="post-2026/email-dns-audit-cleanup" class="article article-type-post" itemscope itemprop="blogPost">
   <div class="article-meta">
     <a href="/2026/06/03/2026/email-dns-audit-cleanup/" class="article-date">
@@ -235,7 +601,7 @@ j=d.createElement(s),dl=l!='dataLayer'?'&l='+l:'';j.async=true;j.src=
       
     </div>
     <footer class="article-footer">
-      <a data-url="https://blog.marsen.me/2026/06/03/2026/email-dns-audit-cleanup/" data-id="cuido7A6Ciun4TR1mqxF4mIMD" class="article-share-link">Share</a>
+      <a data-url="https://blog.marsen.me/2026/06/03/2026/email-dns-audit-cleanup/" data-id="cuidPAytZUWvToA5EnhIJberd" class="article-share-link">Share</a>
       
         <a href="https://blog.marsen.me/2026/06/03/2026/email-dns-audit-cleanup/#disqus_thread" class="article-comment-link">留言</a>
       
@@ -329,7 +695,7 @@ j=d.createElement(s),dl=l!='dataLayer'?'&l='+l:'';j.async=true;j.src=
       
     </div>
     <footer class="article-footer">
-      <a data-url="https://blog.marsen.me/2026/05/28/2026/n8n-7.1-docker-update-on-gcp-vm/" data-id="cuiducBSNsF2kRf2FXOPt116k" class="article-share-link">Share</a>
+      <a data-url="https://blog.marsen.me/2026/05/28/2026/n8n-7.1-docker-update-on-gcp-vm/" data-id="cuidvaGkpcuRXA_VwNlV2K2El" class="article-share-link">Share</a>
       
         <a href="https://blog.marsen.me/2026/05/28/2026/n8n-7.1-docker-update-on-gcp-vm/#disqus_thread" class="article-comment-link">留言</a>
       
@@ -414,7 +780,7 @@ j=d.createElement(s),dl=l!='dataLayer'?'&l='+l:'';j.async=true;j.src=
       
     </div>
     <footer class="article-footer">
-      <a data-url="https://blog.marsen.me/2026/05/21/2026/payment-gateway-prime-token-vs-mpg/" data-id="cuid-Zm6PMVrcJtRfJnEb9rvn" class="article-share-link">Share</a>
+      <a data-url="https://blog.marsen.me/2026/05/21/2026/payment-gateway-prime-token-vs-mpg/" data-id="cuid_ZFndueOhQssoFx3NNbeI" class="article-share-link">Share</a>
       
         <a href="https://blog.marsen.me/2026/05/21/2026/payment-gateway-prime-token-vs-mpg/#disqus_thread" class="article-comment-link">留言</a>
       
@@ -506,7 +872,7 @@ j=d.createElement(s),dl=l!='dataLayer'?'&l='+l:'';j.async=true;j.src=
       
     </div>
     <footer class="article-footer">
-      <a data-url="https://blog.marsen.me/2026/05/10/2026/github-project-skill-integration-auth/" data-id="cuidJqIH2DCLLfXXda00RwYev" class="article-share-link">Share</a>
+      <a data-url="https://blog.marsen.me/2026/05/10/2026/github-project-skill-integration-auth/" data-id="cuidhnyYjg6cH9Ve3p9OySLWX" class="article-share-link">Share</a>
       
         <a href="https://blog.marsen.me/2026/05/10/2026/github-project-skill-integration-auth/#disqus_thread" class="article-comment-link">留言</a>
       
@@ -627,7 +993,7 @@ j=d.createElement(s),dl=l!='dataLayer'?'&l='+l:'';j.async=true;j.src=
       
     </div>
     <footer class="article-footer">
-      <a data-url="https://blog.marsen.me/2026/05/06/2026/line-messaging-api-quota/" data-id="cuidxGYY1WwD1jU0s2iiwvB5f" class="article-share-link">Share</a>
+      <a data-url="https://blog.marsen.me/2026/05/06/2026/line-messaging-api-quota/" data-id="cuidNemO5sopFVP9zJq_U4YJd" class="article-share-link">Share</a>
       
         <a href="https://blog.marsen.me/2026/05/06/2026/line-messaging-api-quota/#disqus_thread" class="article-comment-link">留言</a>
       
@@ -682,7 +1048,7 @@ j=d.createElement(s),dl=l!='dataLayer'?'&l='+l:'';j.async=true;j.src=
       
     </div>
     <footer class="article-footer">
-      <a data-url="https://blog.marsen.me/2026/05/04/2026/ai-weekly-20260505/" data-id="cuidaPGtyOZfIOr0qhlwXWGjQ" class="article-share-link">Share</a>
+      <a data-url="https://blog.marsen.me/2026/05/04/2026/ai-weekly-20260505/" data-id="cuidiAqUSwbzvAr0qsKdiqzBz" class="article-share-link">Share</a>
       
         <a href="https://blog.marsen.me/2026/05/04/2026/ai-weekly-20260505/#disqus_thread" class="article-comment-link">留言</a>
       
@@ -737,341 +1103,12 @@ j=d.createElement(s),dl=l!='dataLayer'?'&l='+l:'';j.async=true;j.src=
       
     </div>
     <footer class="article-footer">
-      <a data-url="https://blog.marsen.me/2026/05/03/2026/ai-weekly-20260504/" data-id="cuidPMRkuCXT6Xip_XdX2q7vh" class="article-share-link">Share</a>
+      <a data-url="https://blog.marsen.me/2026/05/03/2026/ai-weekly-20260504/" data-id="cuidtn-wIK71YZKipqJxWRhl6" class="article-share-link">Share</a>
       
         <a href="https://blog.marsen.me/2026/05/03/2026/ai-weekly-20260504/#disqus_thread" class="article-comment-link">留言</a>
       
       
   <ul class="article-tag-list" itemprop="keywords"><li class="article-tag-list-item"><a class="article-tag-list-link" href="/tags/AI%E7%94%9F%E6%88%90/" rel="tag">AI生成</a></li></ul>
-
-    </footer>
-  </div>
-  
-</article>
-
-
-  
-    <article id="post-2026/ai-weekly-20260503" class="article article-type-post" itemscope itemprop="blogPost">
-  <div class="article-meta">
-    <a href="/2026/05/02/2026/ai-weekly-20260503/" class="article-date">
-  <time datetime="2026-05-02T15:20:23.000Z" itemprop="datePublished">2026-05-02</time>
-</a>
-    
-  </div>
-  <div class="article-inner">
-    
-    
-      <header class="article-header">
-        
-  
-    <h1 itemprop="name">
-      <a class="article-title" href="/2026/05/02/2026/ai-weekly-20260503/">[AI生成]20260502 周報</a>
-    </h1>
-  
-
-      </header>
-    
-    <div class="article-entry" itemprop="articleBody">
-      
-        <h2 id="本周要點"><a href="#本周要點" class="headerlink" title="本周要點"></a>本周要點</h2><ul>
-<li><a target="_blank" rel="noopener" href="https://www.briefs.co/news/uber-torches-entire-2026-ai-budget-on-claude-code-in-four-months/">Uber 在四個月內將 2026 年全年的 AI 預算花光在 Claude Code 上</a>：Uber 因過度使用 Claude Code 進行開發，僅花費四個月就耗盡了原定一整年的 AI 算力預算。</li>
-<li><a target="_blank" rel="noopener" href="https://semgrep.dev/blog/2026/malicious-dependency-in-pytorch-lightning-used-for-ai-training/">在 PyTorch Lightning AI 訓練函式庫中發現以「沙蟲（Shai-Hulud）」為名的惡意軟體</a>：研究人員在主流 AI 訓練工具中發現惡意依賴包，恐威脅開發者的開發環境安全。</li>
-<li><a target="_blank" rel="noopener" href="https://deepmind.google/research/publications/231971/">抽象謬誤：為什麼 AI 只能模擬而無法實例化意識</a>：DeepMind 發表論文探討 AI 與意識的本質區別，強調模擬智慧並不等同於擁有真實意識。</li>
-<li><a target="_blank" rel="noopener" href="https://www.promptarmor.com/resources/ramps-sheets-ai-exfiltrates-financials">Ramp 的 Sheets AI 洩漏財務數據</a>：安全研究指出 Ramp 整合的表格 AI 工具存在漏洞，可能導致敏感的企業財務資訊外流。</li>
-<li><a target="_blank" rel="noopener" href="https://www.bbc.com/news/articles/c5yerr4m1yno">Spotify 推出「已驗證」徽章以區分真人藝術家與 AI</a>：為了應對 AI 生成音樂的洪流，Spotify 開始標記真人歌手以保障創作者權益與聽眾辨識度。</li>
-<li><a target="_blank" rel="noopener" href="https://www.theverge.com/ai-artificial-intelligence/920401/gen-z-ai">年輕人使用 AI 的次數越多，就越討厭它</a>：最新調查顯示 Z 世代對 AI 的排斥感隨著使用頻率增加，反映出對生成內容質量的疲勞與擔憂。</li>
-<li><a target="_blank" rel="noopener" href="https://simonwillison.net/2026/Apr/30/zig-anti-ai/">Zig 專案對其反 AI 貢獻政策的合理解釋</a>：知名程式語言 Zig 團隊說明了為何禁止 AI 生成的程式碼貢獻，旨在維護程式碼庫的純淨與長期可維護性。</li>
-<li><a target="_blank" rel="noopener" href="https://www.dailygrail.com/2026/05/the-claude-delusion-richard-dawkins-believes-his-female-ai-chatbot-is-conscious/">Claude 幻覺：Richard Dawkins 認為他的 AI 聊天機器人具有意識</a>：演化生物學家 Richard Dawkins 聲稱他的 Claude 客製化機器人表現出了意識跡象，引發科學界與哲學界的激辯。</li>
-</ul>
-<h2 id="其他訊息"><a href="#其他訊息" class="headerlink" title="其他訊息"></a>其他訊息</h2><ul>
-<li><a target="_blank" rel="noopener" href="https://arxiv.org/abs/2509.00462">AI 自我偏好在演算法招聘中的應用：實證證據與洞察</a></li>
-<li><a target="_blank" rel="noopener" href="https://mljar.com/">Mljar Studio – 本地 AI 數據分析師，可將分析結果儲存為 Notebooks</a></li>
-<li><a target="_blank" rel="noopener" href="https://copilot.simplepdf.com/?share=a7d00ad073c75a75d493228e6ff7b11eb3f2d945b6175913e87898ec96ca8076&form=w9&lang=en">使用客戶端工具調用通過 AI 填充 PDF 表單</a></li>
-<li><a target="_blank" rel="noopener" href="https://github.com/lahfir/agent-desktop">Agent-desktop – 專為 AI Agent 設計的原生桌面自動化 CLI</a></li>
-<li><a target="_blank" rel="noopener" href="https://fusion.adam.new/install">AI CAD Harness</a></li>
-<li><a target="_blank" rel="noopener" href="https://californiawaterblog.com/2026/04/26/ai-water-use-distractions-and-lessons-for-california/">AI 的用水量比公眾想像的要少</a></li>
-<li><a target="_blank" rel="noopener" href="https://github.com/leox255/loopsy">Loopsy：讓不同機器上的終端與 AI Agent 溝通的方式</a></li>
-<li><a target="_blank" rel="noopener" href="https://datacenter.fm/">DataCenter.FM – 收錄 AI 泡沫環境音的背景噪音 App</a></li>
-<li><a target="_blank" rel="noopener" href="https://status.claude.com/incidents/2gf1jpyty350">Claude.ai 與 API 服務中斷通知（已修復）</a></li>
-<li><a target="_blank" rel="noopener" href="https://mikeoss.com/">Mike：開源法律 AI</a></li>
-<li><a target="_blank" rel="noopener" href="https://handyai.substack.com/p/your-ceo-is-suffering-from-ai-psychosis">你的執行長正患有 AI 精神官能症</a></li>
-<li><a target="_blank" rel="noopener" href="https://migrainebrain.bearblog.dev/people-who-dont-use-ai-will-be-left-behind/">「不用 AI 的人將會被拋在腦後」</a></li>
-</ul>
-<p>(fin)</p>
-
-      
-    </div>
-    <footer class="article-footer">
-      <a data-url="https://blog.marsen.me/2026/05/02/2026/ai-weekly-20260503/" data-id="cuidoCD1i-6bYFZKmXosd2aj2" class="article-share-link">Share</a>
-      
-        <a href="https://blog.marsen.me/2026/05/02/2026/ai-weekly-20260503/#disqus_thread" class="article-comment-link">留言</a>
-      
-      
-  <ul class="article-tag-list" itemprop="keywords"><li class="article-tag-list-item"><a class="article-tag-list-link" href="/tags/AI%E7%94%9F%E6%88%90/" rel="tag">AI生成</a></li></ul>
-
-    </footer>
-  </div>
-  
-</article>
-
-
-  
-    <article id="post-2026/n8n-7-backup-automation" class="article article-type-post" itemscope itemprop="blogPost">
-  <div class="article-meta">
-    <a href="/2026/04/29/2026/n8n-7-backup-automation/" class="article-date">
-  <time datetime="2026-04-29T19:08:11.000Z" itemprop="datePublished">2026-04-30</time>
-</a>
-    
-  </div>
-  <div class="article-inner">
-    
-    
-      <header class="article-header">
-        
-  
-    <h1 itemprop="name">
-      <a class="article-title" href="/2026/04/29/2026/n8n-7-backup-automation/">[實作筆記] 個人自動化平台(七) n8n 備份自動化：workflow + credentials → GitHub</a>
-    </h1>
-  
-
-      </header>
-    
-    <div class="article-entry" itemprop="articleBody">
-      
-        <h2 id="前情提要"><a href="#前情提要" class="headerlink" title="前情提要"></a>前情提要</h2><p>n8n 跑起來、workflow 也在跑了，下一個問題：掛掉怎麼辦？</p>
-<p>VM 重開機沒問題，但容器砍掉重建、或換 VM，workflow 和 credentials 就都要重設。<br>這篇記錄怎麼用 CLI export + git 做自動備份。</p>
-<hr>
-<h2 id="備份方案決策"><a href="#備份方案決策" class="headerlink" title="備份方案決策"></a>備份方案決策</h2><p>考慮過幾個方向：</p>
-<table>
-<thead>
-<tr>
-<th>方案</th>
-<th>問題</th>
-</tr>
-</thead>
-<tbody><tr>
-<td>備份整個 <code>.n8n</code> 目錄</td>
-<td>SQLite 每次執行都寫入，幾乎天天變動，太肥</td>
-</tr>
-<tr>
-<td>只備份 workflow JSON</td>
-<td>沒有 credentials 無法完整還原</td>
-</tr>
-<tr>
-<td>n8n Source Control（GitOps）</td>
-<td>Enterprise&#x2F;Business 付費功能，Community 版不支援</td>
-</tr>
-<tr>
-<td>CLI export workflow + credentials</td>
-<td>可行，輕量，Community 版都有</td>
-</tr>
-</tbody></table>
-<p>最終選 <strong>CLI export + GitHub private repo</strong>，搭配 cron job 每天自動跑。</p>
-<hr>
-<h2 id="架構"><a href="#架構" class="headerlink" title="架構"></a>架構</h2><figure class="highlight text"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br></pre></td><td class="code"><pre><span class="line">GCP VM（cron job 每天凌晨 3 點）</span><br><span class="line">  └─ docker exec n8n → export workflow + credentials JSON</span><br><span class="line">       └─ bind mount（/home/user/.n8n）</span><br><span class="line">            └─ 複製到 repo backup/YYYYMMDD-NNN/ → git commit + push → GitHub</span><br></pre></td></tr></table></figure>
-
-<p>每次跑都建立新的日期資料夾（<code>20260430-001</code>、<code>20260430-002</code>），保留最近 30 份，舊的自動刪除。就算刪了，git log 還是查得到歷史。</p>
-<hr>
-<h2 id="實作"><a href="#實作" class="headerlink" title="實作"></a>實作</h2><h3 id="Repo-結構"><a href="#Repo-結構" class="headerlink" title="Repo 結構"></a>Repo 結構</h3><figure class="highlight text"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br></pre></td><td class="code"><pre><span class="line">Marsen.Butler.n8n.Backup/</span><br><span class="line">├── README.md</span><br><span class="line">├── install.sh    ← 一次性安裝，設定 cron job</span><br><span class="line">├── backup.sh     ← 每次執行的備份邏輯</span><br><span class="line">└── backup/</span><br><span class="line">    └── 20260430-001/</span><br><span class="line">        ├── workflows/</span><br><span class="line">        └── credentials/</span><br></pre></td></tr></table></figure>
-
-<h3 id="backup-sh-核心邏輯"><a href="#backup-sh-核心邏輯" class="headerlink" title="backup.sh 核心邏輯"></a>backup.sh 核心邏輯</h3><figure class="highlight bash"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment"># container name 預設 n8n，可用環境變數覆蓋</span></span><br><span class="line">N8N_CONTAINER=<span class="string">&quot;<span class="variable">$&#123;N8N_CONTAINER:-n8n&#125;</span>&quot;</span></span><br><span class="line">KEEP_COUNT=<span class="string">&quot;<span class="variable">$&#123;KEEP_COUNT:-30&#125;</span>&quot;</span></span><br><span class="line"></span><br><span class="line"><span class="comment"># 產生日期流水號資料夾</span></span><br><span class="line">DATE_TAG=<span class="string">&quot;<span class="subst">$(date +%Y%m%d)</span>&quot;</span></span><br><span class="line">SERIAL=$(<span class="built_in">printf</span> <span class="string">&quot;%03d&quot;</span> $(( $(ls -d backup/<span class="variable">$&#123;DATE_TAG&#125;</span>-* <span class="number">2</span>&gt;/dev/null | wc -l) + <span class="number">1</span> )))</span><br><span class="line">BACKUP_DIR=<span class="string">&quot;backup/<span class="variable">$&#123;DATE_TAG&#125;</span>-<span class="variable">$&#123;SERIAL&#125;</span>&quot;</span></span><br><span class="line"></span><br><span class="line"><span class="comment"># 確認容器在跑，export，複製到 repo...</span></span><br><span class="line"></span><br><span class="line"><span class="comment"># 刪除舊備份（保留最近 KEEP_COUNT 份）</span></span><br><span class="line">TOTAL=$(<span class="built_in">ls</span> -d backup/[0-9]* 2&gt;/dev/null | <span class="built_in">wc</span> -l)</span><br><span class="line"><span class="keyword">if</span> [ <span class="string">&quot;<span class="variable">$TOTAL</span>&quot;</span> -gt <span class="string">&quot;<span class="variable">$KEEP_COUNT</span>&quot;</span> ]; <span class="keyword">then</span></span><br><span class="line">  <span class="built_in">ls</span> -d backup/[0-9]* | <span class="built_in">sort</span> | <span class="built_in">head</span> -n $(( TOTAL - KEEP_COUNT )) | xargs <span class="built_in">rm</span> -rf</span><br><span class="line"><span class="keyword">fi</span></span><br><span class="line"></span><br><span class="line"><span class="comment"># 每次都 commit</span></span><br><span class="line">git add backup/</span><br><span class="line">git commit -m <span class="string">&quot;backup <span class="variable">$&#123;DATE_TAG&#125;</span>-<span class="variable">$&#123;SERIAL&#125;</span>&quot;</span></span><br><span class="line">git push</span><br></pre></td></tr></table></figure>
-
-<p><code>docker inspect</code> 自動找 bind mount 路徑，不寫死，換 VM 也通用。</p>
-<h3 id="install-sh"><a href="#install-sh" class="headerlink" title="install.sh"></a>install.sh</h3><figure class="highlight bash"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment"># 設定每天凌晨 3 點執行</span></span><br><span class="line">CRON_JOB=<span class="string">&quot;0 3 * * * <span class="variable">$&#123;BACKUP_SCRIPT&#125;</span> &gt;&gt; /var/log/n8n-backup.log 2&gt;&amp;1&quot;</span></span><br><span class="line"></span><br><span class="line"><span class="comment"># 避免重複寫入</span></span><br><span class="line"><span class="keyword">if</span> crontab -l 2&gt;/dev/null | grep -q <span class="string">&quot;<span class="variable">$BACKUP_SCRIPT</span>&quot;</span>; <span class="keyword">then</span></span><br><span class="line">  <span class="built_in">echo</span> <span class="string">&quot;Cron job already exists, skipping.&quot;</span></span><br><span class="line"><span class="keyword">else</span></span><br><span class="line">  (crontab -l 2&gt;/dev/null; <span class="built_in">echo</span> <span class="string">&quot;<span class="variable">$CRON_JOB</span>&quot;</span>) | crontab -</span><br><span class="line"><span class="keyword">fi</span></span><br></pre></td></tr></table></figure>
-
-<hr>
-<h2 id="踩坑記錄"><a href="#踩坑記錄" class="headerlink" title="踩坑記錄"></a>踩坑記錄</h2><h3 id="git-clone-下來的腳本沒有執行權限"><a href="#git-clone-下來的腳本沒有執行權限" class="headerlink" title="git clone 下來的腳本沒有執行權限"></a>git clone 下來的腳本沒有執行權限</h3><p><code>git pull</code> 之後直接跑 <code>./backup.sh</code>，結果：</p>
-<figure class="highlight text"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">-bash: ./backup.sh: Permission denied</span><br></pre></td></tr></table></figure>
-
-<p>原因：git 預設不保留 <code>chmod +x</code>，clone 下來的檔案是 644。</p>
-<p>解法：用 <code>git update-index</code> 把執行權限記進 git：</p>
-<figure class="highlight bash"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br></pre></td><td class="code"><pre><span class="line">git update-index --<span class="built_in">chmod</span>=+x backup.sh install.sh</span><br><span class="line">git commit -m <span class="string">&quot;fix: preserve execute permission for scripts in git&quot;</span></span><br><span class="line">git push</span><br></pre></td></tr></table></figure>
-
-<p>之後 <code>git pull</code> 拿到的檔案就自帶執行權限，不需要手動 <code>chmod</code>。</p>
-<h3 id="Container-name-不應該硬綁定"><a href="#Container-name-不應該硬綁定" class="headerlink" title="Container name 不應該硬綁定"></a>Container name 不應該硬綁定</h3><p>一開始寫死 <code>N8N_CONTAINER=&quot;n8n&quot;</code>，但我的容器叫 <code>n8n-01</code>，直接報錯。</p>
-<p>改為環境變數覆蓋，預設值 <code>n8n</code>：</p>
-<figure class="highlight bash"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">N8N_CONTAINER=<span class="string">&quot;<span class="variable">$&#123;N8N_CONTAINER:-n8n&#125;</span>&quot;</span></span><br></pre></td></tr></table></figure>
-
-<p>臨時要換：<code>N8N_CONTAINER=n8n-01 ./backup.sh</code>，不需要改腳本。</p>
-<h3 id="備份會把-token-明文存進-git"><a href="#備份會把-token-明文存進-git" class="headerlink" title="備份會把 token 明文存進 git"></a>備份會把 token 明文存進 git</h3><p>備份的是 workflow JSON，而 workflow JSON 裡如果 token 是直接寫在節點裡，那備份就等於把 token 存進 git repo。</p>
-<p>用文字搜尋就找得到：</p>
-<figure class="highlight bash"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">grep -r <span class="string">&quot;access_token\|IGAA&quot;</span> backup/</span><br></pre></td></tr></table></figure>
-
-<h3 id="解法：改用-n8n-Credential-存-token"><a href="#解法：改用-n8n-Credential-存-token" class="headerlink" title="解法：改用 n8n Credential 存 token"></a>解法：改用 n8n Credential 存 token</h3><p>n8n 的 Credential 有獨立加密機制，workflow JSON 裡只會存 Credential 的 ID，不含實際值。這樣備份出來的 workflow 就不會洩漏 token。</p>
-<figure class="highlight text"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br></pre></td><td class="code"><pre><span class="line"># 不好（硬寫在節點）</span><br><span class="line">&quot;access_token&quot;: &quot;IGAAYLng3...&quot;</span><br><span class="line"></span><br><span class="line"># 好（引用 Credential）</span><br><span class="line">&quot;credentials&quot;: &#123; &quot;instagramOAuth2Api&quot;: &#123; &quot;id&quot;: &quot;xxx&quot;, &quot;name&quot;: &quot;IG&quot; &#125; &#125;</span><br></pre></td></tr></table></figure>
-
-<p>Credential 本身也可以 export 備份，但它是加密的（用 <code>N8N_ENCRYPTION_KEY</code>），只要 Key 沒洩漏，備份裡的 Credential 就是安全的。</p>
-<hr>
-<h2 id="VM-上安裝步驟"><a href="#VM-上安裝步驟" class="headerlink" title="VM 上安裝步驟"></a>VM 上安裝步驟</h2><figure class="highlight bash"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment"># 1. clone repo</span></span><br><span class="line">git <span class="built_in">clone</span> git@github.com:marsen/Marsen.Butler.n8n.Backup.git ~/n8n-backup</span><br><span class="line"></span><br><span class="line"><span class="comment"># 2. 安裝 cron job</span></span><br><span class="line"><span class="built_in">cd</span> ~/n8n-backup</span><br><span class="line">./install.sh</span><br><span class="line"></span><br><span class="line"><span class="comment"># 3. 手動跑一次確認</span></span><br><span class="line">./backup.sh</span><br></pre></td></tr></table></figure>
-
-<hr>
-<h2 id="還原"><a href="#還原" class="headerlink" title="還原"></a>還原</h2><h3 id="情境一：同-VM，換新容器"><a href="#情境一：同-VM，換新容器" class="headerlink" title="情境一：同 VM，換新容器"></a>情境一：同 VM，換新容器</h3><figure class="highlight bash"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br></pre></td><td class="code"><pre><span class="line">docker run -d \</span><br><span class="line">  --name n8n \</span><br><span class="line">  -e N8N_SECURE_COOKIE=<span class="literal">false</span> \</span><br><span class="line">  -v /home/user/.n8n:/home/node/.n8n \</span><br><span class="line">  -p 5678:5678 \</span><br><span class="line">  --restart unless-stopped \</span><br><span class="line">  docker.n8n.io/n8nio/n8n</span><br><span class="line"></span><br><span class="line"><span class="comment"># 取最新備份</span></span><br><span class="line">LATEST=$(<span class="built_in">ls</span> -d ~/n8n-backup/backup/[0-9]* | <span class="built_in">sort</span> | <span class="built_in">tail</span> -1)</span><br><span class="line"><span class="built_in">cp</span> -r <span class="string">&quot;<span class="variable">$&#123;LATEST&#125;</span>/workflows/.&quot;</span> /home/user/.n8n/exports/workflows/</span><br><span class="line"><span class="built_in">cp</span> -r <span class="string">&quot;<span class="variable">$&#123;LATEST&#125;</span>/credentials/.&quot;</span> /home/user/.n8n/exports/credentials/</span><br><span class="line">docker <span class="built_in">exec</span> n8n n8n import:workflow --separate --input=/home/node/.n8n/exports/workflows/</span><br><span class="line">docker <span class="built_in">exec</span> n8n n8n import:credentials --separate --input=/home/node/.n8n/exports/credentials/</span><br></pre></td></tr></table></figure>
-
-<h3 id="情境二：新-VM"><a href="#情境二：新-VM" class="headerlink" title="情境二：新 VM"></a>情境二：新 VM</h3><p>從密碼管理器取出 <code>N8N_ENCRYPTION_KEY</code>，啟動時帶入：</p>
-<figure class="highlight bash"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br></pre></td><td class="code"><pre><span class="line">docker run -d \</span><br><span class="line">  --name n8n \</span><br><span class="line">  -e N8N_ENCRYPTION_KEY=你的key \</span><br><span class="line">  -e N8N_SECURE_COOKIE=<span class="literal">false</span> \</span><br><span class="line">  -v /home/user/.n8n:/home/node/.n8n \</span><br><span class="line">  -p 5678:5678 \</span><br><span class="line">  --restart unless-stopped \</span><br><span class="line">  docker.n8n.io/n8nio/n8n</span><br></pre></td></tr></table></figure>
-
-<p>clone repo 並還原最新備份：</p>
-<figure class="highlight bash"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br></pre></td><td class="code"><pre><span class="line">git <span class="built_in">clone</span> git@github.com:marsen/Marsen.Butler.n8n.Backup.git ~/n8n-backup</span><br><span class="line">LATEST=$(<span class="built_in">ls</span> -d ~/n8n-backup/backup/[0-9]* | <span class="built_in">sort</span> | <span class="built_in">tail</span> -1)</span><br><span class="line"><span class="built_in">cp</span> -r <span class="string">&quot;<span class="variable">$&#123;LATEST&#125;</span>/workflows/.&quot;</span> /home/user/.n8n/exports/workflows/</span><br><span class="line"><span class="built_in">cp</span> -r <span class="string">&quot;<span class="variable">$&#123;LATEST&#125;</span>/credentials/.&quot;</span> /home/user/.n8n/exports/credentials/</span><br><span class="line">docker <span class="built_in">exec</span> n8n n8n import:workflow --separate --input=/home/node/.n8n/exports/workflows/</span><br><span class="line">docker <span class="built_in">exec</span> n8n n8n import:credentials --separate --input=/home/node/.n8n/exports/credentials/</span><br></pre></td></tr></table></figure>
-
-<blockquote>
-<p>Credentials 是用 <code>N8N_ENCRYPTION_KEY</code> 加密儲存，還原時必須用相同的 Key，否則全部無法解密。Key 存密碼管理器，不存 repo。</p>
-</blockquote>
-<hr>
-<h2 id="參考"><a href="#參考" class="headerlink" title="參考"></a>參考</h2><ul>
-<li><a href="/2026/04/17/2026/n8n-1-in-gcp-free-tier-vm/">個人自動化平台(一) 用 GCP 免費 VM 跑 n8n</a></li>
-<li><a href="/2026/04/17/2026/n8n-2-cloudflared-and-tunnel/">個人自動化平台(二) Cloudflare Access &amp; Cloudflare Tunnel</a></li>
-<li><a href="/2026/04/20/2026/n8n-3-pipeline-overview/">個人自動化平台(三) 收集、處理、輸出：三層可插拔管道設計</a></li>
-<li><a href="/2026/04/18/2026/n8n-3.1-rebuild-infromation/">個人自動化平台(番外) 拆掉重建 GCP VM &amp; Cloudflared Tunnel &amp; Cloudflare Access</a></li>
-<li><a href="/2026/04/20/2026/n8n-4-pipeline-fetch/">個人自動化平台(四) n8n 實作：收集層，RSS 資料來源</a></li>
-<li><a href="/2026/04/27/2026/n8n-5-pipeline-process/">個人自動化平台(五) n8n 實作：處理層，Aggregate + Gemini 週報整理</a></li>
-<li><a href="/2026/04/22/2026/n8n-6-pipeline-output/">個人自動化平台(六) n8n 實作：輸出層，Instagram API 取得 Token 全記錄</a></li>
-<li><a href="/2026/04/27/2026/n8n-6.1-google-oauth-redirect-uri-debug/">個人自動化平台(番外) Google OAuth redirect_uri_mismatch 除錯記錄</a></li>
-<li><a href="/2026/05/28/2026/n8n-7.1-docker-update-on-gcp-vm/">個人自動化平台(番外) 更新自架在 GCP VM 上的 n8n（Docker 版）</a></li>
-<li><a href="/2026/06/05/2026/n8n-ai-weekly-ig-debug-free-image-gen/">個人自動化平台(番外) n8n AI 週報踩坑記：一條接錯的線，與找免費生圖來源的旅程</a></li>
-</ul>
-<h2 id="小結"><a href="#小結" class="headerlink" title="小結"></a>小結</h2><ul>
-<li>CLI export 是 Community 版可用的最輕量備份方案</li>
-<li>每次建日期資料夾（<code>YYYYMMDD-NNN</code>），保留最近 30 份，超過自動 prune</li>
-<li>就算資料夾被刪，git log 還是查得到歷史</li>
-<li><code>git update-index --chmod=+x</code> 讓腳本執行權限跟著 repo 走</li>
-<li><code>N8N_CONTAINER</code> 環境變數讓腳本不寫死 container name</li>
-<li>還原關鍵：<code>N8N_ENCRYPTION_KEY</code> 要另外存好</li>
-</ul>
-<p>(fin)</p>
-
-      
-    </div>
-    <footer class="article-footer">
-      <a data-url="https://blog.marsen.me/2026/04/29/2026/n8n-7-backup-automation/" data-id="cuid3QsYXLr-98Yk1eSyVmp78" class="article-share-link">Share</a>
-      
-        <a href="https://blog.marsen.me/2026/04/29/2026/n8n-7-backup-automation/#disqus_thread" class="article-comment-link">留言</a>
-      
-      
-  <ul class="article-tag-list" itemprop="keywords"><li class="article-tag-list-item"><a class="article-tag-list-link" href="/tags/%E5%AF%A6%E4%BD%9C%E7%AD%86%E8%A8%98/" rel="tag">實作筆記</a></li></ul>
-
-    </footer>
-  </div>
-  
-</article>
-
-
-  
-    <article id="post-2026/interview-high-traffic-system-design" class="article article-type-post" itemscope itemprop="blogPost">
-  <div class="article-meta">
-    <a href="/2026/04/28/2026/interview-high-traffic-system-design/" class="article-date">
-  <time datetime="2026-04-28T09:01:57.000Z" itemprop="datePublished">2026-04-28</time>
-</a>
-    
-  </div>
-  <div class="article-inner">
-    
-    
-      <header class="article-header">
-        
-  
-    <h1 itemprop="name">
-      <a class="article-title" href="/2026/04/28/2026/interview-high-traffic-system-design/">[實作筆記] 技術面試 Q&amp;A：大流量電商系統設計實戰</a>
-    </h1>
-  
-
-      </header>
-    
-    <div class="article-entry" itemprop="articleBody">
-      
-        <h2 id="前情提要"><a href="#前情提要" class="headerlink" title="前情提要"></a>前情提要</h2><p>整理一次技術面試的對話紀錄，主題圍繞在大流量電商系統的設計與應變。</p>
-<p><strong>面試公司</strong>：H 社，北台灣，科技服務業，員工數十人。實際業務為線上遊戲平台的開發與維運；產品涵蓋自研遊戲、第三方遊戲接入，以及面向代理商與玩家的平台系統。整體採微服務架構，開發部門數十人，小組制運作。跨國營運，技術端設於台灣。</p>
-<p><strong>職位</strong>：後端為主的全端工程師，技術棧含 Node.js &#x2F; Go、現代前端框架、SQL &#x2F; NoSQL，要求具備架構設計與 CI&#x2F;CD 實務能力，並承擔技術指導職責。</p>
-<p>以下按主題整理成 Q&amp;A，並附上現代技術視角供參考。</p>
-<hr>
-<h2 id="大流量與快取架構"><a href="#大流量與快取架構" class="headerlink" title="大流量與快取架構"></a>大流量與快取架構</h2><p><strong>Q：電商搶購時流量瞬間暴增，怎麼擋？</strong></p>
-<p>先接受「讓使用者排隊，不讓網站 crash」這個前提，整個設計才會清楚。</p>
-<p>具體做法是多層 Cache 疊加：</p>
-<ul>
-<li><strong>前端</strong>：搶購期間關掉非核心的資訊（推薦、廣告等），減少後端壓力</li>
-<li><strong>後端第一層</strong>：庫存資料放 Redis</li>
-<li><strong>後端第二層</strong>：使用 MemoryCache（.NET 4.5&#x2F;4.6 內建）做本地快取</li>
-<li><strong>DB 層</strong>：DB 自身的查詢快取</li>
-</ul>
-<p>流量依序被每一層擋掉，真正打到 DB 的請求量才能控制住。</p>
-<p><strong>現代解法</strong>：Kubernetes + HPA（Horizontal Pod Autoscaler）根據 CPU &#x2F; Memory 自動擴縮容，不再需要預先備機和人工值班。Redis 依然是標準選擇，但搭配 Lua Script 或 WATCH&#x2F;MULTI&#x2F;EXEC 可更精確控制庫存的原子操作，避免超賣。</p>
-<hr>
-<p><strong>Q：那時候沒有 Kubernetes，怎麼做水平擴充？</strong></p>
-<p>用 VM 搭配手動的負載分流。備用機平時待機，搶購前預先準備好；緊急時把流量導過去。</p>
-<p>沒有自動 scale，所以需要人工值班監控——雙 11 期間三班制，值班加 on-call 全員待命。</p>
-<p><strong>現代解法</strong>：Kubernetes 的 Deployment + HPA 讓水平擴充自動化，節省人力成本。搭配 Cluster Autoscaler，甚至連底層節點都能自動增減，不再需要預先開好備用機等待。</p>
-<hr>
-<h2 id="監控與事故應對"><a href="#監控與事故應對" class="headerlink" title="監控與事故應對"></a>監控與事故應對</h2><p><strong>Q：系統是 crash 了才知道，還是有提前預警？</strong></p>
-<p>有兩個觸發條件：</p>
-<ol>
-<li><strong>資源閾值警報</strong>：CPU 或 Memory 超過 80% 就通知，不等到崩潰</li>
-<li><strong>錯誤日誌頻率</strong>：同類型錯誤在短時間內高頻出現，自動告警</li>
-</ol>
-<p>這些監控都是自己開發的，那個年代沒有現成的 APM 工具可以直接套。</p>
-<p><strong>現代解法</strong>：Prometheus + Grafana 是現在的標準配置，幾乎不需要自己開發。資源閾值警報用 AlertManager 設定即可；錯誤頻率則可搭配 ELK Stack 或 Loki，對 log 做 rate 統計觸發告警。SaaS 選項如 Datadog、New Relic 更是開箱即用。</p>
-<hr>
-<p><strong>Q：真的發生過事故嗎？當下怎麼處理？</strong></p>
-<p>有發生過，包含主機掛掉切備用機、備用機跟著掛掉的連環情況。</p>
-<p>第一線的原則是：<strong>先讓系統回來，問題找根因可以之後再說</strong>。</p>
-<p>當下操作是執行預先備好的備案（切流量、重啟服務），同時通報讓有能力解決根本問題的人起來處理。</p>
-<p>事後改進：正式搶購活動前一定先壓測，模擬預估流量的 110%，只測核心購物流程，把能關的功能全部關掉。</p>
-<p><strong>現代解法</strong>：事故應對流程本身可以標準化為 <strong>Runbook</strong>，記錄每種已知情境的處置步驟，讓值班工程師不需要靠記憶應急。Kubernetes 搭配 liveness&#x2F;readiness probe 可自動偵測服務不健康並重啟，減少人工介入的時間窗口。壓測工具如 k6 或 Locust 可整合進 CI&#x2F;CD，讓每次上線前自動跑一輪基準測試。</p>
-<hr>
-<h2 id="金流系統設計"><a href="#金流系統設計" class="headerlink" title="金流系統設計"></a>金流系統設計</h2><p><strong>Q：對接多個金流廠商，程式碼怎麼不變成一團亂？</strong></p>
-<p>用 Strategy Pattern 的概念，把金流流程切成 Workflow。</p>
-<p>整個下單流程是一條工作站鍊：</p>
-<figure class="highlight text"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">商品計算（折扣、贈品）→ 訂單建立 → 金流付款</span><br></pre></td></tr></table></figure>
-
-<p>金流工作站本身的邏輯很薄：根據使用者選的付款方式，決定走哪個 Strategy。不同廠商（信用卡、超商取貨、銀行轉帳）各自封裝成獨立模組，主流程不在意裡面怎麼串接。</p>
-<p>新增金流廠商：加一個新模組，主流程不用改。</p>
-<p><strong>現代解法</strong>：這個架構今天依然適用，核心概念沒有過時。如果系統更大，可以把每個金流廠商拆成獨立的微服務，透過統一的 Payment Gateway API 對外暴露，主流程完全不感知廠商差異。設計模式上除了 Strategy，也可以考慮 Plugin Architecture，讓新廠商直接以套件形式掛入，不需要改動核心程式碼。</p>
-<hr>
-<p><strong>Q：訂單成立了，金流卻失敗，怎麼處理？</strong></p>
-<p>訂單成立和金流付款是兩個獨立的 Transaction。</p>
-<p>金流失敗不會 rollback 訂單，而是讓訂單保持「待付款」狀態，通知使用者重新付款或換付款方式。</p>
-<p>好處是：金流失敗是常見的可預期錯誤，這樣設計使用者體驗比較好，也避免訂單資料不一致。</p>
-<p><strong>現代解法</strong>：在微服務架構下，這個問題升級為<strong>分散式交易</strong>問題。現代標準解法是 <strong>Saga Pattern</strong>：每個步驟成功後發事件觸發下一步，失敗時執行 compensating transaction 回滾前面的狀態，整個流程不依賴跨服務的 ACID Transaction。Choreography Saga 適合步驟簡單的流程，Orchestration Saga 適合需要集中管控的複雜流程。</p>
-<hr>
-<h2 id="AI-與本地部署"><a href="#AI-與本地部署" class="headerlink" title="AI 與本地部署"></a>AI 與本地部署</h2><p><strong>Q：你做的法律 AI 系統，為什麼不用雲端大模型就好？</strong></p>
-<p>客戶是大型企業（Sony、政府機關、醫療機構），他們不願意把公司內部資料送上雲端。</p>
-<p>做法是把 AI 系統打包進實體機器，送進客戶的內網部署。功能類似 ChatGPT，但跑在客戶自己的機房裡。</p>
-<p>主要應用場景是：</p>
-<ol>
-<li><strong>RAG</strong>：上傳法律文件，AI 從裡面查詢相關資訊</li>
-<li><strong>專利風險分析</strong>：原本需要半年人工查詢各大專利資料庫，自動化後大幅縮短</li>
-</ol>
-<p><strong>現代工具</strong>：本地部署 AI 的技術棧已經成熟許多。<strong>Ollama</strong> 可以一鍵跑主流開源模型（Llama 3、Mistral 等），<strong>LlamaIndex</strong> 或 <strong>LangChain</strong> 提供 RAG pipeline 的標準建構塊，向量資料庫用 <strong>ChromaDB</strong>、<strong>Qdrant</strong> 或 <strong>Weaviate</strong> 都可以，整個 stack 都可以打包進客戶內網。對於需要更強模型的場景，也可以考慮 <strong>vLLM</strong> 搭配企業級 GPU，在不上雲的前提下跑到生產等級的推論效能。</p>
-<hr>
-<h2 id="關於-AI-對開發的影響"><a href="#關於-AI-對開發的影響" class="headerlink" title="關於 AI 對開發的影響"></a>關於 AI 對開發的影響</h2><p><strong>Q：你覺得 AI 工具對軟體開發的影響是什麼？</strong></p>
-<p>一個工程師現在能產出的東西，可能相當於十年前一整個小團隊的產出。</p>
-<p>但這也帶來新的問題：程式碼產出速度快了，但架構決策、程式碼品質的門檻反而更重要。AI 可以快速生出大量程式碼，但如果架構設計不對，技術債也會累積得更快。</p>
-<p><strong>進一步的觀察</strong>：Coding style 和命名規範這類問題，現在完全可以交給 AI 處理——把 guideline 寫好，讓 AI 執行和稽核就好，不值得花人力在上面爭論。真正需要人把關的是 <strong>Domain 層和 Use Case 層的設計</strong>：商業邏輯有沒有被正確封裝？Unit Test 有沒有覆蓋核心行為？這兩層做對了，架構就不容易爛掉。六邊形架構（Hexagonal Architecture）或 Clean Architecture 在 AI 輔助開發的時代反而更值得落地，因為邊界清楚，AI 才不容易在錯誤的地方塞邏輯。</p>
-<hr>
-<h2 id="面試反思"><a href="#面試反思" class="headerlink" title="面試反思"></a>面試反思</h2><p><strong>用業界術語包裝已知的答案</strong></p>
-<p>描述分散式交易的處理方式時，邏輯是對的，但沒有說出 <strong>Saga Pattern</strong> 這個詞。面試官如果熟悉這個詞，會更快建立信心；說不出來反而讓人以為是靠直覺摸索，不是系統性的設計知識。同樣的，提到 Request ID 追蹤時，可以直接說 <strong>Distributed Tracing</strong>、<strong>OpenTelemetry</strong>，展示對現代標準的認識。術語不是裝飾，它是讓對方快速理解你程度的捷徑。</p>
-<p><strong>主動帶出現代解法</strong></p>
-<p>談電商 N 社那個年代的做法時，可以補一句「現在我會用 Kubernetes + HPA 處理這個問題」——展示持續學習的態度。技術知識有，但沒有主動說出來，廣度就沒有完整呈現。</p>
-<blockquote>
-<p>這兩點對應的技術題目值得另外整理成文章研究：Saga Pattern、Distributed Tracing、OpenTelemetry。</p>
-</blockquote>
-<hr>
-<h2 id="小結"><a href="#小結" class="headerlink" title="小結"></a>小結</h2><ul>
-<li>大流量不靠單一技術解決，是多層 Cache + 系統開關 + 人工值班的組合</li>
-<li>監控要在系統崩潰前就觸發，資源閾值和錯誤頻率是兩個實用的指標</li>
-<li>事故處理分兩階段：先讓系統回來，再找根因</li>
-<li>金流複雜性用 Strategy Pattern + Workflow 拆解，廠商細節封裝進模組</li>
-<li>本地 AI 部署是企業安全性需求的實際解法，不只是技術選擇</li>
-</ul>
-<p>(fin)</p>
-
-      
-    </div>
-    <footer class="article-footer">
-      <a data-url="https://blog.marsen.me/2026/04/28/2026/interview-high-traffic-system-design/" data-id="cuid9vovTaZIcRV7UwtIwHMUB" class="article-share-link">Share</a>
-      
-        <a href="https://blog.marsen.me/2026/04/28/2026/interview-high-traffic-system-design/#disqus_thread" class="article-comment-link">留言</a>
-      
-      
-  <ul class="article-tag-list" itemprop="keywords"><li class="article-tag-list-item"><a class="article-tag-list-link" href="/tags/%E5%AF%A6%E4%BD%9C%E7%AD%86%E8%A8%98/" rel="tag">實作筆記</a></li></ul>
 
     </footer>
   </div>
@@ -1104,15 +1141,15 @@ j=d.createElement(s),dl=l!='dataLayer'?'&l='+l:'';j.async=true;j.src=
           </li>
         
           <li>
+            <a href="/2026/07/26/2026/google-oauth-revoke-third-party-access/">[實作筆記] Google OAuth Refresh Token（三）：第三方應用權限撤銷入口與自動失效條件</a>
+          </li>
+        
+          <li>
             <a href="/2026/07/24/2026/ai-weekly-20260724/">[AI生成] 20260724 科技周報</a>
           </li>
         
           <li>
             <a href="/2026/07/17/2026/ai-weekly-20260717/">[AI生成] 20260717 科技周報</a>
-          </li>
-        
-          <li>
-            <a href="/2026/07/09/2026/llm-port-tool-calling-redesign/">[實作筆記] Tool Calling 是什麼：從一次介面改版學到的事</a>
           </li>
         
       </ul>
@@ -1124,7 +1161,7 @@ j=d.createElement(s),dl=l!='dataLayer'?'&l='+l:'';j.async=true;j.src=
   <div class="widget-wrap">
     <h3 class="widget-title">彙整</h3>
     <div class="widget">
-      <ul class="archive-list"><li class="archive-list-item"><a class="archive-list-link" href="/archives/2026/07/">七月 2026</a><span class="archive-list-count">6</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2026/06/">六月 2026</a><span class="archive-list-count">15</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2026/05/">五月 2026</a><span class="archive-list-count">7</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2026/04/">四月 2026</a><span class="archive-list-count">12</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2026/03/">三月 2026</a><span class="archive-list-count">5</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2026/02/">二月 2026</a><span class="archive-list-count">2</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2025/12/">十二月 2025</a><span class="archive-list-count">1</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2025/11/">十一月 2025</a><span class="archive-list-count">1</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2025/10/">十月 2025</a><span class="archive-list-count">2</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2025/09/">九月 2025</a><span class="archive-list-count">4</span></li><span id='list_archives2' style='display:none'><li class="archive-list-item"><a class="archive-list-link" href="/archives/2025/08/">八月 2025</a><span class="archive-list-count">3</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2025/07/">七月 2025</a><span class="archive-list-count">4</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2025/06/">六月 2025</a><span class="archive-list-count">4</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2025/05/">五月 2025</a><span class="archive-list-count">5</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2025/04/">四月 2025</a><span class="archive-list-count">1</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2025/03/">三月 2025</a><span class="archive-list-count">2</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2025/02/">二月 2025</a><span class="archive-list-count">4</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2025/01/">一月 2025</a><span class="archive-list-count">3</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2024/12/">十二月 2024</a><span class="archive-list-count">3</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2024/11/">十一月 2024</a><span class="archive-list-count">3</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2024/10/">十月 2024</a><span class="archive-list-count">4</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2024/09/">九月 2024</a><span class="archive-list-count">5</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2024/08/">八月 2024</a><span class="archive-list-count">4</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2024/07/">七月 2024</a><span class="archive-list-count">3</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2024/06/">六月 2024</a><span class="archive-list-count">2</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2024/05/">五月 2024</a><span class="archive-list-count">1</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2024/04/">四月 2024</a><span class="archive-list-count">2</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2024/03/">三月 2024</a><span class="archive-list-count">3</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2024/02/">二月 2024</a><span class="archive-list-count">2</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2024/01/">一月 2024</a><span class="archive-list-count">4</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2023/12/">十二月 2023</a><span class="archive-list-count">2</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2023/11/">十一月 2023</a><span class="archive-list-count">3</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2023/10/">十月 2023</a><span class="archive-list-count">2</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2023/09/">九月 2023</a><span class="archive-list-count">3</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2023/08/">八月 2023</a><span class="archive-list-count">2</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2023/07/">七月 2023</a><span class="archive-list-count">6</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2023/06/">六月 2023</a><span class="archive-list-count">6</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2023/05/">五月 2023</a><span class="archive-list-count">1</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2023/04/">四月 2023</a><span class="archive-list-count">10</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2023/03/">三月 2023</a><span class="archive-list-count">5</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2023/02/">二月 2023</a><span class="archive-list-count">2</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2023/01/">一月 2023</a><span class="archive-list-count">2</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2022/12/">十二月 2022</a><span class="archive-list-count">1</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2022/10/">十月 2022</a><span class="archive-list-count">2</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2022/09/">九月 2022</a><span class="archive-list-count">6</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2022/08/">八月 2022</a><span class="archive-list-count">3</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2022/07/">七月 2022</a><span class="archive-list-count">2</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2022/06/">六月 2022</a><span class="archive-list-count">3</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2022/05/">五月 2022</a><span class="archive-list-count">7</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2022/04/">四月 2022</a><span class="archive-list-count">3</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2022/03/">三月 2022</a><span class="archive-list-count">3</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2022/02/">二月 2022</a><span class="archive-list-count">2</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2022/01/">一月 2022</a><span class="archive-list-count">3</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2021/12/">十二月 2021</a><span class="archive-list-count">2</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2021/11/">十一月 2021</a><span class="archive-list-count">2</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2021/10/">十月 2021</a><span class="archive-list-count">2</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2021/09/">九月 2021</a><span class="archive-list-count">1</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2021/08/">八月 2021</a><span class="archive-list-count">2</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2021/07/">七月 2021</a><span class="archive-list-count">4</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2021/06/">六月 2021</a><span class="archive-list-count">1</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2021/05/">五月 2021</a><span class="archive-list-count">2</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2021/04/">四月 2021</a><span class="archive-list-count">3</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2021/03/">三月 2021</a><span class="archive-list-count">3</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2021/02/">二月 2021</a><span class="archive-list-count">1</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2021/01/">一月 2021</a><span class="archive-list-count">7</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2020/12/">十二月 2020</a><span class="archive-list-count">1</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2020/11/">十一月 2020</a><span class="archive-list-count">2</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2020/10/">十月 2020</a><span class="archive-list-count">5</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2020/09/">九月 2020</a><span class="archive-list-count">5</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2020/08/">八月 2020</a><span class="archive-list-count">2</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2020/07/">七月 2020</a><span class="archive-list-count">3</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2020/06/">六月 2020</a><span class="archive-list-count">3</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2020/05/">五月 2020</a><span class="archive-list-count">3</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2020/04/">四月 2020</a><span class="archive-list-count">4</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2020/03/">三月 2020</a><span class="archive-list-count">1</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2020/02/">二月 2020</a><span class="archive-list-count">1</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2020/01/">一月 2020</a><span class="archive-list-count">5</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2019/12/">十二月 2019</a><span class="archive-list-count">1</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2019/11/">十一月 2019</a><span class="archive-list-count">2</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2019/10/">十月 2019</a><span class="archive-list-count">1</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2019/09/">九月 2019</a><span class="archive-list-count">2</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2019/08/">八月 2019</a><span class="archive-list-count">5</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2019/07/">七月 2019</a><span class="archive-list-count">1</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2019/06/">六月 2019</a><span class="archive-list-count">1</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2019/05/">五月 2019</a><span class="archive-list-count">3</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2019/04/">四月 2019</a><span class="archive-list-count">3</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2019/03/">三月 2019</a><span class="archive-list-count">1</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2019/02/">二月 2019</a><span class="archive-list-count">3</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2019/01/">一月 2019</a><span class="archive-list-count">4</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2018/12/">十二月 2018</a><span class="archive-list-count">5</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2018/11/">十一月 2018</a><span class="archive-list-count">7</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2018/10/">十月 2018</a><span class="archive-list-count">6</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2018/09/">九月 2018</a><span class="archive-list-count">3</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2018/08/">八月 2018</a><span class="archive-list-count">2</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2018/07/">七月 2018</a><span class="archive-list-count">6</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2018/06/">六月 2018</a><span class="archive-list-count">2</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2018/05/">五月 2018</a><span class="archive-list-count">1</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2018/04/">四月 2018</a><span class="archive-list-count">5</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2018/03/">三月 2018</a><span class="archive-list-count">5</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2018/02/">二月 2018</a><span class="archive-list-count">1</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2018/01/">一月 2018</a><span class="archive-list-count">5</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2017/12/">十二月 2017</a><span class="archive-list-count">3</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2017/11/">十一月 2017</a><span class="archive-list-count">1</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2017/10/">十月 2017</a><span class="archive-list-count">3</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2017/09/">九月 2017</a><span class="archive-list-count">2</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2017/08/">八月 2017</a><span class="archive-list-count">1</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2017/07/">七月 2017</a><span class="archive-list-count">2</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2017/05/">五月 2017</a><span class="archive-list-count">1</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2017/04/">四月 2017</a><span class="archive-list-count">2</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2017/03/">三月 2017</a><span class="archive-list-count">1</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2017/02/">二月 2017</a><span class="archive-list-count">1</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2017/01/">一月 2017</a><span class="archive-list-count">6</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2016/12/">十二月 2016</a><span class="archive-list-count">1</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2016/11/">十一月 2016</a><span class="archive-list-count">3</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2016/10/">十月 2016</a><span class="archive-list-count">4</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2016/09/">九月 2016</a><span class="archive-list-count">1</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2016/08/">八月 2016</a><span class="archive-list-count">6</span></li></span><span id=''></span><span onclick="var d=document.getElementById('list_archives2'); d.style.display===''?d.style='display:none':d.style=''">toggle...</span></ul>
+      <ul class="archive-list"><li class="archive-list-item"><a class="archive-list-link" href="/archives/2026/07/">七月 2026</a><span class="archive-list-count">9</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2026/06/">六月 2026</a><span class="archive-list-count">15</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2026/05/">五月 2026</a><span class="archive-list-count">7</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2026/04/">四月 2026</a><span class="archive-list-count">12</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2026/03/">三月 2026</a><span class="archive-list-count">5</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2026/02/">二月 2026</a><span class="archive-list-count">2</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2025/12/">十二月 2025</a><span class="archive-list-count">1</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2025/11/">十一月 2025</a><span class="archive-list-count">1</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2025/10/">十月 2025</a><span class="archive-list-count">2</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2025/09/">九月 2025</a><span class="archive-list-count">4</span></li><span id='list_archives2' style='display:none'><li class="archive-list-item"><a class="archive-list-link" href="/archives/2025/08/">八月 2025</a><span class="archive-list-count">3</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2025/07/">七月 2025</a><span class="archive-list-count">4</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2025/06/">六月 2025</a><span class="archive-list-count">4</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2025/05/">五月 2025</a><span class="archive-list-count">5</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2025/04/">四月 2025</a><span class="archive-list-count">1</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2025/03/">三月 2025</a><span class="archive-list-count">2</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2025/02/">二月 2025</a><span class="archive-list-count">4</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2025/01/">一月 2025</a><span class="archive-list-count">3</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2024/12/">十二月 2024</a><span class="archive-list-count">3</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2024/11/">十一月 2024</a><span class="archive-list-count">3</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2024/10/">十月 2024</a><span class="archive-list-count">4</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2024/09/">九月 2024</a><span class="archive-list-count">5</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2024/08/">八月 2024</a><span class="archive-list-count">4</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2024/07/">七月 2024</a><span class="archive-list-count">3</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2024/06/">六月 2024</a><span class="archive-list-count">2</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2024/05/">五月 2024</a><span class="archive-list-count">1</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2024/04/">四月 2024</a><span class="archive-list-count">2</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2024/03/">三月 2024</a><span class="archive-list-count">3</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2024/02/">二月 2024</a><span class="archive-list-count">2</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2024/01/">一月 2024</a><span class="archive-list-count">4</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2023/12/">十二月 2023</a><span class="archive-list-count">2</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2023/11/">十一月 2023</a><span class="archive-list-count">3</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2023/10/">十月 2023</a><span class="archive-list-count">2</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2023/09/">九月 2023</a><span class="archive-list-count">3</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2023/08/">八月 2023</a><span class="archive-list-count">2</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2023/07/">七月 2023</a><span class="archive-list-count">6</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2023/06/">六月 2023</a><span class="archive-list-count">6</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2023/05/">五月 2023</a><span class="archive-list-count">1</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2023/04/">四月 2023</a><span class="archive-list-count">10</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2023/03/">三月 2023</a><span class="archive-list-count">5</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2023/02/">二月 2023</a><span class="archive-list-count">2</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2023/01/">一月 2023</a><span class="archive-list-count">2</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2022/12/">十二月 2022</a><span class="archive-list-count">1</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2022/10/">十月 2022</a><span class="archive-list-count">2</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2022/09/">九月 2022</a><span class="archive-list-count">6</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2022/08/">八月 2022</a><span class="archive-list-count">3</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2022/07/">七月 2022</a><span class="archive-list-count">2</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2022/06/">六月 2022</a><span class="archive-list-count">3</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2022/05/">五月 2022</a><span class="archive-list-count">7</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2022/04/">四月 2022</a><span class="archive-list-count">3</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2022/03/">三月 2022</a><span class="archive-list-count">3</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2022/02/">二月 2022</a><span class="archive-list-count">2</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2022/01/">一月 2022</a><span class="archive-list-count">3</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2021/12/">十二月 2021</a><span class="archive-list-count">2</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2021/11/">十一月 2021</a><span class="archive-list-count">2</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2021/10/">十月 2021</a><span class="archive-list-count">2</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2021/09/">九月 2021</a><span class="archive-list-count">1</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2021/08/">八月 2021</a><span class="archive-list-count">2</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2021/07/">七月 2021</a><span class="archive-list-count">4</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2021/06/">六月 2021</a><span class="archive-list-count">1</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2021/05/">五月 2021</a><span class="archive-list-count">2</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2021/04/">四月 2021</a><span class="archive-list-count">3</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2021/03/">三月 2021</a><span class="archive-list-count">3</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2021/02/">二月 2021</a><span class="archive-list-count">1</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2021/01/">一月 2021</a><span class="archive-list-count">7</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2020/12/">十二月 2020</a><span class="archive-list-count">1</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2020/11/">十一月 2020</a><span class="archive-list-count">2</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2020/10/">十月 2020</a><span class="archive-list-count">5</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2020/09/">九月 2020</a><span class="archive-list-count">5</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2020/08/">八月 2020</a><span class="archive-list-count">2</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2020/07/">七月 2020</a><span class="archive-list-count">3</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2020/06/">六月 2020</a><span class="archive-list-count">3</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2020/05/">五月 2020</a><span class="archive-list-count">3</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2020/04/">四月 2020</a><span class="archive-list-count">4</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2020/03/">三月 2020</a><span class="archive-list-count">1</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2020/02/">二月 2020</a><span class="archive-list-count">1</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2020/01/">一月 2020</a><span class="archive-list-count">5</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2019/12/">十二月 2019</a><span class="archive-list-count">1</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2019/11/">十一月 2019</a><span class="archive-list-count">2</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2019/10/">十月 2019</a><span class="archive-list-count">1</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2019/09/">九月 2019</a><span class="archive-list-count">2</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2019/08/">八月 2019</a><span class="archive-list-count">5</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2019/07/">七月 2019</a><span class="archive-list-count">1</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2019/06/">六月 2019</a><span class="archive-list-count">1</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2019/05/">五月 2019</a><span class="archive-list-count">3</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2019/04/">四月 2019</a><span class="archive-list-count">3</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2019/03/">三月 2019</a><span class="archive-list-count">1</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2019/02/">二月 2019</a><span class="archive-list-count">3</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2019/01/">一月 2019</a><span class="archive-list-count">4</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2018/12/">十二月 2018</a><span class="archive-list-count">5</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2018/11/">十一月 2018</a><span class="archive-list-count">7</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2018/10/">十月 2018</a><span class="archive-list-count">6</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2018/09/">九月 2018</a><span class="archive-list-count">3</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2018/08/">八月 2018</a><span class="archive-list-count">2</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2018/07/">七月 2018</a><span class="archive-list-count">6</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2018/06/">六月 2018</a><span class="archive-list-count">2</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2018/05/">五月 2018</a><span class="archive-list-count">1</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2018/04/">四月 2018</a><span class="archive-list-count">5</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2018/03/">三月 2018</a><span class="archive-list-count">5</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2018/02/">二月 2018</a><span class="archive-list-count">1</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2018/01/">一月 2018</a><span class="archive-list-count">5</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2017/12/">十二月 2017</a><span class="archive-list-count">3</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2017/11/">十一月 2017</a><span class="archive-list-count">1</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2017/10/">十月 2017</a><span class="archive-list-count">3</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2017/09/">九月 2017</a><span class="archive-list-count">2</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2017/08/">八月 2017</a><span class="archive-list-count">1</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2017/07/">七月 2017</a><span class="archive-list-count">2</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2017/05/">五月 2017</a><span class="archive-list-count">1</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2017/04/">四月 2017</a><span class="archive-list-count">2</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2017/03/">三月 2017</a><span class="archive-list-count">1</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2017/02/">二月 2017</a><span class="archive-list-count">1</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2017/01/">一月 2017</a><span class="archive-list-count">6</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2016/12/">十二月 2016</a><span class="archive-list-count">1</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2016/11/">十一月 2016</a><span class="archive-list-count">3</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2016/10/">十月 2016</a><span class="archive-list-count">4</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2016/09/">九月 2016</a><span class="archive-list-count">1</span></li><li class="archive-list-item"><a class="archive-list-link" href="/archives/2016/08/">八月 2016</a><span class="archive-list-count">6</span></li></span><span id=''></span><span onclick="var d=document.getElementById('list_archives2'); d.style.display===''?d.style='display:none':d.style=''">toggle...</span></ul>
     </div>
   </div>
 
@@ -1150,7 +1187,7 @@ This work is licensed under a
   <div class="widget-wrap">
     <h3 class="widget-title">標籤</h3>
     <div class="widget">
-      <ul class="tag-list" itemprop="keywords"><li class="tag-list-item"><a class="tag-list-link" href="/tags/Net-Framework/" rel="tag">.Net Framework</a><span class="tag-list-count">10</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/AI%E7%94%9F%E6%88%90/" rel="tag">AI生成</a><span class="tag-list-count">10</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/API/" rel="tag">API</a><span class="tag-list-count">3</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/ASP-NET/" rel="tag">ASP.NET</a><span class="tag-list-count">1</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/AWS/" rel="tag">AWS</a><span class="tag-list-count">7</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/Agile/" rel="tag">Agile</a><span class="tag-list-count">14</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/CI-CD/" rel="tag">CI&#x2F;CD</a><span class="tag-list-count">24</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/Cache/" rel="tag">Cache</a><span class="tag-list-count">1</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/Coding-Standard/" rel="tag">Coding Standard</a><span class="tag-list-count">1</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/Container/" rel="tag">Container</a><span class="tag-list-count">4</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/Database/" rel="tag">Database</a><span class="tag-list-count">6</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/Design-Pattern/" rel="tag">Design Pattern</a><span class="tag-list-count">2</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/Docker/" rel="tag">Docker</a><span class="tag-list-count">4</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/ESLint/" rel="tag">ESLint</a><span class="tag-list-count">1</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/Entity-Framework/" rel="tag">Entity Framework</a><span class="tag-list-count">2</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/Firebase/" rel="tag">Firebase</a><span class="tag-list-count">1</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/GCP/" rel="tag">GCP</a><span class="tag-list-count">1</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/Git/" rel="tag">Git</a><span class="tag-list-count">2</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/Golang/" rel="tag">Golang</a><span class="tag-list-count">3</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/Google/" rel="tag">Google</a><span class="tag-list-count">3</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/GulpJs/" rel="tag">GulpJs</a><span class="tag-list-count">2</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/HTTP/" rel="tag">HTTP</a><span class="tag-list-count">1</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/Hexo/" rel="tag">Hexo</a><span class="tag-list-count">10</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/IIS/" rel="tag">IIS</a><span class="tag-list-count">1</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/IO/" rel="tag">IO</a><span class="tag-list-count">1</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/Integrated-Testing/" rel="tag">Integrated Testing</a><span class="tag-list-count">1</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/Jenkins/" rel="tag">Jenkins</a><span class="tag-list-count">4</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/Kubernetes/" rel="tag">Kubernetes</a><span class="tag-list-count">1</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/Linux/" rel="tag">Linux</a><span class="tag-list-count">2</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/Mongodb/" rel="tag">Mongodb</a><span class="tag-list-count">1</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/MsSQL/" rel="tag">MsSQL</a><span class="tag-list-count">3</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/MsTest/" rel="tag">MsTest</a><span class="tag-list-count">1</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/Mutation-Testing/" rel="tag">Mutation Testing</a><span class="tag-list-count">1</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/Nodejs/" rel="tag">Nodejs</a><span class="tag-list-count">10</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/OAuth/" rel="tag">OAuth</a><span class="tag-list-count">1</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/OOP/" rel="tag">OOP</a><span class="tag-list-count">3</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/Openshift/" rel="tag">Openshift</a><span class="tag-list-count">2</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/PowerShell/" rel="tag">PowerShell</a><span class="tag-list-count">3</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/React/" rel="tag">React</a><span class="tag-list-count">5</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/Redis/" rel="tag">Redis</a><span class="tag-list-count">3</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/SQL/" rel="tag">SQL</a><span class="tag-list-count">4</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/Scrum/" rel="tag">Scrum</a><span class="tag-list-count">13</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/Shell/" rel="tag">Shell</a><span class="tag-list-count">2</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/Specflow/" rel="tag">Specflow</a><span class="tag-list-count">1</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/StyleCop/" rel="tag">StyleCop</a><span class="tag-list-count">1</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/TDD/" rel="tag">TDD</a><span class="tag-list-count">11</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/Testing/" rel="tag">Testing</a><span class="tag-list-count">8</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/Thread/" rel="tag">Thread</a><span class="tag-list-count">2</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/Trello/" rel="tag">Trello</a><span class="tag-list-count">1</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/TypeScript/" rel="tag">TypeScript</a><span class="tag-list-count">8</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/Unit-Testing/" rel="tag">Unit Testing</a><span class="tag-list-count">19</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/Unix/" rel="tag">Unix</a><span class="tag-list-count">2</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/Vim/" rel="tag">Vim</a><span class="tag-list-count">1</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/Visual-Studio/" rel="tag">Visual Studio</a><span class="tag-list-count">1</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/html/" rel="tag">html</a><span class="tag-list-count">1</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/post/" rel="tag">post</a><span class="tag-list-count">1</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/%E5%AD%B8%E7%BF%92%E7%AD%86%E8%A8%98/" rel="tag">學習筆記</a><span class="tag-list-count">16</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/%E5%AF%A6%E4%BD%9C%E7%AD%86%E8%A8%98/" rel="tag">實作筆記</a><span class="tag-list-count">164</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/%E5%B7%A5%E5%85%B7%E7%AD%86%E8%A8%98/" rel="tag">工具筆記</a><span class="tag-list-count">4</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/%E6%99%82%E9%96%93%E7%AE%A1%E7%90%86/" rel="tag">時間管理</a><span class="tag-list-count">2</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/%E6%B4%BB%E5%8B%95%E7%AD%86%E8%A8%98/" rel="tag">活動筆記</a><span class="tag-list-count">6</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/%E7%94%9F%E6%B4%BB%E7%AD%86%E8%A8%98/" rel="tag">生活筆記</a><span class="tag-list-count">15</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/%E7%94%A2%E6%A5%AD%E5%A0%B1%E5%91%8A/" rel="tag">產業報告</a><span class="tag-list-count">1</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/%E8%A8%98%E9%8C%84/" rel="tag">記錄</a><span class="tag-list-count">3</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/%E8%AE%80%E6%9B%B8%E7%AD%86%E8%A8%98/" rel="tag">讀書筆記</a><span class="tag-list-count">1</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/%E8%B8%A9%E9%9B%B7%E7%AD%86%E8%A8%98/" rel="tag">踩雷筆記</a><span class="tag-list-count">11</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/%E9%87%8D%E6%A7%8B/" rel="tag">重構</a><span class="tag-list-count">5</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/%E9%96%B1%E8%AE%80%E7%AD%86%E8%A8%98/" rel="tag">閱讀筆記</a><span class="tag-list-count">15</span></li></ul>
+      <ul class="tag-list" itemprop="keywords"><li class="tag-list-item"><a class="tag-list-link" href="/tags/Net-Framework/" rel="tag">.Net Framework</a><span class="tag-list-count">10</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/AI%E7%94%9F%E6%88%90/" rel="tag">AI生成</a><span class="tag-list-count">10</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/API/" rel="tag">API</a><span class="tag-list-count">3</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/ASP-NET/" rel="tag">ASP.NET</a><span class="tag-list-count">1</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/AWS/" rel="tag">AWS</a><span class="tag-list-count">7</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/Agile/" rel="tag">Agile</a><span class="tag-list-count">14</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/CI-CD/" rel="tag">CI&#x2F;CD</a><span class="tag-list-count">24</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/Cache/" rel="tag">Cache</a><span class="tag-list-count">1</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/Coding-Standard/" rel="tag">Coding Standard</a><span class="tag-list-count">1</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/Container/" rel="tag">Container</a><span class="tag-list-count">4</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/Database/" rel="tag">Database</a><span class="tag-list-count">6</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/Design-Pattern/" rel="tag">Design Pattern</a><span class="tag-list-count">2</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/Docker/" rel="tag">Docker</a><span class="tag-list-count">4</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/ESLint/" rel="tag">ESLint</a><span class="tag-list-count">1</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/Entity-Framework/" rel="tag">Entity Framework</a><span class="tag-list-count">2</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/Firebase/" rel="tag">Firebase</a><span class="tag-list-count">1</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/GCP/" rel="tag">GCP</a><span class="tag-list-count">1</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/Git/" rel="tag">Git</a><span class="tag-list-count">2</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/Golang/" rel="tag">Golang</a><span class="tag-list-count">3</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/Google/" rel="tag">Google</a><span class="tag-list-count">3</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/GulpJs/" rel="tag">GulpJs</a><span class="tag-list-count">2</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/HTTP/" rel="tag">HTTP</a><span class="tag-list-count">1</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/Hexo/" rel="tag">Hexo</a><span class="tag-list-count">10</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/IIS/" rel="tag">IIS</a><span class="tag-list-count">1</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/IO/" rel="tag">IO</a><span class="tag-list-count">1</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/Integrated-Testing/" rel="tag">Integrated Testing</a><span class="tag-list-count">1</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/Jenkins/" rel="tag">Jenkins</a><span class="tag-list-count">4</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/Kubernetes/" rel="tag">Kubernetes</a><span class="tag-list-count">1</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/Linux/" rel="tag">Linux</a><span class="tag-list-count">2</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/Mongodb/" rel="tag">Mongodb</a><span class="tag-list-count">1</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/MsSQL/" rel="tag">MsSQL</a><span class="tag-list-count">3</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/MsTest/" rel="tag">MsTest</a><span class="tag-list-count">1</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/Mutation-Testing/" rel="tag">Mutation Testing</a><span class="tag-list-count">1</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/Nodejs/" rel="tag">Nodejs</a><span class="tag-list-count">10</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/OAuth/" rel="tag">OAuth</a><span class="tag-list-count">1</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/OOP/" rel="tag">OOP</a><span class="tag-list-count">3</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/Openshift/" rel="tag">Openshift</a><span class="tag-list-count">2</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/PowerShell/" rel="tag">PowerShell</a><span class="tag-list-count">3</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/React/" rel="tag">React</a><span class="tag-list-count">5</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/Redis/" rel="tag">Redis</a><span class="tag-list-count">3</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/SQL/" rel="tag">SQL</a><span class="tag-list-count">4</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/Scrum/" rel="tag">Scrum</a><span class="tag-list-count">13</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/Shell/" rel="tag">Shell</a><span class="tag-list-count">2</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/Specflow/" rel="tag">Specflow</a><span class="tag-list-count">1</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/StyleCop/" rel="tag">StyleCop</a><span class="tag-list-count">1</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/TDD/" rel="tag">TDD</a><span class="tag-list-count">11</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/Testing/" rel="tag">Testing</a><span class="tag-list-count">8</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/Thread/" rel="tag">Thread</a><span class="tag-list-count">2</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/Trello/" rel="tag">Trello</a><span class="tag-list-count">1</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/TypeScript/" rel="tag">TypeScript</a><span class="tag-list-count">8</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/Unit-Testing/" rel="tag">Unit Testing</a><span class="tag-list-count">19</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/Unix/" rel="tag">Unix</a><span class="tag-list-count">2</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/Vim/" rel="tag">Vim</a><span class="tag-list-count">1</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/Visual-Studio/" rel="tag">Visual Studio</a><span class="tag-list-count">1</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/html/" rel="tag">html</a><span class="tag-list-count">1</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/post/" rel="tag">post</a><span class="tag-list-count">1</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/%E5%AD%B8%E7%BF%92%E7%AD%86%E8%A8%98/" rel="tag">學習筆記</a><span class="tag-list-count">16</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/%E5%AF%A6%E4%BD%9C%E7%AD%86%E8%A8%98/" rel="tag">實作筆記</a><span class="tag-list-count">167</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/%E5%B7%A5%E5%85%B7%E7%AD%86%E8%A8%98/" rel="tag">工具筆記</a><span class="tag-list-count">4</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/%E6%99%82%E9%96%93%E7%AE%A1%E7%90%86/" rel="tag">時間管理</a><span class="tag-list-count">2</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/%E6%B4%BB%E5%8B%95%E7%AD%86%E8%A8%98/" rel="tag">活動筆記</a><span class="tag-list-count">6</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/%E7%94%9F%E6%B4%BB%E7%AD%86%E8%A8%98/" rel="tag">生活筆記</a><span class="tag-list-count">15</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/%E7%94%A2%E6%A5%AD%E5%A0%B1%E5%91%8A/" rel="tag">產業報告</a><span class="tag-list-count">1</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/%E8%A8%98%E9%8C%84/" rel="tag">記錄</a><span class="tag-list-count">3</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/%E8%AE%80%E6%9B%B8%E7%AD%86%E8%A8%98/" rel="tag">讀書筆記</a><span class="tag-list-count">1</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/%E8%B8%A9%E9%9B%B7%E7%AD%86%E8%A8%98/" rel="tag">踩雷筆記</a><span class="tag-list-count">11</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/%E9%87%8D%E6%A7%8B/" rel="tag">重構</a><span class="tag-list-count">5</span></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/%E9%96%B1%E8%AE%80%E7%AD%86%E8%A8%98/" rel="tag">閱讀筆記</a><span class="tag-list-count">15</span></li></ul>
     </div>
   </div>
 
@@ -1212,20 +1249,12 @@ This work is licensed under a
 <script src="/js/script.js?v=0.js"></script>
 
 <div id="likecoin">
-Please enable JavaScript to view the LikeCoin. :P
+  <script type="text/javascript">
+    document.write(
+      "<iframe scrolling='no' frameborder='0' sandbox='allow-scripts allow-same-origin allow-popups allow-popups-to-escape-sandbox allow-storage-access-by-user-activation' style='height: 212px; width: 100%;' src='https://button.like.co/in/embed/marsenlin/button?referrer=" +
+      encodeURIComponent(location.href.split("?")[0].split("#")[0]) + "'></iframe>");
+  </script>
 </div>
-<script>
-
-  (function(){
-    var ifrm = document.createElement("iframe");
-    ifrm.setAttribute("src", "https://button.like.co/in/embed/marsenlin/button?referrer=undefined");      
-    ifrm.setAttribute("sandbox","allow-scripts allow-same-origin allow-popups allow-popups-to-escape-sandbox");
-    ifrm.frameborder = "0";
-    ifrm.scrolling = "no";
-    (document.getElementById("likecoin").replaceChild(ifrm, document.getElementById("likecoin").childNodes[0]));
-  })();
-
-</script>
 <script>
 
   var disqus_shortname = 'marsenlin';
